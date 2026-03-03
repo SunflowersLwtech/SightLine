@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520">
+  <defs>
+    <linearGradient id="memBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f0a2e"/>
+      <stop offset="100%" stop-color="#1a1145"/>
+    </linearGradient>
+    <linearGradient id="memHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+    <filter id="memShadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <rect width="960" height="520" fill="url(#memBg)" rx="8"/>
+
+  <!-- Title -->
+  <rect x="0" y="0" width="960" height="44" rx="8" fill="url(#memHeader)"/>
+  <text x="480" y="28" text-anchor="middle" font-family="'SF Pro Display','Inter',sans-serif" font-size="14" font-weight="700" fill="#e2e8f0" letter-spacing="3">CONTEXT ENGINE &amp; MEMORY ARCHITECTURE</text>
+
+  <!-- ═══════ THREE CONTEXT TIERS ═══════ -->
+  <text x="30" y="72" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#94a3b8" font-weight="600" letter-spacing="1.5">THREE-TIER CONTEXT MODEL</text>
+
+  <!-- Ephemeral -->
+  <g transform="translate(30, 85)" filter="url(#memShadow)">
+    <rect width="290" height="130" rx="8" fill="#111827" stroke="#4285f4" stroke-width="1"/>
+    <rect width="290" height="28" rx="8" fill="#1e3a5f"/>
+    <rect y="20" width="290" height="8" fill="#1e3a5f"/>
+    <text x="15" y="19" font-family="'SF Pro Text',sans-serif" font-size="10" font-weight="700" fill="#93c5fd">Ephemeral Context</text>
+    <text x="230" y="19" font-family="'Courier New',monospace" font-size="8" fill="#64748b">ms–seconds</text>
+
+    <text x="15" y="48" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Motion state + step cadence</text>
+    <text x="15" y="62" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ GPS · heading · altitude</text>
+    <text x="15" y="76" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Heart rate · SpO2 · noise dB</text>
+    <text x="15" y="90" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Weather · depth estimates</text>
+    <text x="15" y="104" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Watch (pitch/roll/yaw/stability)</text>
+    <text x="15" y="118" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">└ Time context (morning_commute...)</text>
+  </g>
+
+  <!-- Session -->
+  <g transform="translate(335, 85)" filter="url(#memShadow)">
+    <rect width="290" height="130" rx="8" fill="#111827" stroke="#34a853" stroke-width="1"/>
+    <rect width="290" height="28" rx="8" fill="#14532d"/>
+    <rect y="20" width="290" height="8" fill="#14532d"/>
+    <text x="15" y="19" font-family="'SF Pro Text',sans-serif" font-size="10" font-weight="700" fill="#6ee7b7">Session Context</text>
+    <text x="220" y="19" font-family="'Courier New',monospace" font-size="8" fill="#64748b">minutes–hours</text>
+
+    <text x="15" y="48" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Trip purpose + space type</text>
+    <text x="15" y="62" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Space transitions log</text>
+    <text x="15" y="76" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Conversation topics</text>
+    <text x="15" y="90" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Narrative snapshot (checkpoint)</text>
+    <text x="15" y="104" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Familiarity score</text>
+    <text x="15" y="118" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">└ Current LOD + activity state</text>
+  </g>
+
+  <!-- Persistent -->
+  <g transform="translate(640, 85)" filter="url(#memShadow)">
+    <rect width="290" height="130" rx="8" fill="#111827" stroke="#a78bfa" stroke-width="1"/>
+    <rect width="290" height="28" rx="8" fill="#3b0764"/>
+    <rect y="20" width="290" height="8" fill="#3b0764"/>
+    <text x="15" y="19" font-family="'SF Pro Text',sans-serif" font-size="10" font-weight="700" fill="#c4b5fd">Persistent Context</text>
+    <text x="218" y="19" font-family="'Courier New',monospace" font-size="8" fill="#64748b">days–forever</text>
+
+    <text x="15" y="48" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ User profile (vision, O&amp;M, language)</text>
+    <text x="15" y="62" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Face library (512-D embeddings)</text>
+    <text x="15" y="76" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Memory bank (2048-D vectors)</text>
+    <text x="15" y="90" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Entity graph (people/places)</text>
+    <text x="15" y="104" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">├ Scene patterns + habits</text>
+    <text x="15" y="118" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">└ Firestore + Vector Search</text>
+  </g>
+
+  <!-- ═══════ MEMORY BANK DETAIL ═══════ -->
+  <text x="30" y="242" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#94a3b8" font-weight="600" letter-spacing="1.5">MEMORY BANK · EMBEDDING-BASED RETRIEVAL</text>
+
+  <!-- Memory Layers -->
+  <g transform="translate(30, 255)" filter="url(#memShadow)">
+    <rect width="440" height="120" rx="8" fill="#111827" stroke="#06b6d4" stroke-width="1"/>
+    <text x="220" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#06b6d4" font-weight="700">Memory Layers (Exponential Decay)</text>
+
+    <!-- Episodic -->
+    <rect x="15" y="32" width="125" height="75" rx="5" fill="#0c1f3d" stroke="#4285f4" stroke-width="0.8"/>
+    <text x="77" y="50" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#4285f4" font-weight="600">Episodic</text>
+    <text x="77" y="64" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Half-life: 7 days</text>
+    <text x="77" y="78" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">"Saw parade on</text>
+    <text x="77" y="90" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b"> Main St Tuesday"</text>
+
+    <!-- Semantic -->
+    <rect x="155" y="32" width="125" height="75" rx="5" fill="#0c1f3d" stroke="#34a853" stroke-width="0.8"/>
+    <text x="217" y="50" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#34a853" font-weight="600">Semantic</text>
+    <text x="217" y="64" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Half-life: 90 days</text>
+    <text x="217" y="78" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">"Mom's name is</text>
+    <text x="217" y="90" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b"> Sarah, lives nearby"</text>
+
+    <!-- Procedural -->
+    <rect x="295" y="32" width="130" height="75" rx="5" fill="#0c1f3d" stroke="#a78bfa" stroke-width="0.8"/>
+    <text x="360" y="50" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#a78bfa" font-weight="600">Procedural</text>
+    <text x="360" y="64" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Half-life: 999 days</text>
+    <text x="360" y="78" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">"Prefers prices</text>
+    <text x="360" y="90" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b"> read at restaurants"</text>
+  </g>
+
+  <!-- Ranking System -->
+  <g transform="translate(490, 255)" filter="url(#memShadow)">
+    <rect width="440" height="120" rx="8" fill="#111827" stroke="#ec4899" stroke-width="1"/>
+    <text x="220" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#ec4899" font-weight="700">5-Dimensional Memory Ranking</text>
+
+    <g transform="translate(15, 32)">
+      <!-- Bars -->
+      <text x="0" y="10" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#94a3b8">Relevance</text>
+      <rect x="75" y="1" width="120" height="12" rx="3" fill="#0c1f3d"/>
+      <rect x="75" y="1" width="90" height="12" rx="3" fill="#4285f4" opacity="0.8"/>
+      <text x="200" y="11" font-family="'Courier New',monospace" font-size="7" fill="#4285f4">0.30</text>
+
+      <text x="0" y="27" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#94a3b8">Recency</text>
+      <rect x="75" y="18" width="120" height="12" rx="3" fill="#0c1f3d"/>
+      <rect x="75" y="18" width="60" height="12" rx="3" fill="#34a853" opacity="0.8"/>
+      <text x="200" y="28" font-family="'Courier New',monospace" font-size="7" fill="#34a853">0.20</text>
+
+      <text x="0" y="44" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#94a3b8">Location</text>
+      <rect x="75" y="35" width="120" height="12" rx="3" fill="#0c1f3d"/>
+      <rect x="75" y="35" width="60" height="12" rx="3" fill="#fbbc04" opacity="0.8"/>
+      <text x="200" y="45" font-family="'Courier New',monospace" font-size="7" fill="#fbbc04">0.20</text>
+
+      <text x="0" y="61" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#94a3b8">Importance</text>
+      <rect x="75" y="52" width="120" height="12" rx="3" fill="#0c1f3d"/>
+      <rect x="75" y="52" width="45" height="12" rx="3" fill="#ea4335" opacity="0.8"/>
+      <text x="200" y="62" font-family="'Courier New',monospace" font-size="7" fill="#ea4335">0.15</text>
+
+      <text x="0" y="78" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#94a3b8">Entity Overlap</text>
+      <rect x="75" y="69" width="120" height="12" rx="3" fill="#0c1f3d"/>
+      <rect x="75" y="69" width="45" height="12" rx="3" fill="#a78bfa" opacity="0.8"/>
+      <text x="200" y="79" font-family="'Courier New',monospace" font-size="7" fill="#a78bfa">0.15</text>
+    </g>
+
+    <text x="320" y="50" font-family="'Courier New',monospace" font-size="8" fill="#64748b">Embedding:</text>
+    <text x="320" y="65" font-family="'Courier New',monospace" font-size="9" fill="#ec4899" font-weight="600">gemini-embedding-001</text>
+    <text x="320" y="80" font-family="'Courier New',monospace" font-size="8" fill="#64748b">2048 dimensions</text>
+    <text x="320" y="95" font-family="'Courier New',monospace" font-size="8" fill="#64748b">Firestore Vector Search</text>
+  </g>
+
+  <!-- ═══════ ENTITY GRAPH + HABITS ═══════ -->
+  <text x="30" y="403" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#94a3b8" font-weight="600" letter-spacing="1.5">KNOWLEDGE GRAPH &amp; BEHAVIORAL PATTERNS</text>
+
+  <!-- Entity Graph -->
+  <g transform="translate(30, 415)" filter="url(#memShadow)">
+    <rect width="440" height="85" rx="8" fill="#111827" stroke="#f59e0b" stroke-width="1"/>
+    <text x="15" y="20" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#f59e0b" font-weight="700">Entity Graph (Firestore)</text>
+
+    <text x="15" y="40" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">Types: person · place · organization · event</text>
+    <text x="15" y="55" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">Relations: directed edges · 1-hop traversal</text>
+    <text x="15" y="70" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">Caps: 200 entities · 500 relations per user</text>
+
+    <!-- Mini graph illustration -->
+    <g transform="translate(330, 30)">
+      <circle cx="0" cy="0" r="8" fill="#4285f4" opacity="0.5"/>
+      <circle cx="50" cy="-15" r="8" fill="#34a853" opacity="0.5"/>
+      <circle cx="50" cy="15" r="8" fill="#ea4335" opacity="0.5"/>
+      <circle cx="90" cy="0" r="8" fill="#fbbc04" opacity="0.5"/>
+      <line x1="8" y1="-3" x2="42" y2="-13" stroke="#475569" stroke-width="0.8"/>
+      <line x1="8" y1="3" x2="42" y2="13" stroke="#475569" stroke-width="0.8"/>
+      <line x1="58" y1="-10" x2="82" y2="-3" stroke="#475569" stroke-width="0.8"/>
+      <line x1="58" y1="10" x2="82" y2="3" stroke="#475569" stroke-width="0.8"/>
+      <text x="0" y="22" text-anchor="middle" font-family="'Courier New',monospace" font-size="6" fill="#64748b">User</text>
+      <text x="50" y="-22" text-anchor="middle" font-family="'Courier New',monospace" font-size="6" fill="#64748b">Mom</text>
+      <text x="50" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="6" fill="#64748b">Cafe</text>
+      <text x="90" y="15" text-anchor="middle" font-family="'Courier New',monospace" font-size="6" fill="#64748b">Work</text>
+    </g>
+  </g>
+
+  <!-- Habit Detection -->
+  <g transform="translate(490, 415)" filter="url(#memShadow)">
+    <rect width="440" height="85" rx="8" fill="#111827" stroke="#10b981" stroke-width="1"/>
+    <text x="15" y="20" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#10b981" font-weight="700">Habit Detection + Proactive Hints</text>
+
+    <text x="15" y="40" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">Pattern mining from last 30 sessions</text>
+    <text x="15" y="55" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">Location habits · LOD preferences · Action patterns</text>
+    <text x="15" y="70" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">Scene matching (cosine &gt; 0.8) → warm-start LOD</text>
+
+    <!-- Mini habit icons -->
+    <g transform="translate(340, 35)">
+      <rect x="0" y="0" width="80" height="18" rx="9" fill="#10b981" opacity="0.15" stroke="#10b981" stroke-width="0.5"/>
+      <text x="40" y="12" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#6ee7b7">Mon 8am ☕</text>
+      <rect x="0" y="22" width="80" height="18" rx="9" fill="#10b981" opacity="0.15" stroke="#10b981" stroke-width="0.5"/>
+      <text x="40" y="34" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#6ee7b7">LOD 3 @ food</text>
+    </g>
+  </g>
+</svg>

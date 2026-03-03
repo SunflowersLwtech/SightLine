@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480">
+  <defs>
+    <linearGradient id="lodBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f0a2e"/>
+      <stop offset="100%" stop-color="#1a1145"/>
+    </linearGradient>
+    <linearGradient id="lodHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+    <filter id="lodShadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <rect width="960" height="480" fill="url(#lodBg)" rx="8"/>
+
+  <!-- Title -->
+  <rect x="0" y="0" width="960" height="44" rx="8" fill="url(#lodHeader)"/>
+  <text x="480" y="28" text-anchor="middle" font-family="'SF Pro Display','Inter',sans-serif" font-size="14" font-weight="700" fill="#e2e8f0" letter-spacing="3">ADAPTIVE LEVEL-OF-DETAIL (LOD) ENGINE</text>
+
+  <!-- Subtitle -->
+  <text x="480" y="70" text-anchor="middle" font-family="'Georgia',serif" font-size="11" fill="#64748b" font-style="italic">"Speech has a cost — only speak when the value exceeds the user's cognitive load"</text>
+
+  <!-- Three LOD Level Cards -->
+  <!-- LOD 1 -->
+  <g transform="translate(30, 90)" filter="url(#lodShadow)">
+    <rect width="280" height="150" rx="8" fill="#111827" stroke="#dc2626" stroke-width="1.5"/>
+    <rect width="280" height="30" rx="8" fill="#7f1d1d"/>
+    <rect y="22" width="280" height="8" fill="#7f1d1d"/>
+    <circle cx="18" cy="15" r="6" fill="#dc2626"/>
+    <text x="32" y="19" font-family="'SF Pro Text',sans-serif" font-size="11" font-weight="700" fill="#fca5a5">LOD 1 · SAFETY</text>
+
+    <text x="15" y="50" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Trigger:</text>
+    <text x="70" y="50" font-family="'Courier New',monospace" font-size="8" fill="#f87171">Running · Cycling · Low Signal</text>
+
+    <text x="15" y="68" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Camera:</text>
+    <text x="70" y="68" font-family="'Courier New',monospace" font-size="8" fill="#e2e8f0">1 FPS · Low resolution</text>
+
+    <text x="15" y="86" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Vision:</text>
+    <text x="70" y="86" font-family="'Courier New',monospace" font-size="8" fill="#e2e8f0">Hazards ONLY (~70 tokens)</text>
+
+    <text x="15" y="104" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Speech:</text>
+    <text x="70" y="104" font-family="'Courier New',monospace" font-size="8" fill="#e2e8f0">≤8 words per utterance</text>
+
+    <text x="15" y="122" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Telemetry:</text>
+    <text x="70" y="122" font-family="'Courier New',monospace" font-size="8" fill="#e2e8f0">Every 3-4 seconds</text>
+
+    <text x="15" y="140" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Example:</text>
+    <text x="70" y="140" font-family="'Georgia',serif" font-size="8" fill="#fca5a5" font-style="italic">"Stairs ahead, 2 o'clock"</text>
+  </g>
+
+  <!-- LOD 2 -->
+  <g transform="translate(340, 90)" filter="url(#lodShadow)">
+    <rect width="280" height="150" rx="8" fill="#111827" stroke="#4285f4" stroke-width="1.5"/>
+    <rect width="280" height="30" rx="8" fill="#1e3a5f"/>
+    <rect y="22" width="280" height="8" fill="#1e3a5f"/>
+    <circle cx="18" cy="15" r="6" fill="#4285f4"/>
+    <text x="32" y="19" font-family="'SF Pro Text',sans-serif" font-size="11" font-weight="700" fill="#93c5fd">LOD 2 · BALANCED</text>
+
+    <text x="15" y="50" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Trigger:</text>
+    <text x="70" y="50" font-family="'Courier New',monospace" font-size="8" fill="#60a5fa">Walking · Normal activity</text>
+
+    <text x="15" y="68" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Camera:</text>
+    <text x="70" y="68" font-family="'Courier New',monospace" font-size="8" fill="#e2e8f0">1 FPS · Medium resolution</text>
+
+    <text x="15" y="86" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Vision:</text>
+    <text x="70" y="86" font-family="'Courier New',monospace" font-size="8" fill="#e2e8f0">Navigation (~560 tokens)</text>
+
+    <text x="15" y="104" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Speech:</text>
+    <text x="70" y="104" font-family="'Courier New',monospace" font-size="8" fill="#e2e8f0">≤20 words, contextual</text>
+
+    <text x="15" y="122" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Telemetry:</text>
+    <text x="70" y="122" font-family="'Courier New',monospace" font-size="8" fill="#e2e8f0">Every 2-3 seconds</text>
+
+    <text x="15" y="140" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Example:</text>
+    <text x="70" y="140" font-family="'Georgia',serif" font-size="8" fill="#93c5fd" font-style="italic">"Café entrance at 10, 3 steps up"</text>
+  </g>
+
+  <!-- LOD 3 -->
+  <g transform="translate(650, 90)" filter="url(#lodShadow)">
+    <rect width="280" height="150" rx="8" fill="#111827" stroke="#34a853" stroke-width="1.5"/>
+    <rect width="280" height="30" rx="8" fill="#14532d"/>
+    <rect y="22" width="280" height="8" fill="#14532d"/>
+    <circle cx="18" cy="15" r="6" fill="#34a853"/>
+    <text x="32" y="19" font-family="'SF Pro Text',sans-serif" font-size="11" font-weight="700" fill="#6ee7b7">LOD 3 · FULL DETAIL</text>
+
+    <text x="15" y="50" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Trigger:</text>
+    <text x="70" y="50" font-family="'Courier New',monospace" font-size="8" fill="#34d399">Stationary · New space</text>
+
+    <text x="15" y="68" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Camera:</text>
+    <text x="70" y="68" font-family="'Courier New',monospace" font-size="8" fill="#e2e8f0">0.5 FPS · High resolution</text>
+
+    <text x="15" y="86" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Vision:</text>
+    <text x="70" y="86" font-family="'Courier New',monospace" font-size="8" fill="#e2e8f0">Full narrative (~1120 tokens)</text>
+
+    <text x="15" y="104" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Speech:</text>
+    <text x="70" y="104" font-family="'Courier New',monospace" font-size="8" fill="#e2e8f0">≤40 words, rich context</text>
+
+    <text x="15" y="122" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Telemetry:</text>
+    <text x="70" y="122" font-family="'Courier New',monospace" font-size="8" fill="#e2e8f0">Every 5-10 seconds</text>
+
+    <text x="15" y="140" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#94a3b8" font-weight="600">Example:</text>
+    <text x="70" y="140" font-family="'Georgia',serif" font-size="8" fill="#6ee7b7" font-style="italic">"Italian restaurant, warm lights, 4 tables..."</text>
+  </g>
+
+  <!-- Decision Inputs Section -->
+  <text x="30" y="268" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#94a3b8" font-weight="600" letter-spacing="1.5">DECISION INPUTS</text>
+
+  <!-- Input factors -->
+  <g transform="translate(30, 280)">
+    <!-- Row 1 -->
+    <g>
+      <rect width="140" height="36" rx="5" fill="#0c1f3d" stroke="#4285f4" stroke-width="0.8"/>
+      <text x="70" y="16" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#4285f4" font-weight="600">Motion State</text>
+      <text x="70" y="28" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">walk · run · cycle · still</text>
+    </g>
+    <g transform="translate(150, 0)">
+      <rect width="140" height="36" rx="5" fill="#0c1f3d" stroke="#34a853" stroke-width="0.8"/>
+      <text x="70" y="16" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#34a853" font-weight="600">Ambient Noise</text>
+      <text x="70" y="28" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">&gt;75dB → penalty</text>
+    </g>
+    <g transform="translate(300, 0)">
+      <rect width="140" height="36" rx="5" fill="#0c1f3d" stroke="#fbbc04" stroke-width="0.8"/>
+      <text x="70" y="16" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#fbbc04" font-weight="600">Space Transition</text>
+      <text x="70" y="28" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">new place → LOD 3 boost</text>
+    </g>
+    <g transform="translate(450, 0)">
+      <rect width="140" height="36" rx="5" fill="#0c1f3d" stroke="#ea4335" stroke-width="0.8"/>
+      <text x="70" y="16" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#ea4335" font-weight="600">Heart Rate</text>
+      <text x="70" y="28" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">&gt;120BPM → immediate</text>
+    </g>
+    <g transform="translate(600, 0)">
+      <rect width="140" height="36" rx="5" fill="#0c1f3d" stroke="#a78bfa" stroke-width="0.8"/>
+      <text x="70" y="16" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#a78bfa" font-weight="600">User Preference</text>
+      <text x="70" y="28" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">concise · detailed</text>
+    </g>
+    <g transform="translate(750, 0)">
+      <rect width="140" height="36" rx="5" fill="#0c1f3d" stroke="#ec4899" stroke-width="0.8"/>
+      <text x="70" y="16" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#ec4899" font-weight="600">O&amp;M Level</text>
+      <text x="70" y="28" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">novice · intermediate · expert</text>
+    </g>
+  </g>
+
+  <!-- Arrows to Decision Engine -->
+  <g stroke="#475569" stroke-width="0.8">
+    <line x1="100" y1="322" x2="100" y2="340"/>
+    <line x1="250" y1="322" x2="250" y2="340"/>
+    <line x1="400" y1="322" x2="400" y2="340"/>
+    <line x1="550" y1="322" x2="550" y2="340"/>
+    <line x1="700" y1="322" x2="700" y2="340"/>
+    <line x1="850" y1="322" x2="850" y2="340"/>
+  </g>
+
+  <!-- Decision Engine -->
+  <g transform="translate(30, 340)" filter="url(#lodShadow)">
+    <rect width="900" height="50" rx="8" fill="#1e1b4b" stroke="#7c3aed" stroke-width="1.5"/>
+    <text x="450" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="12" font-weight="700" fill="#c4b5fd">LOD Decision Engine</text>
+    <text x="450" y="38" text-anchor="middle" font-family="'Courier New',monospace" font-size="9" fill="#94a3b8">Rule-Based (&lt;1ms) + Optional LLM Micro-Adjustment (debounced 30s, ±1 range, 500ms timeout)</text>
+  </g>
+
+  <!-- Speech Cost Model -->
+  <g transform="translate(30, 405)" filter="url(#lodShadow)">
+    <rect width="900" height="55" rx="8" fill="#111827" stroke="#06b6d4" stroke-width="1"/>
+    <text x="18" y="22" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#06b6d4" font-weight="700">Speech Cost Model</text>
+    <text x="18" y="40" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">INFO_VALUE: navigation=8.0 · face=7.0 · spatial=5.0 · objects=3.0 · atmosphere=1.0</text>
+    <text x="650" y="22" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#64748b">Only vocalize when</text>
+    <text x="650" y="40" font-family="'Courier New',monospace" font-size="9" fill="#06b6d4" font-weight="600">info_value &gt; BASE_THRESHOLD (3.5)</text>
+  </g>
+</svg>

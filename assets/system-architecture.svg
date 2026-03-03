@@ -1,0 +1,330 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 820">
+  <defs>
+    <linearGradient id="archBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f0a2e"/>
+      <stop offset="100%" stop-color="#1a1145"/>
+    </linearGradient>
+    <linearGradient id="headerBar" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+    <filter id="cardShadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.2"/>
+    </filter>
+    <filter id="glowBlue">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="820" fill="url(#archBg)" rx="8"/>
+
+  <!-- Title -->
+  <rect x="0" y="0" width="1100" height="48" rx="8" fill="url(#headerBar)"/>
+  <text x="550" y="31" text-anchor="middle" font-family="'SF Pro Display','Inter',sans-serif" font-size="16" font-weight="700" fill="#e2e8f0" letter-spacing="3">SYSTEM ARCHITECTURE</text>
+
+  <!-- ═══════════════ LAYER 1: CLIENT DEVICES ═══════════════ -->
+  <text x="40" y="82" font-family="'SF Pro Text','Inter',sans-serif" font-size="10" fill="#94a3b8" font-weight="600" letter-spacing="2">CLIENT LAYER</text>
+
+  <!-- iPhone Card -->
+  <g transform="translate(40, 95)" filter="url(#cardShadow)">
+    <rect width="480" height="190" rx="8" fill="#111827" stroke="#1e3a5f" stroke-width="1"/>
+    <rect width="480" height="32" rx="8" fill="#1e3a5f"/>
+    <rect y="24" width="480" height="8" fill="#1e3a5f"/>
+    <!-- Phone icon -->
+    <rect x="14" y="8" width="10" height="16" rx="2" fill="none" stroke="#4285f4" stroke-width="1.2"/>
+    <text x="32" y="22" font-family="'SF Pro Text','Inter',sans-serif" font-size="12" font-weight="700" fill="#e2e8f0">iPhone App (SwiftUI + UIKit)</text>
+
+    <!-- Sub-modules -->
+    <g transform="translate(15, 44)">
+      <!-- Camera -->
+      <rect width="100" height="50" rx="5" fill="#0c1f3d" stroke="#4285f4" stroke-width="0.8"/>
+      <text x="50" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#4285f4" font-weight="600">Camera</text>
+      <text x="50" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">768×768 JPEG</text>
+      <text x="50" y="40" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">LOD throttle</text>
+    </g>
+    <g transform="translate(125, 44)">
+      <!-- Audio -->
+      <rect width="100" height="50" rx="5" fill="#0c1f3d" stroke="#34a853" stroke-width="0.8"/>
+      <text x="50" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#34a853" font-weight="600">Audio Engine</text>
+      <text x="50" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">PCM 16kHz in</text>
+      <text x="50" y="40" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">24kHz out + AEC</text>
+    </g>
+    <g transform="translate(235, 44)">
+      <!-- Sensors -->
+      <rect width="100" height="50" rx="5" fill="#0c1f3d" stroke="#fbbc04" stroke-width="0.8"/>
+      <text x="50" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#fbbc04" font-weight="600">Sensors</text>
+      <text x="50" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">GPS · Compass</text>
+      <text x="50" y="40" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Motion · Weather</text>
+    </g>
+    <g transform="translate(345, 44)">
+      <!-- ML -->
+      <rect width="120" height="50" rx="5" fill="#0c1f3d" stroke="#ea4335" stroke-width="0.8"/>
+      <text x="60" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#ea4335" font-weight="600">On-Device ML</text>
+      <text x="60" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">DepthAnythingV2</text>
+      <text x="60" y="40" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Silero VAD (ONNX)</text>
+    </g>
+
+    <!-- Second row -->
+    <g transform="translate(15, 104)">
+      <rect width="220" height="40" rx="5" fill="#0c1f3d" stroke="#a78bfa" stroke-width="0.8"/>
+      <text x="110" y="17" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#a78bfa" font-weight="600">Gesture Recognition (6 patterns)</text>
+      <text x="110" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Tap · Double · Triple · LongPress · Swipe↑↓</text>
+    </g>
+    <g transform="translate(245, 104)">
+      <rect width="220" height="40" rx="5" fill="#0c1f3d" stroke="#ec4899" stroke-width="0.8"/>
+      <text x="110" y="17" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#ec4899" font-weight="600">Core Haptics + Accessibility</text>
+      <text x="110" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Obstacle · Direction · Object · VoiceOver</text>
+    </g>
+
+    <!-- LOD label -->
+    <rect x="170" y="150" width="140" height="24" rx="12" fill="#1e1b4b" stroke="#4fc3f7" stroke-width="0.8"/>
+    <text x="240" y="166" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#4fc3f7" font-weight="600">LOD 1 · 2 · 3 Adaptive</text>
+  </g>
+
+  <!-- Watch Card -->
+  <g transform="translate(560, 95)" filter="url(#cardShadow)">
+    <rect width="500" height="190" rx="8" fill="#111827" stroke="#1e3a5f" stroke-width="1"/>
+    <rect width="500" height="32" rx="8" fill="#1e3a5f"/>
+    <rect y="24" width="500" height="8" fill="#1e3a5f"/>
+    <!-- Watch icon -->
+    <rect x="14" y="10" width="12" height="12" rx="3" fill="none" stroke="#34a853" stroke-width="1.2"/>
+    <text x="34" y="22" font-family="'SF Pro Text','Inter',sans-serif" font-size="12" font-weight="700" fill="#e2e8f0">Apple Watch Companion (watchOS)</text>
+
+    <g transform="translate(15, 44)">
+      <rect width="145" height="50" rx="5" fill="#0c1f3d" stroke="#34a853" stroke-width="0.8"/>
+      <text x="72" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#34a853" font-weight="600">WorkoutManager</text>
+      <text x="72" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Heart Rate (1-5s)</text>
+      <text x="72" y="40" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">HKWorkoutSession</text>
+    </g>
+    <g transform="translate(170, 44)">
+      <rect width="145" height="50" rx="5" fill="#0c1f3d" stroke="#fbbc04" stroke-width="0.8"/>
+      <text x="72" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#fbbc04" font-weight="600">Motion (10 Hz)</text>
+      <text x="72" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Pitch · Roll · Yaw</text>
+      <text x="72" y="40" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Stability Score</text>
+    </g>
+    <g transform="translate(325, 44)">
+      <rect width="160" height="50" rx="5" fill="#0c1f3d" stroke="#a78bfa" stroke-width="0.8"/>
+      <text x="80" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#a78bfa" font-weight="600">Health Context</text>
+      <text x="80" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">SpO2 · Noise dB</text>
+      <text x="80" y="40" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Compass Heading</text>
+    </g>
+
+    <!-- WCSession bridge -->
+    <g transform="translate(120, 110)">
+      <rect width="260" height="35" rx="6" fill="#1e1b4b" stroke="#34a853" stroke-width="1"/>
+      <text x="130" y="15" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#6ee7b7" font-weight="600">WatchConnectivity (WCSession)</text>
+      <text x="130" y="27" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">sendMessage (realtime) · transferUserInfo (queued)</text>
+    </g>
+
+    <!-- Arrow to phone -->
+    <line x1="250" y1="155" x2="250" y2="170" stroke="#34a853" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="250" y="183" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#34a853">&lt;1s latency</text>
+  </g>
+
+  <!-- ═══════════════ CONNECTION ARROWS ═══════════════ -->
+  <!-- Phone to Server -->
+  <g>
+    <line x1="280" y1="295" x2="280" y2="335" stroke="#4285f4" stroke-width="2"/>
+    <polygon points="275,332 280,342 285,332" fill="#4285f4"/>
+    <text x="290" y="318" font-family="'Courier New',monospace" font-size="7" fill="#4fc3f7">WebSocket (Binary+JSON)</text>
+  </g>
+  <!-- Watch arrow -->
+  <path d="M810,285 L810,320 L360,320 L360,335" fill="none" stroke="#34a853" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- ═══════════════ LAYER 2: BACKEND ═══════════════ -->
+  <text x="40" y="358" font-family="'SF Pro Text','Inter',sans-serif" font-size="10" fill="#94a3b8" font-weight="600" letter-spacing="2">BACKEND LAYER  ·  GOOGLE CLOUD RUN</text>
+
+  <g transform="translate(40, 370)" filter="url(#cardShadow)">
+    <rect width="1020" height="240" rx="8" fill="#111827" stroke="#312e81" stroke-width="1"/>
+    <rect width="1020" height="32" rx="8" fill="#312e81"/>
+    <rect y="24" width="1020" height="8" fill="#312e81"/>
+    <text x="510" y="22" text-anchor="middle" font-family="'SF Pro Text','Inter',sans-serif" font-size="12" font-weight="700" fill="#e2e8f0">SightLine Backend · Python 3.12 · FastAPI · Google ADK</text>
+
+    <!-- Orchestrator -->
+    <g transform="translate(20, 45)">
+      <rect width="230" height="80" rx="6" fill="#0c1f3d" stroke="#4285f4" stroke-width="1"/>
+      <text x="115" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#4285f4" font-weight="700">Orchestrator Agent</text>
+      <text x="115" y="35" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">gemini-live-2.5-flash</text>
+      <text x="115" y="47" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">native-audio (Vertex AI)</text>
+      <text x="115" y="62" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#64748b">18 Function-Calling Tools</text>
+      <text x="115" y="74" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#64748b">Real-time Voice I/O</text>
+    </g>
+
+    <!-- Vision Agent -->
+    <g transform="translate(265, 45)">
+      <rect width="170" height="80" rx="6" fill="#0c1f3d" stroke="#34a853" stroke-width="1"/>
+      <text x="85" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#34a853" font-weight="700">Vision Agent</text>
+      <text x="85" y="35" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">gemini-3.1-pro</text>
+      <text x="85" y="47" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">-preview</text>
+      <text x="85" y="62" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#64748b">Async Scene Analysis</text>
+      <text x="85" y="74" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#64748b">LOD-Adaptive Detail</text>
+    </g>
+
+    <!-- OCR Agent -->
+    <g transform="translate(450, 45)">
+      <rect width="150" height="80" rx="6" fill="#0c1f3d" stroke="#fbbc04" stroke-width="1"/>
+      <text x="75" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#fbbc04" font-weight="700">OCR Agent</text>
+      <text x="75" y="35" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">gemini-3-flash</text>
+      <text x="75" y="47" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">-preview</text>
+      <text x="75" y="62" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#64748b">Text Extraction</text>
+      <text x="75" y="74" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#64748b">Safety Detection</text>
+    </g>
+
+    <!-- Face Agent -->
+    <g transform="translate(615, 45)">
+      <rect width="170" height="80" rx="6" fill="#0c1f3d" stroke="#ea4335" stroke-width="1"/>
+      <text x="85" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#ea4335" font-weight="700">Face Agent</text>
+      <text x="85" y="35" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">InsightFace ArcFace</text>
+      <text x="85" y="47" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">512-D Embeddings</text>
+      <text x="85" y="62" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#64748b">Real-time Detection</text>
+      <text x="85" y="74" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#64748b">Privacy-First</text>
+    </g>
+
+    <!-- LOD + Context Engine -->
+    <g transform="translate(800, 45)">
+      <rect width="200" height="80" rx="6" fill="#0c1f3d" stroke="#a78bfa" stroke-width="1"/>
+      <text x="100" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#a78bfa" font-weight="700">LOD + Context Engine</text>
+      <text x="100" y="35" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Rule-Based (&lt;1ms)</text>
+      <text x="100" y="47" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">+ LLM Micro-Adjust</text>
+      <text x="100" y="62" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#64748b">Speech Cost Model</text>
+      <text x="100" y="74" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#64748b">Habit Detection</text>
+    </g>
+
+    <!-- Memory + Tools row -->
+    <g transform="translate(20, 140)">
+      <rect width="300" height="55" rx="6" fill="#0c1f3d" stroke="#06b6d4" stroke-width="1"/>
+      <text x="150" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#06b6d4" font-weight="700">Memory Bank + Entity Graph</text>
+      <text x="150" y="33" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">2048-D Embeddings · Exponential Decay</text>
+      <text x="150" y="45" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Episodic(7d) · Semantic(90d) · Procedural(999d)</text>
+    </g>
+
+    <g transform="translate(335, 140)">
+      <rect width="330" height="55" rx="6" fill="#0c1f3d" stroke="#f59e0b" stroke-width="1"/>
+      <text x="165" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#f59e0b" font-weight="700">18 Integrated Tools</text>
+      <text x="165" y="33" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Navigation · Search · Maps · Places · Elevation</text>
+      <text x="165" y="45" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">OCR · Accessibility · Plus Codes · Memory CRUD</text>
+    </g>
+
+    <g transform="translate(680, 140)">
+      <rect width="320" height="55" rx="6" fill="#0c1f3d" stroke="#ec4899" stroke-width="1"/>
+      <text x="160" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#ec4899" font-weight="700">Context Injection Pipeline</text>
+      <text x="160" y="33" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">LiveRequestQueue · Dynamic Prompts</text>
+      <text x="160" y="45" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">[VISION] [OCR] [FACE] [TELEMETRY] [LOD]</text>
+    </g>
+
+    <!-- Behavior mode badges -->
+    <g transform="translate(20, 205)">
+      <rect width="80" height="20" rx="10" fill="#dc2626" opacity="0.2" stroke="#dc2626" stroke-width="0.6"/>
+      <text x="40" y="14" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="7" fill="#fca5a5" font-weight="600">INTERRUPT</text>
+    </g>
+    <g transform="translate(110, 205)">
+      <rect width="80" height="20" rx="10" fill="#f59e0b" opacity="0.2" stroke="#f59e0b" stroke-width="0.6"/>
+      <text x="40" y="14" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="7" fill="#fcd34d" font-weight="600">WHEN_IDLE</text>
+    </g>
+    <g transform="translate(200, 205)">
+      <rect width="60" height="20" rx="10" fill="#6b7280" opacity="0.2" stroke="#6b7280" stroke-width="0.6"/>
+      <text x="30" y="14" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="7" fill="#d1d5db" font-weight="600">SILENT</text>
+    </g>
+    <text x="280" y="219" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#64748b">← Tool Behavior Modes: control when results are vocalized</text>
+  </g>
+
+  <!-- ═══════════════ LAYER 3: GOOGLE CLOUD SERVICES ═══════════════ -->
+  <text x="40" y="635" font-family="'SF Pro Text','Inter',sans-serif" font-size="10" fill="#94a3b8" font-weight="600" letter-spacing="2">GOOGLE CLOUD SERVICES</text>
+
+  <!-- Service cards -->
+  <g transform="translate(40, 648)">
+    <!-- Vertex AI -->
+    <g filter="url(#cardShadow)">
+      <rect width="160" height="65" rx="6" fill="#111827" stroke="#4285f4" stroke-width="1"/>
+      <text x="80" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#4285f4" font-weight="700">Vertex AI</text>
+      <text x="80" y="35" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Gemini Live API</text>
+      <text x="80" y="47" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Maps Grounding</text>
+      <text x="80" y="59" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Native Audio I/O</text>
+    </g>
+
+    <!-- Google AI -->
+    <g transform="translate(175, 0)" filter="url(#cardShadow)">
+      <rect width="160" height="65" rx="6" fill="#111827" stroke="#34a853" stroke-width="1"/>
+      <text x="80" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#34a853" font-weight="700">Google AI API</text>
+      <text x="80" y="35" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Vision · OCR · Search</text>
+      <text x="80" y="47" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Embeddings (2048-D)</text>
+      <text x="80" y="59" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">LOD Evaluator</text>
+    </g>
+
+    <!-- Firestore -->
+    <g transform="translate(350, 0)" filter="url(#cardShadow)">
+      <rect width="160" height="65" rx="6" fill="#111827" stroke="#fbbc04" stroke-width="1"/>
+      <text x="80" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#fbbc04" font-weight="700">Firestore</text>
+      <text x="80" y="35" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">User Profiles</text>
+      <text x="80" y="47" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Vector Search (512/2048)</text>
+      <text x="80" y="59" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Entity Graph</text>
+    </g>
+
+    <!-- Maps Platform -->
+    <g transform="translate(525, 0)" filter="url(#cardShadow)">
+      <rect width="160" height="65" rx="6" fill="#111827" stroke="#ea4335" stroke-width="1"/>
+      <text x="80" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#ea4335" font-weight="700">Maps Platform</text>
+      <text x="80" y="35" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Routes · Places</text>
+      <text x="80" y="47" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Elevation · Geocoding</text>
+      <text x="80" y="59" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Street View · Validate</text>
+    </g>
+
+    <!-- Cloud Run + Secrets -->
+    <g transform="translate(700, 0)" filter="url(#cardShadow)">
+      <rect width="160" height="65" rx="6" fill="#111827" stroke="#a78bfa" stroke-width="1"/>
+      <text x="80" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#a78bfa" font-weight="700">Infrastructure</text>
+      <text x="80" y="35" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Cloud Run (2 CPU)</text>
+      <text x="80" y="47" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Secret Manager</text>
+      <text x="80" y="59" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Artifact Registry</text>
+    </g>
+
+    <!-- OSM -->
+    <g transform="translate(875, 0)" filter="url(#cardShadow)">
+      <rect width="145" height="65" rx="6" fill="#111827" stroke="#06b6d4" stroke-width="1"/>
+      <text x="72" y="20" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" fill="#06b6d4" font-weight="700">OpenStreetMap</text>
+      <text x="72" y="35" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Overpass API</text>
+      <text x="72" y="47" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Tactile Paving</text>
+      <text x="72" y="59" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Accessibility Info</text>
+    </g>
+  </g>
+
+  <!-- Connection lines: Backend to Services -->
+  <g stroke="#475569" stroke-width="1" stroke-dasharray="3,3">
+    <line x1="160" y1="613" x2="160" y2="648"/>
+    <line x1="335" y1="613" x2="335" y2="648"/>
+    <line x1="510" y1="613" x2="510" y2="648"/>
+    <line x1="685" y1="613" x2="685" y2="648"/>
+    <line x1="860" y1="613" x2="860" y2="648"/>
+    <line x1="1000" y1="613" x2="1000" y2="648"/>
+  </g>
+
+  <!-- Bottom: Protocol legend -->
+  <g transform="translate(40, 740)">
+    <text x="0" y="12" font-family="'SF Pro Text',sans-serif" font-size="9" fill="#475569" font-weight="600">PROTOCOL:</text>
+    <rect x="80" y="0" width="12" height="12" rx="2" fill="#4285f4"/>
+    <text x="98" y="11" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">0x01 PCM Audio</text>
+    <rect x="200" y="0" width="12" height="12" rx="2" fill="#34a853"/>
+    <text x="218" y="11" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">0x02 JPEG Image</text>
+    <rect x="330" y="0" width="12" height="12" rx="2" fill="#fbbc04"/>
+    <text x="348" y="11" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">JSON Telemetry/Control</text>
+    <rect x="500" y="0" width="12" height="12" rx="2" fill="#a78bfa"/>
+    <text x="518" y="11" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">Context Injection Tags</text>
+  </g>
+
+  <!-- Bottom: Binary savings note -->
+  <g transform="translate(40, 770)">
+    <text x="0" y="12" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#475569">Binary magic-byte protocol eliminates ~33% Base64 overhead on audio/video frames</text>
+  </g>
+
+  <!-- Data flow arrows between backend boxes -->
+  <g transform="translate(40, 370)">
+    <!-- Vision → Orchestrator -->
+    <path d="M265,85 L250,85" fill="none" stroke="#34a853" stroke-width="1" marker-end="url(#arrowGreen)"/>
+    <!-- OCR → Orchestrator -->
+    <path d="M450,85 L265,65 L250,65" fill="none" stroke="#fbbc04" stroke-width="0.8" stroke-dasharray="3,2"/>
+    <!-- Face → Orchestrator -->
+    <path d="M615,85 L250,75" fill="none" stroke="#ea4335" stroke-width="0.8" stroke-dasharray="3,2"/>
+  </g>
+</svg>

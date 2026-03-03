@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400">
+  <defs>
+    <linearGradient id="pipeBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f0a2e"/>
+      <stop offset="100%" stop-color="#1a1145"/>
+    </linearGradient>
+    <linearGradient id="pipeHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+    <filter id="pipeShadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.2"/>
+    </filter>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4285f4"/>
+    </marker>
+    <marker id="arrowGreen2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34a853"/>
+    </marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbc04"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="400" fill="url(#pipeBg)" rx="8"/>
+
+  <!-- Title -->
+  <rect x="0" y="0" width="960" height="44" rx="8" fill="url(#pipeHeader)"/>
+  <text x="480" y="28" text-anchor="middle" font-family="'SF Pro Display','Inter',sans-serif" font-size="14" font-weight="700" fill="#e2e8f0" letter-spacing="3">REAL-TIME LIVE AGENT PIPELINE</text>
+
+  <!-- Stage 1: User Input -->
+  <g transform="translate(30, 65)" filter="url(#pipeShadow)">
+    <rect width="150" height="140" rx="8" fill="#111827" stroke="#4285f4" stroke-width="1"/>
+    <rect width="150" height="26" rx="8" fill="#1e3a5f"/>
+    <rect y="18" width="150" height="8" fill="#1e3a5f"/>
+    <text x="75" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="9" font-weight="700" fill="#93c5fd">USER INPUT</text>
+
+    <text x="15" y="42" font-family="'Courier New',monospace" font-size="7" fill="#4285f4">🎤</text>
+    <text x="30" y="42" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#94a3b8">Voice (PCM 16kHz)</text>
+    <text x="15" y="58" font-family="'Courier New',monospace" font-size="7" fill="#34a853">📷</text>
+    <text x="30" y="58" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#94a3b8">Camera (768×768)</text>
+    <text x="15" y="74" font-family="'Courier New',monospace" font-size="7" fill="#fbbc04">📍</text>
+    <text x="30" y="74" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#94a3b8">GPS + Sensors</text>
+    <text x="15" y="90" font-family="'Courier New',monospace" font-size="7" fill="#ea4335">❤️</text>
+    <text x="30" y="90" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#94a3b8">Watch HR/Motion</text>
+    <text x="15" y="106" font-family="'Courier New',monospace" font-size="7" fill="#a78bfa">👆</text>
+    <text x="30" y="106" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#94a3b8">Gestures (6 types)</text>
+    <text x="15" y="122" font-family="'Courier New',monospace" font-size="7" fill="#06b6d4">📐</text>
+    <text x="30" y="122" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#94a3b8">Depth (CoreML)</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <line x1="185" y1="135" x2="210" y2="135" stroke="#4285f4" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <text x="198" y="128" font-family="'Courier New',monospace" font-size="6" fill="#4285f4" text-anchor="middle">WS</text>
+
+  <!-- Stage 2: WebSocket Router -->
+  <g transform="translate(215, 85)" filter="url(#pipeShadow)">
+    <rect width="120" height="100" rx="8" fill="#111827" stroke="#7c3aed" stroke-width="1"/>
+    <rect width="120" height="26" rx="8" fill="#3b0764"/>
+    <rect y="18" width="120" height="8" fill="#3b0764"/>
+    <text x="60" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="9" font-weight="700" fill="#c4b5fd">WS ROUTER</text>
+
+    <text x="60" y="44" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Binary Protocol</text>
+    <text x="60" y="57" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">0x01 → Audio</text>
+    <text x="60" y="70" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">0x02 → Image</text>
+    <text x="60" y="83" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">JSON → Control</text>
+  </g>
+
+  <!-- Arrows from Router (fan out) -->
+  <line x1="340" y1="110" x2="365" y2="85" stroke="#34a853" stroke-width="1.5" marker-end="url(#arrowGreen2)"/>
+  <line x1="340" y1="135" x2="365" y2="135" stroke="#4285f4" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <line x1="340" y1="160" x2="365" y2="185" stroke="#fbbc04" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+  <line x1="340" y1="175" x2="365" y2="250" stroke="#ea4335" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- Stage 3a: Vision Agent (async) -->
+  <g transform="translate(370, 55)" filter="url(#pipeShadow)">
+    <rect width="130" height="55" rx="6" fill="#111827" stroke="#34a853" stroke-width="1"/>
+    <text x="65" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="9" font-weight="700" fill="#6ee7b7">Vision Agent</text>
+    <text x="65" y="32" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">gemini-3.1-pro</text>
+    <text x="65" y="44" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">ASYNC · LOD-adaptive</text>
+  </g>
+
+  <!-- Stage 3b: Orchestrator (main) -->
+  <g transform="translate(370, 115)" filter="url(#pipeShadow)">
+    <rect width="200" height="60" rx="8" fill="#111827" stroke="#4285f4" stroke-width="1.5"/>
+    <rect width="200" height="26" rx="8" fill="#1e3a5f"/>
+    <rect y="18" width="200" height="8" fill="#1e3a5f"/>
+    <text x="100" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="10" font-weight="700" fill="#93c5fd">ORCHESTRATOR</text>
+    <text x="100" y="42" text-anchor="middle" font-family="'Courier New',monospace" font-size="8" fill="#94a3b8">gemini-live-2.5-flash</text>
+    <text x="100" y="55" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">18 tools · native audio · Vertex AI</text>
+  </g>
+
+  <!-- Stage 3c: OCR Agent (async) -->
+  <g transform="translate(370, 185)" filter="url(#pipeShadow)">
+    <rect width="130" height="55" rx="6" fill="#111827" stroke="#fbbc04" stroke-width="1"/>
+    <text x="65" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="9" font-weight="700" fill="#fcd34d">OCR Agent</text>
+    <text x="65" y="32" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">gemini-3-flash</text>
+    <text x="65" y="44" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">ASYNC · Safety detect</text>
+  </g>
+
+  <!-- Stage 3d: Face Agent (async) -->
+  <g transform="translate(370, 248)" filter="url(#pipeShadow)">
+    <rect width="130" height="45" rx="6" fill="#111827" stroke="#ea4335" stroke-width="1"/>
+    <text x="65" y="16" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="9" font-weight="700" fill="#fca5a5">Face Agent</text>
+    <text x="65" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">InsightFace 512-D</text>
+    <text x="65" y="40" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">ASYNC · Privacy-first</text>
+  </g>
+
+  <!-- Injection arrows (agents → orchestrator) -->
+  <path d="M500,90 L530,90 L530,130 L575,130" fill="none" stroke="#34a853" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowGreen2)"/>
+  <path d="M500,210 L540,210 L540,155 L575,155" fill="none" stroke="#fbbc04" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowOrange)"/>
+  <path d="M500,270 L545,270 L545,165 L575,165" fill="none" stroke="#ea4335" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- Context Injection Queue -->
+  <g transform="translate(580, 115)" filter="url(#pipeShadow)">
+    <rect width="150" height="60" rx="8" fill="#1e1b4b" stroke="#c4b5fd" stroke-width="1"/>
+    <text x="75" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="9" font-weight="700" fill="#c4b5fd">Context Injection</text>
+    <text x="75" y="33" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">[VISION] [OCR]</text>
+    <text x="75" y="44" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">[FACE] [TELEMETRY]</text>
+    <text x="75" y="55" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">[LOD] [RESUME]</text>
+  </g>
+
+  <!-- Arrow to output -->
+  <line x1="735" y1="145" x2="760" y2="145" stroke="#4285f4" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+  <!-- Stage 4: Output -->
+  <g transform="translate(765, 65)" filter="url(#pipeShadow)">
+    <rect width="165" height="160" rx="8" fill="#111827" stroke="#10b981" stroke-width="1"/>
+    <rect width="165" height="26" rx="8" fill="#14532d"/>
+    <rect y="18" width="165" height="8" fill="#14532d"/>
+    <text x="82" y="18" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="9" font-weight="700" fill="#6ee7b7">USER OUTPUT</text>
+
+    <text x="15" y="42" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#6ee7b7" font-weight="600">Voice Response</text>
+    <text x="15" y="54" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">24kHz native audio</text>
+
+    <text x="15" y="72" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#6ee7b7" font-weight="600">Haptic Feedback</text>
+    <text x="15" y="84" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Obstacle · Direction</text>
+    <text x="15" y="96" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Object · Connection</text>
+
+    <text x="15" y="114" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#6ee7b7" font-weight="600">Context Tags</text>
+    <text x="15" y="126" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">LOD update</text>
+    <text x="15" y="138" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Face ID · Nav result</text>
+    <text x="15" y="150" font-family="'Courier New',monospace" font-size="7" fill="#94a3b8">Tool events</text>
+  </g>
+
+  <!-- Bottom: LOD + Memory row -->
+  <g transform="translate(370, 308)" filter="url(#pipeShadow)">
+    <rect width="200" height="38" rx="6" fill="#0c1f3d" stroke="#06b6d4" stroke-width="0.8"/>
+    <text x="100" y="16" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#06b6d4" font-weight="600">LOD Engine (&lt;1ms)</text>
+    <text x="100" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Rule-based + LLM micro-adjust</text>
+  </g>
+  <g transform="translate(580, 308)" filter="url(#pipeShadow)">
+    <rect width="200" height="38" rx="6" fill="#0c1f3d" stroke="#ec4899" stroke-width="0.8"/>
+    <text x="100" y="16" text-anchor="middle" font-family="'SF Pro Text',sans-serif" font-size="8" fill="#ec4899" font-weight="600">Memory + Entity Graph</text>
+    <text x="100" y="30" text-anchor="middle" font-family="'Courier New',monospace" font-size="7" fill="#64748b">Firestore · 2048-D vectors</text>
+  </g>
+
+  <!-- Upward arrows from bottom modules -->
+  <line x1="470" y1="308" x2="470" y2="180" stroke="#06b6d4" stroke-width="0.8" stroke-dasharray="3,2"/>
+  <line x1="680" y1="308" x2="680" y2="180" stroke="#ec4899" stroke-width="0.8" stroke-dasharray="3,2"/>
+
+  <!-- Legend -->
+  <g transform="translate(30, 360)">
+    <line x1="0" y1="0" x2="20" y2="0" stroke="#4285f4" stroke-width="2"/>
+    <text x="25" y="4" font-family="'SF Pro Text',sans-serif" font-size="7" fill="#64748b">Primary data flow</text>
+    <line x1="110" y1="0" x2="130" y2="0" stroke="#34a853" stroke-width="1" stroke-dasharray="3,2"/>
+    <text x="135" y="4" font-family="'SF Pro Text',sans-serif" font-size="7" fill="#64748b">Async injection</text>
+    <text x="220" y="4" font-family="'SF Pro Text',sans-serif" font-size="7" fill="#64748b">All sub-agents run in parallel — non-blocking to the Live API conversation</text>
+  </g>
+</svg>

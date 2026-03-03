@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f0a2e"/>
+      <stop offset="50%" stop-color="#1a1145"/>
+      <stop offset="100%" stop-color="#0d0825"/>
+    </linearGradient>
+    <linearGradient id="titleGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4fc3f7"/>
+      <stop offset="50%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#4fc3f7"/>
+    </linearGradient>
+    <linearGradient id="accentLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="20%" stop-color="#4285f4"/>
+      <stop offset="50%" stop-color="#34a853"/>
+      <stop offset="80%" stop-color="#fbbc04"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4285f4" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#4285f4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#34a853" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#34a853" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.15"/>
+    </filter>
+    <filter id="textGlow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="iconGlow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="420" fill="url(#bg)"/>
+
+  <!-- Ambient glows -->
+  <ellipse cx="300" cy="210" rx="300" ry="200" fill="url(#glow1)"/>
+  <ellipse cx="900" cy="210" rx="300" ry="200" fill="url(#glow2)"/>
+
+  <!-- Constellation dots -->
+  <g opacity="0.3">
+    <circle cx="100" cy="60" r="1.5" fill="#4fc3f7"/>
+    <circle cx="250" cy="40" r="1" fill="#4fc3f7"/>
+    <circle cx="400" cy="80" r="1.2" fill="#4fc3f7"/>
+    <circle cx="550" cy="30" r="0.8" fill="#4fc3f7"/>
+    <circle cx="700" cy="65" r="1.5" fill="#4fc3f7"/>
+    <circle cx="850" cy="45" r="1" fill="#4fc3f7"/>
+    <circle cx="1000" cy="70" r="1.3" fill="#4fc3f7"/>
+    <circle cx="1100" cy="50" r="0.9" fill="#4fc3f7"/>
+    <circle cx="150" cy="370" r="1" fill="#4fc3f7"/>
+    <circle cx="350" cy="390" r="1.5" fill="#4fc3f7"/>
+    <circle cx="600" cy="380" r="0.8" fill="#4fc3f7"/>
+    <circle cx="800" cy="395" r="1.2" fill="#4fc3f7"/>
+    <circle cx="1050" cy="375" r="1" fill="#4fc3f7"/>
+  </g>
+
+  <!-- Corner brackets -->
+  <g stroke="#4285f4" stroke-width="1.5" fill="none" opacity="0.4">
+    <path d="M30,30 L30,60 M30,30 L60,30"/>
+    <path d="M1170,30 L1170,60 M1170,30 L1140,30"/>
+    <path d="M30,390 L30,360 M30,390 L60,390"/>
+    <path d="M1170,390 L1170,360 M1170,390 L1140,390"/>
+  </g>
+
+  <!-- Central eye icon (accessibility symbol) -->
+  <g transform="translate(600, 135)" filter="url(#iconGlow)">
+    <!-- Outer eye shape -->
+    <path d="M-55,0 Q-30,-35 0,-40 Q30,-35 55,0 Q30,35 0,40 Q-30,35 -55,0 Z" fill="none" stroke="#4285f4" stroke-width="2" opacity="0.8"/>
+    <path d="M-45,0 Q-25,-28 0,-32 Q25,-28 45,0 Q25,28 0,32 Q-25,28 -45,0 Z" fill="none" stroke="#34a853" stroke-width="1.5" opacity="0.5"/>
+    <!-- Iris -->
+    <circle cx="0" cy="0" r="16" fill="none" stroke="#4fc3f7" stroke-width="2" opacity="0.9"/>
+    <circle cx="0" cy="0" r="8" fill="#4285f4" opacity="0.7"/>
+    <circle cx="0" cy="0" r="4" fill="#ffffff" opacity="0.8"/>
+    <!-- Radiating signals -->
+    <g stroke="#4fc3f7" stroke-width="1" opacity="0.3">
+      <path d="M-70,-10 Q-80,-5 -70,0" fill="none"/>
+      <path d="M-78,-15 Q-90,-5 -78,5" fill="none"/>
+      <path d="M70,-10 Q80,-5 70,0" fill="none"/>
+      <path d="M78,-15 Q90,-5 78,5" fill="none"/>
+    </g>
+  </g>
+
+  <!-- Pulsing rings around eye -->
+  <g transform="translate(600, 135)" opacity="0.15">
+    <circle cx="0" cy="0" r="65" fill="none" stroke="#4285f4" stroke-width="1"/>
+    <circle cx="0" cy="0" r="80" fill="none" stroke="#34a853" stroke-width="0.8"/>
+    <circle cx="0" cy="0" r="95" fill="none" stroke="#fbbc04" stroke-width="0.5"/>
+  </g>
+
+  <!-- Title -->
+  <text x="600" y="225" text-anchor="middle" font-family="'SF Pro Display','Inter','Segoe UI',sans-serif" font-size="52" font-weight="800" fill="url(#titleGlow)" letter-spacing="8" filter="url(#textGlow)">SIGHTLINE</text>
+
+  <!-- Accent line -->
+  <rect x="350" y="242" width="500" height="2" rx="1" fill="url(#accentLine)"/>
+
+  <!-- Subtitle -->
+  <text x="600" y="270" text-anchor="middle" font-family="'SF Pro Display','Inter','Segoe UI',sans-serif" font-size="14" font-weight="600" fill="#94a3b8" letter-spacing="4">AI-POWERED ACCESSIBILITY FOR THE VISUALLY IMPAIRED</text>
+
+  <!-- Tagline -->
+  <text x="600" y="300" text-anchor="middle" font-family="'Georgia','Playfair Display',serif" font-size="16" font-weight="400" fill="#64748b" font-style="italic">See the world through sound, touch, and intelligence</text>
+
+  <!-- Feature pills -->
+  <g transform="translate(600, 340)">
+    <g transform="translate(-350, 0)">
+      <rect x="0" y="0" width="130" height="28" rx="14" fill="#1e3a5f" stroke="#4285f4" stroke-width="0.8" opacity="0.8"/>
+      <text x="65" y="18" text-anchor="middle" font-family="'SF Pro Text','Inter',sans-serif" font-size="9" fill="#4fc3f7" font-weight="600">GEMINI LIVE API</text>
+    </g>
+    <g transform="translate(-195, 0)">
+      <rect x="0" y="0" width="120" height="28" rx="14" fill="#1e3a5f" stroke="#34a853" stroke-width="0.8" opacity="0.8"/>
+      <text x="60" y="18" text-anchor="middle" font-family="'SF Pro Text','Inter',sans-serif" font-size="9" fill="#6ee7b7" font-weight="600">LIVE AGENTS</text>
+    </g>
+    <g transform="translate(-50, 0)">
+      <rect x="0" y="0" width="100" height="28" rx="14" fill="#1e3a5f" stroke="#fbbc04" stroke-width="0.8" opacity="0.8"/>
+      <text x="50" y="18" text-anchor="middle" font-family="'SF Pro Text','Inter',sans-serif" font-size="9" fill="#fcd34d" font-weight="600">CORE ML</text>
+    </g>
+    <g transform="translate(75, 0)">
+      <rect x="0" y="0" width="130" height="28" rx="14" fill="#1e3a5f" stroke="#ea4335" stroke-width="0.8" opacity="0.8"/>
+      <text x="65" y="18" text-anchor="middle" font-family="'SF Pro Text','Inter',sans-serif" font-size="9" fill="#fca5a5" font-weight="600">FACE RECOGNITION</text>
+    </g>
+    <g transform="translate(230, 0)">
+      <rect x="0" y="0" width="120" height="28" rx="14" fill="#1e3a5f" stroke="#a78bfa" stroke-width="0.8" opacity="0.8"/>
+      <text x="60" y="18" text-anchor="middle" font-family="'SF Pro Text','Inter',sans-serif" font-size="9" fill="#c4b5fd" font-weight="600">WATCH + PHONE</text>
+    </g>
+  </g>
+
+  <!-- Bottom: Google Cloud badge -->
+  <g transform="translate(600, 395)">
+    <text x="0" y="0" text-anchor="middle" font-family="'SF Pro Text','Inter',sans-serif" font-size="10" fill="#475569" font-weight="500" letter-spacing="1.5">BUILT ON GOOGLE CLOUD  ·  GEMINI  ·  VERTEX AI  ·  CLOUD RUN  ·  FIRESTORE</text>
+  </g>
+</svg>
