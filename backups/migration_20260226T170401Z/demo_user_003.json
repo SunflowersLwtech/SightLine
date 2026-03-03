@@ -1,0 +1,23 @@
+{
+  "profile": {
+    "color_description": true,
+    "vision_status": "low_vision",
+    "description_priority": "object",
+    "tts_speed": 1.2,
+    "om_level": "beginner",
+    "updated_at": "2026-02-22T03:49:44.122000+00:00",
+    "language": "en-US",
+    "has_guide_dog": false,
+    "onset_age": 40,
+    "travel_frequency": "rarely",
+    "has_white_cane": false,
+    "created_at": "2026-02-22T03:49:44.122000+00:00",
+    "verbosity_preference": "detailed",
+    "blindness_onset": "acquired"
+  },
+  "subcollections": {
+    "memories": {},
+    "face_library": {},
+    "sessions_meta": {}
+  }
+}

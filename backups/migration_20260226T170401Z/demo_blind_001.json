@@ -1,0 +1,24 @@
+{
+  "profile": {
+    "tts_speed": 2.0,
+    "description_priority": "spatial",
+    "language": "en-US",
+    "has_guide_dog": true,
+    "travel_frequency": "daily",
+    "has_white_cane": false,
+    "verbosity_preference": "concise",
+    "preferred_name": "Demo User",
+    "blindness_onset": "congenital",
+    "color_description": false,
+    "vision_status": "totally_blind",
+    "updated_at": "2026-02-22T10:24:36.557000+00:00",
+    "created_at": "2026-02-22T10:24:36.557000+00:00",
+    "om_level": "intermediate",
+    "onset_age": null
+  },
+  "subcollections": {
+    "memories": {},
+    "face_library": {},
+    "sessions_meta": {}
+  }
+}

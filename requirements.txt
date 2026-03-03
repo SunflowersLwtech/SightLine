@@ -1,0 +1,30 @@
+# ============================================================
+# SightLine Backend Dependencies
+# Python 3.12 | Verified: 2026-02-22
+# ============================================================
+
+# === 核心 Agent 框架 ===
+# 自动拉入: fastapi 0.129.2, uvicorn 0.41.0, google-genai 1.64.0,
+#   google-cloud-aiplatform 1.138.0, google-cloud-secret-manager 2.26.0,
+#   pydantic 2.12.5, websockets 15.0.1, httpx, requests, python-dotenv 等
+google-adk==1.25.1
+
+# === Firestore（ADK 不包含，必须单独安装） ===
+google-cloud-firestore==2.23.0
+
+# === 人脸识别 ===
+insightface==0.7.3
+onnxruntime==1.24.2
+opencv-python-headless==4.10.0.84     # 4.13+ 要求 numpy>=2，不兼容 insightface
+
+# === Google Maps（Places / Routes / Geocoding） ===
+googlemaps==4.10.0
+
+# === 版本锁定 ===
+numpy>=1.24.0,<2.0                    # insightface 不兼容 numpy 2.x
+
+# === Plus Codes (离线位置编码，替代 What3Words) ===
+openlocationcode>=1.0.1               # Google Plus Codes encode/decode
+
+# === 编译依赖 ===
+cython>=3.0.0                         # insightface Cython 扩展编译需要

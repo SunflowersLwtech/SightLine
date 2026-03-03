@@ -1,0 +1,45 @@
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/sightline-backend'
+      - '.'
+
+  # Push to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/sightline-backend'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sightline-backend'
+      - '--image=gcr.io/$PROJECT_ID/sightline-backend'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--min-instances=1'
+      - '--max-instances=10'
+      - '--timeout=3600'
+      - '--memory=2Gi'
+      - '--cpu=2'
+      - '--no-cpu-throttling'
+      - '--cpu-boost'
+      - '--set-env-vars=GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_LOCATION=us-central1,GEMINI_LIVE_MODEL=gemini-live-2.5-flash-native-audio,AGENT_ENGINE_ID=${_AGENT_ENGINE_ID}'
+      - '--set-secrets=GOOGLE_API_KEY=gemini-api-key:latest,GOOGLE_MAPS_API_KEY=google-maps-api-key:latest'
+      - '--service-account=sightline-backend@$PROJECT_ID.iam.gserviceaccount.com'
+
+substitutions:
+  # _AGENT_ENGINE_ID: Used for VertexAiSessionService persistence (optional).
+  # If unset, SessionService falls back to InMemory. Does not affect Memory Bank (Memory uses Firestore directly).
+  _AGENT_ENGINE_ID: '8731647347169165312'
+
+timeout: '1800s'
+options:
+  machineType: 'E2_HIGHCPU_8'

@@ -1,0 +1,935 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		9649CD022F5194C4004993EE /* onnxruntime in Frameworks */ = {isa = PBXBuildFile; productRef = DD0010022F4B1BF10068374A /* onnxruntime */; };
+		9656C1B12F4A1BF10068374A /* SightLineWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 9656C1A52F4A1BF10068374A /* SightLineWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		9656C1AE2F4A1BF10068374A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9656C18B2F4A1BF00068374A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9656C1AA2F4A1BF10068374A;
+			remoteInfo = SightLineWatch;
+		};
+		AA0010072F4A1BF10068374A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9656C18B2F4A1BF00068374A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9656C1922F4A1BF00068374A;
+			remoteInfo = SightLine;
+		};
+		BB0010072F4A1BF10068374A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9656C18B2F4A1BF00068374A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9656C1922F4A1BF00068374A;
+			remoteInfo = SightLine;
+		};
+		CC0010072F4A1BF10068374A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9656C18B2F4A1BF00068374A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9656C1AA2F4A1BF10068374A;
+			remoteInfo = SightLineWatch;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		9656C1B02F4A1BF10068374A /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				9656C1B12F4A1BF10068374A /* SightLineWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		9656C1932F4A1BF00068374A /* SightLine.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SightLine.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9656C1A52F4A1BF10068374A /* SightLineWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SightLineWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0010012F4A1BF10068374A /* SightLineTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SightLineTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB0010012F4A1BF10068374A /* SightLineUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SightLineUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC0010012F4A1BF10068374A /* SightLineWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SightLineWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		EE0010012F4A1BF10068374A /* Exceptions for "SightLine" folder in "SightLine" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Info-Debug.plist",
+			);
+			target = 9656C1922F4A1BF00068374A /* SightLine */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		9656C1952F4A1BF00068374A /* SightLine */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EE0010012F4A1BF10068374A /* Exceptions for "SightLine" folder in "SightLine" target */,
+			);
+			path = SightLine;
+			sourceTree = "<group>";
+		};
+		9656C1A62F4A1BF10068374A /* SightLineWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SightLineWatch;
+			sourceTree = "<group>";
+		};
+		AA0010022F4A1BF10068374A /* SightLineTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SightLineTests;
+			sourceTree = "<group>";
+		};
+		BB0010022F4A1BF10068374A /* SightLineUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SightLineUITests;
+			sourceTree = "<group>";
+		};
+		CC0010022F4A1BF10068374A /* SightLineWatchTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SightLineWatchTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		9656C1902F4A1BF00068374A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9649CD022F5194C4004993EE /* onnxruntime in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9656C1A82F4A1BF10068374A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0010042F4A1BF10068374A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0010042F4A1BF10068374A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC0010042F4A1BF10068374A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		9656C18A2F4A1BF00068374A = {
+			isa = PBXGroup;
+			children = (
+				9656C1952F4A1BF00068374A /* SightLine */,
+				9656C1A62F4A1BF10068374A /* SightLineWatch */,
+				AA0010022F4A1BF10068374A /* SightLineTests */,
+				BB0010022F4A1BF10068374A /* SightLineUITests */,
+				CC0010022F4A1BF10068374A /* SightLineWatchTests */,
+				9656C1942F4A1BF00068374A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		9656C1942F4A1BF00068374A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9656C1932F4A1BF00068374A /* SightLine.app */,
+				9656C1A52F4A1BF10068374A /* SightLineWatch.app */,
+				AA0010012F4A1BF10068374A /* SightLineTests.xctest */,
+				BB0010012F4A1BF10068374A /* SightLineUITests.xctest */,
+				CC0010012F4A1BF10068374A /* SightLineWatchTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		9656C1922F4A1BF00068374A /* SightLine */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9656C19E2F4A1BF10068374A /* Build configuration list for PBXNativeTarget "SightLine" */;
+			buildPhases = (
+				9656C18F2F4A1BF00068374A /* Sources */,
+				9656C1902F4A1BF00068374A /* Frameworks */,
+				9656C1912F4A1BF00068374A /* Resources */,
+				9656C1B02F4A1BF10068374A /* Embed Watch Content */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9656C1AF2F4A1BF10068374A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				9656C1952F4A1BF00068374A /* SightLine */,
+			);
+			name = SightLine;
+			packageProductDependencies = (
+				DD0010022F4B1BF10068374A /* onnxruntime */,
+			);
+			productName = SightLine;
+			productReference = 9656C1932F4A1BF00068374A /* SightLine.app */;
+			productType = "com.apple.product-type.application";
+		};
+		9656C1AA2F4A1BF10068374A /* SightLineWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9656C1AD2F4A1BF10068374A /* Build configuration list for PBXNativeTarget "SightLineWatch" */;
+			buildPhases = (
+				9656C1A72F4A1BF10068374A /* Sources */,
+				9656C1A82F4A1BF10068374A /* Frameworks */,
+				9656C1A92F4A1BF10068374A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				9656C1A62F4A1BF10068374A /* SightLineWatch */,
+			);
+			name = SightLineWatch;
+			packageProductDependencies = (
+			);
+			productName = SightLineWatch;
+			productReference = 9656C1A52F4A1BF10068374A /* SightLineWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		AA0010062F4A1BF10068374A /* SightLineTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA00100B2F4A1BF10068374A /* Build configuration list for PBXNativeTarget "SightLineTests" */;
+			buildPhases = (
+				AA0010032F4A1BF10068374A /* Sources */,
+				AA0010042F4A1BF10068374A /* Frameworks */,
+				AA0010052F4A1BF10068374A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA0010082F4A1BF10068374A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA0010022F4A1BF10068374A /* SightLineTests */,
+			);
+			name = SightLineTests;
+			packageProductDependencies = (
+			);
+			productName = SightLineTests;
+			productReference = AA0010012F4A1BF10068374A /* SightLineTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		BB0010062F4A1BF10068374A /* SightLineUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BB00100B2F4A1BF10068374A /* Build configuration list for PBXNativeTarget "SightLineUITests" */;
+			buildPhases = (
+				BB0010032F4A1BF10068374A /* Sources */,
+				BB0010042F4A1BF10068374A /* Frameworks */,
+				BB0010052F4A1BF10068374A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BB0010082F4A1BF10068374A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				BB0010022F4A1BF10068374A /* SightLineUITests */,
+			);
+			name = SightLineUITests;
+			packageProductDependencies = (
+			);
+			productName = SightLineUITests;
+			productReference = BB0010012F4A1BF10068374A /* SightLineUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		CC0010062F4A1BF10068374A /* SightLineWatchTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CC00100B2F4A1BF10068374A /* Build configuration list for PBXNativeTarget "SightLineWatchTests" */;
+			buildPhases = (
+				CC0010032F4A1BF10068374A /* Sources */,
+				CC0010042F4A1BF10068374A /* Frameworks */,
+				CC0010052F4A1BF10068374A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CC0010082F4A1BF10068374A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				CC0010022F4A1BF10068374A /* SightLineWatchTests */,
+			);
+			name = SightLineWatchTests;
+			packageProductDependencies = (
+			);
+			productName = SightLineWatchTests;
+			productReference = CC0010012F4A1BF10068374A /* SightLineWatchTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		9656C18B2F4A1BF00068374A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					9656C1922F4A1BF00068374A = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					9656C1AA2F4A1BF10068374A = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					AA0010062F4A1BF10068374A = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 9656C1922F4A1BF00068374A;
+					};
+					BB0010062F4A1BF10068374A = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 9656C1922F4A1BF00068374A;
+					};
+					CC0010062F4A1BF10068374A = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 9656C1AA2F4A1BF10068374A;
+					};
+				};
+			};
+			buildConfigurationList = 9656C18E2F4A1BF00068374A /* Build configuration list for PBXProject "SightLine" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 9656C18A2F4A1BF00068374A;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				DD0010012F4B1BF10068374A /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 9656C1942F4A1BF00068374A /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				9656C1922F4A1BF00068374A /* SightLine */,
+				9656C1AA2F4A1BF10068374A /* SightLineWatch */,
+				AA0010062F4A1BF10068374A /* SightLineTests */,
+				BB0010062F4A1BF10068374A /* SightLineUITests */,
+				CC0010062F4A1BF10068374A /* SightLineWatchTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		9656C1912F4A1BF00068374A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9656C1A92F4A1BF10068374A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0010052F4A1BF10068374A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0010052F4A1BF10068374A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC0010052F4A1BF10068374A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		9656C18F2F4A1BF00068374A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9656C1A72F4A1BF10068374A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0010032F4A1BF10068374A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0010032F4A1BF10068374A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC0010032F4A1BF10068374A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		9656C1AF2F4A1BF10068374A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9656C1AA2F4A1BF10068374A /* SightLineWatch */;
+			targetProxy = 9656C1AE2F4A1BF10068374A /* PBXContainerItemProxy */;
+		};
+		AA0010082F4A1BF10068374A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9656C1922F4A1BF00068374A /* SightLine */;
+			targetProxy = AA0010072F4A1BF10068374A /* PBXContainerItemProxy */;
+		};
+		BB0010082F4A1BF10068374A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9656C1922F4A1BF00068374A /* SightLine */;
+			targetProxy = BB0010072F4A1BF10068374A /* PBXContainerItemProxy */;
+		};
+		CC0010082F4A1BF10068374A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9656C1AA2F4A1BF10068374A /* SightLineWatch */;
+			targetProxy = CC0010072F4A1BF10068374A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		9656C19C2F4A1BF10068374A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 2MCUR7CFAU;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		9656C19D2F4A1BF10068374A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 2MCUR7CFAU;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		9656C19F2F4A1BF10068374A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
+				CODE_SIGN_ENTITLEMENTS = SightLine/SightLine.Debug.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2MCUR7CFAU;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "SightLine/Info-Debug.plist";
+				INFOPLIST_KEY_NSCameraUsageDescription = "SightLine uses the camera to capture your surroundings and provide real-time scene descriptions.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "SightLine monitors your heart rate to detect stress or panic and adjust assistance level.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "SightLine uses your location to provide contextual navigation assistance.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SightLine uses the microphone for voice interaction with the AI assistant.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "SightLine uses motion data to detect walking, running, and other activities for context-aware assistance.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "SightLine stores consented familiar-face photos to improve recognition accuracy.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "SightLine lets you choose family and friend photos for familiar-face registration.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = "(audio)";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sunflowers.SightLine;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		9656C1A02F4A1BF10068374A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SightLine/SightLine.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2MCUR7CFAU;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "SightLine uses the camera to capture your surroundings and provide real-time scene descriptions.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "SightLine monitors your heart rate to detect stress or panic and adjust assistance level.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "SightLine uses your location to provide contextual navigation assistance.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SightLine uses the microphone for voice interaction with the AI assistant.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "SightLine uses motion data to detect walking, running, and other activities for context-aware assistance.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "SightLine stores consented familiar-face photos to improve recognition accuracy.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "SightLine lets you choose family and friend photos for familiar-face registration.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = "(audio)";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sunflowers.SightLine;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		9656C1AB2F4A1BF10068374A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SightLineWatch/SightLineWatch.Debug.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2MCUR7CFAU;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "SightLine Watch";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "SightLine Watch monitors your heart rate for real-time stress and panic detection.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "SightLine Watch writes workout sessions so heart-rate sampling stays responsive for safety alerts.";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.sunflowers.SightLine;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sunflowers.SightLine.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		9656C1AC2F4A1BF10068374A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SightLineWatch/SightLineWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2MCUR7CFAU;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "SightLine Watch";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "SightLine Watch monitors your heart rate for real-time stress and panic detection.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "SightLine Watch writes workout sessions so heart-rate sampling stays responsive for safety alerts.";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.sunflowers.SightLine;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sunflowers.SightLine.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
+		AA0010092F4A1BF10068374A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2MCUR7CFAU;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sunflowers.SightLineTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SightLine.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SightLine";
+			};
+			name = Debug;
+		};
+		AA00100A2F4A1BF10068374A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2MCUR7CFAU;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sunflowers.SightLineTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SightLine.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SightLine";
+			};
+			name = Release;
+		};
+		BB0010092F4A1BF10068374A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2MCUR7CFAU;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sunflowers.SightLineUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SightLine;
+			};
+			name = Debug;
+		};
+		BB00100A2F4A1BF10068374A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2MCUR7CFAU;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sunflowers.SightLineUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SightLine;
+			};
+			name = Release;
+		};
+		CC0010092F4A1BF10068374A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2MCUR7CFAU;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sunflowers.SightLineWatchTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SightLineWatch.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SightLineWatch";
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		CC00100A2F4A1BF10068374A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2MCUR7CFAU;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sunflowers.SightLineWatchTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SightLineWatch.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SightLineWatch";
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		9656C18E2F4A1BF00068374A /* Build configuration list for PBXProject "SightLine" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9656C19C2F4A1BF10068374A /* Debug */,
+				9656C19D2F4A1BF10068374A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9656C19E2F4A1BF10068374A /* Build configuration list for PBXNativeTarget "SightLine" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9656C19F2F4A1BF10068374A /* Debug */,
+				9656C1A02F4A1BF10068374A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9656C1AD2F4A1BF10068374A /* Build configuration list for PBXNativeTarget "SightLineWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9656C1AB2F4A1BF10068374A /* Debug */,
+				9656C1AC2F4A1BF10068374A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA00100B2F4A1BF10068374A /* Build configuration list for PBXNativeTarget "SightLineTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0010092F4A1BF10068374A /* Debug */,
+				AA00100A2F4A1BF10068374A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BB00100B2F4A1BF10068374A /* Build configuration list for PBXNativeTarget "SightLineUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB0010092F4A1BF10068374A /* Debug */,
+				BB00100A2F4A1BF10068374A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CC00100B2F4A1BF10068374A /* Build configuration list for PBXNativeTarget "SightLineWatchTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC0010092F4A1BF10068374A /* Debug */,
+				CC00100A2F4A1BF10068374A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		DD0010012F4B1BF10068374A /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/microsoft/onnxruntime-swift-package-manager";
+			requirement = {
+				kind = exactVersion;
+				version = 1.20.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		DD0010022F4B1BF10068374A /* onnxruntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DD0010012F4B1BF10068374A /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */;
+			productName = onnxruntime;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 9656C18B2F4A1BF00068374A /* Project object */;
+}

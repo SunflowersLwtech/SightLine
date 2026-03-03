@@ -1,0 +1,24 @@
+# ============================================================
+# SightLine Backend - Cloud Run Deployment Dependencies
+# Phase 3: Full Agent Capabilities
+# ============================================================
+
+# === Core Agent Framework ===
+google-adk==1.25.1
+
+# === Firestore ===
+google-cloud-firestore==2.23.0
+
+# === Google Maps ===
+googlemaps==4.10.0
+
+# === Face Recognition ===
+insightface==0.7.3
+onnxruntime==1.24.2
+opencv-python-headless==4.10.0.84
+
+# === Version Constraints ===
+numpy>=1.24.0,<2.0
+
+# === Build Dependencies ===
+cython>=3.0.0

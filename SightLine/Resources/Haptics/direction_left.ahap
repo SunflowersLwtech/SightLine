@@ -1,0 +1,40 @@
+{
+  "Version": 1.0,
+  "Metadata": {
+    "Project": "SightLine",
+    "Description": "Directional cue: turn left — short-long-short pattern"
+  },
+  "Pattern": [
+    {
+      "Event": {
+        "Time": 0.0,
+        "EventType": "HapticTransient",
+        "EventParameters": [
+          { "ParameterID": "HapticIntensity", "ParameterValue": 0.5 },
+          { "ParameterID": "HapticSharpness", "ParameterValue": 0.4 }
+        ]
+      }
+    },
+    {
+      "Event": {
+        "Time": 0.1,
+        "EventType": "HapticContinuous",
+        "EventDuration": 0.25,
+        "EventParameters": [
+          { "ParameterID": "HapticIntensity", "ParameterValue": 0.8 },
+          { "ParameterID": "HapticSharpness", "ParameterValue": 0.5 }
+        ]
+      }
+    },
+    {
+      "Event": {
+        "Time": 0.45,
+        "EventType": "HapticTransient",
+        "EventParameters": [
+          { "ParameterID": "HapticIntensity", "ParameterValue": 0.5 },
+          { "ParameterID": "HapticSharpness", "ParameterValue": 0.4 }
+        ]
+      }
+    }
+  ]
+}

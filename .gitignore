@@ -1,0 +1,80 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+ENV/
+
+# Test / coverage
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+
+# Logs
+*.log
+
+# Environment / secrets
+.env
+.env.*
+*.pem
+*.key
+sightline-backend-sa.json
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Xcode / Apple platforms
+DerivedData/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcuserdatad/
+*.xcuserstate
+*.xcresult/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Firebase / local emulators
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Terraform (project root; module-specific ignore remains in infrastructure/terraform/.gitignore)
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+terraform.tfvars
+*.auto.tfvars
+
+# Misc temp
+tmp/
+temp/
+*.tmp

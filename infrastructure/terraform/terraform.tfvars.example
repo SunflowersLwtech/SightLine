@@ -1,0 +1,39 @@
+# =============================================================================
+# SightLine — Terraform Variables Example
+# Copy this file to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to version control!
+# =============================================================================
+
+project_id = "sightline-hackathon"
+region     = "us-central1"
+
+# Service Account
+service_account_id = "sightline-backend"
+
+# Cloud Run Configuration
+cloud_run_service_name  = "sightline-backend"
+cloud_run_min_instances = 1    # 1 = eliminate cold start
+cloud_run_max_instances = 10
+cloud_run_memory        = "2Gi"
+cloud_run_cpu           = "2"
+cloud_run_timeout       = "3600s"  # WebSocket long connections
+
+# Container Image (leave empty to use Artifact Registry default)
+# container_image = "us-central1-docker.pkg.dev/sightline-hackathon/sightline/sightline-backend:latest"
+
+# API Keys — fill these in with your actual keys
+# Alternatively, create secrets via gcloud CLI first and leave these empty
+# gemini_api_key     = "your-gemini-api-key-here"
+# google_maps_api_key = "your-google-maps-api-key-here"
+
+# Artifact Registry
+artifact_registry_repo = "sightline"
+
+# Firestore
+firestore_database_id = "(default)"
+
+# Additional Cloud Run Environment Variables
+env_vars = {
+  GOOGLE_GENAI_USE_VERTEXAI = "TRUE"
+  GOOGLE_CLOUD_LOCATION     = "us-central1"
+}

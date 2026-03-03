@@ -1,0 +1,39 @@
+{
+  "Version": 1.0,
+  "Metadata": {
+    "Project": "SightLine",
+    "Description": "Obstacle proximity warning — repeating pulses that intensify"
+  },
+  "Pattern": [
+    {
+      "Event": {
+        "Time": 0.0,
+        "EventType": "HapticTransient",
+        "EventParameters": [
+          { "ParameterID": "HapticIntensity", "ParameterValue": 0.8 },
+          { "ParameterID": "HapticSharpness", "ParameterValue": 0.7 }
+        ]
+      }
+    },
+    {
+      "Event": {
+        "Time": 0.15,
+        "EventType": "HapticTransient",
+        "EventParameters": [
+          { "ParameterID": "HapticIntensity", "ParameterValue": 0.9 },
+          { "ParameterID": "HapticSharpness", "ParameterValue": 0.8 }
+        ]
+      }
+    },
+    {
+      "Event": {
+        "Time": 0.25,
+        "EventType": "HapticTransient",
+        "EventParameters": [
+          { "ParameterID": "HapticIntensity", "ParameterValue": 1.0 },
+          { "ParameterID": "HapticSharpness", "ParameterValue": 0.9 }
+        ]
+      }
+    }
+  ]
+}

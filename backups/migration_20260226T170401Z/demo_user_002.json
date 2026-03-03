@@ -1,0 +1,23 @@
+{
+  "profile": {
+    "color_description": false,
+    "vision_status": "totally_blind",
+    "description_priority": "spatial",
+    "tts_speed": 2.0,
+    "om_level": "advanced",
+    "updated_at": "2026-02-22T03:49:43.076000+00:00",
+    "language": "en-US",
+    "has_guide_dog": true,
+    "onset_age": null,
+    "travel_frequency": "daily",
+    "has_white_cane": false,
+    "created_at": "2026-02-22T03:49:43.076000+00:00",
+    "verbosity_preference": "minimal",
+    "blindness_onset": "congenital"
+  },
+  "subcollections": {
+    "memories": {},
+    "face_library": {},
+    "sessions_meta": {}
+  }
+}
