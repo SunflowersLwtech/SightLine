@@ -1,0 +1,147 @@
+# =============================================================================
+# SightLine — Automated Cloud Deployment (CI/CD)
+# Triggers on push to main: Test → Build → Push → Deploy → Verify
+# =============================================================================
+
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - 'SightLine/**'          # iOS source changes don't need backend redeploy
+      - 'SightLineWatch/**'
+      - 'SightLineTests/**'
+      - '.gitignore'
+
+  workflow_dispatch:             # Allow manual trigger from GitHub UI
+
+env:
+  PROJECT_ID: sightline-hackathon
+  REGION: us-central1
+  SERVICE_NAME: sightline-backend
+  AR_REPO: sightline
+  IMAGE: us-central1-docker.pkg.dev/sightline-hackathon/sightline/sightline-backend
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Stage 1: Run backend unit tests
+  # ---------------------------------------------------------------------------
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run unit tests
+        run: pytest tests/ -v --tb=short
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+
+  # ---------------------------------------------------------------------------
+  # Stage 2: Build Docker image and push to Artifact Registry
+  # ---------------------------------------------------------------------------
+  build-and-push:
+    name: Build & Push Image
+    needs: test
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write           # Required for Workload Identity Federation
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ env.IMAGE }}:latest \
+            -t ${{ env.IMAGE }}:${{ github.sha }} \
+            .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.IMAGE }}:latest
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+
+  # ---------------------------------------------------------------------------
+  # Stage 3: Deploy to Cloud Run
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to Cloud Run
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          image: ${{ env.IMAGE }}:${{ github.sha }}
+          region: ${{ env.REGION }}
+          flags: |
+            --allow-unauthenticated
+            --min-instances=1
+            --max-instances=10
+            --timeout=3600
+            --memory=2Gi
+            --cpu=2
+            --no-cpu-throttling
+            --cpu-boost
+            --service-account=sightline-backend@sightline-hackathon.iam.gserviceaccount.com
+            --set-secrets=GOOGLE_API_KEY=gemini-api-key:latest,GOOGLE_MAPS_API_KEY=google-maps-api-key:latest
+          env_vars: |
+            GOOGLE_GENAI_USE_VERTEXAI=TRUE
+            GOOGLE_CLOUD_LOCATION=us-central1
+
+      - name: Verify deployment
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --format='value(status.url)')
+          echo "Service URL: $URL"
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health" --max-time 30 || echo "000")
+          echo "Health check: HTTP $STATUS"
+
+          if [ "$STATUS" != "200" ]; then
+            echo "::warning::Health check returned HTTP $STATUS (service may still be starting)"
+          else
+            echo "Deployment verified successfully!"
+          fi

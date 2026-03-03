@@ -74,6 +74,9 @@ override.tf.json
 terraform.tfvars
 *.auto.tfvars
 
+# Claude Code
+.claude/
+
 # Misc temp
 tmp/
 temp/
