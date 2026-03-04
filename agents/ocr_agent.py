@@ -108,6 +108,11 @@ def _get_client() -> genai.Client:
     global _client
     if _client is None:
         api_key = os.environ.get("_GOOGLE_AI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
+        if not api_key:
+            raise RuntimeError(
+                "OCR agent requires a Gemini API key. "
+                "Set _GOOGLE_AI_API_KEY or GOOGLE_API_KEY environment variable."
+            )
         _client = genai.Client(api_key=api_key, vertexai=False)
     return _client
 

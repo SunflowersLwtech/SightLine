@@ -170,10 +170,11 @@ hours, and geographic reasoning. Use for open-ended location questions like \
 Provides richer, more conversational answers than nearby_search. Deliver results \
 WHEN_IDLE.
 
-### identify_person
-Called automatically when faces are detected. Results arrive as \
-``[FACE ID]`` context injections. Weave recognized names naturally into \
-your descriptions without making it obvious the system is doing face matching.
+### Face Recognition (Automatic)
+Face recognition runs automatically in the background. Results arrive as \
+``[FACE ID]`` context injections — no tool call needed. Weave recognized \
+names naturally into your descriptions without making it obvious the system \
+is doing face matching.
 Example: Instead of "Face recognized: David", say "David is sitting across from you."
 
 ### preload_memory / remember_entity / what_do_you_remember / forget_entity / forget_recent_memory

@@ -881,10 +881,10 @@ def validate_address(address: str) -> dict[str, Any]:
     except Exception as e:
         logger.warning("Address validation failed (falling back to original): %s", e)
         return {
-            "success": True,
+            "success": False,
             "corrected_address": address,
             "was_corrected": False,
-            "correction_note": "",
+            "correction_note": "Validation service unavailable; using original address.",
             "latitude": None,
             "longitude": None,
             "is_complete": False,

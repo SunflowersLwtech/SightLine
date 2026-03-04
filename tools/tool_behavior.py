@@ -37,7 +37,7 @@ def resolve_tool_behavior(
     if name == "identify_person":
         return ToolBehavior.SILENT
 
-    if name in {"navigate_to", "navigate_location"} and lod <= 1:
+    if name == "navigate_to" and lod <= 1:
         return ToolBehavior.INTERRUPT
 
     # Keep API shape stable even though current policy defaults to WHEN_IDLE.

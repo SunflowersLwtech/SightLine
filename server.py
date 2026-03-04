@@ -1213,7 +1213,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
     # Output transcription buffering (avoid flooding client with fragments)
     _transcript_buffer: str = ""
-    _transcript_buffer_last_update: float = 0.0
+    _transcript_buffer_started_at: float = 0.0  # when first fragment arrived
     _TRANSCRIPT_FLUSH_TIMEOUT_SEC = 1.5
 
     _SENTENCE_BOUNDARY_RE = re.compile(r"[。！？.!?\n]")
@@ -1224,10 +1224,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
     async def _flush_transcript_buffer() -> bool:
         """Flush the accumulated transcript buffer to the client."""
-        nonlocal _transcript_buffer, _transcript_buffer_last_update
+        nonlocal _transcript_buffer, _transcript_buffer_started_at
         text = _transcript_buffer.strip()
         _transcript_buffer = ""
-        _transcript_buffer_last_update = 0.0
+        _transcript_buffer_started_at = 0.0
         if not text:
             return True
         # Track for echo detection
@@ -1727,9 +1727,11 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             return
 
         # B-5: Pre-feedback — immediate audio cue before analysis starts
-        # Suppress during camera activation grace period
+        # Suppress during camera activation grace period AND vision spoken cooldown
         if (now_mono - _last_vision_prefeedback_at >= VISION_PREFEEDBACK_COOLDOWN_SEC
-                and (_camera_activated_at <= 0 or now_mono - _camera_activated_at >= _CAMERA_GRACE_PERIOD_SEC)):
+                and (_camera_activated_at <= 0 or now_mono - _camera_activated_at >= _CAMERA_GRACE_PERIOD_SEC)
+                and not ctx_queue.vision_spoken_cooldown_active
+                and not _first_vision_after_camera):
             await _forward_agent_transcript("Let me look at that for you...")
             _last_vision_prefeedback_at = now_mono
 
@@ -2117,6 +2119,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     payload = raw_bytes[1:]
 
                     if magic == _MAGIC_AUDIO:
+                        _last_user_activity_at = time.monotonic()
                         blob = types.Blob(
                             data=payload,
                             mime_type="audio/pcm;rate=16000",
@@ -2138,8 +2141,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                             _last_frame_to_gemini_at = now_frame
 
                         # Trigger async sub-agents (same logic as JSON path)
-                        import time as _time
-                        now = _time.monotonic()
+                        now = time.monotonic()
                         lod = session_ctx.current_lod
                         # Vision intervals widened: LOD1: 10s, LOD2: 8s, LOD3: 5s
                         vision_interval = {1: 10.0, 2: 8.0, 3: 5.0}.get(lod, 8.0)
@@ -2226,8 +2228,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         _last_frame_to_gemini_at = now_frame
 
                     # Phase 3: Trigger async sub-agents on image frames
-                    import time as _time
-                    now = _time.monotonic()
+                    now = time.monotonic()
                     lod = session_ctx.current_lod
 
                     # Vision analysis: LOD-aware frequency (widened)
@@ -2359,6 +2360,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         logger.info("Force LOD gesture received: %d -> %d", old_lod, forced_lod)
                         resume_prompt = on_lod_change(session_ctx, old_lod, forced_lod)
                         session_ctx.current_lod = forced_lod
+                        # Clear one-shot voice intent flags (same as automatic LOD transition)
+                        session_ctx.user_requested_detail = False
+                        session_ctx.user_said_stop = False
                         session_meta.record_lod_time(forced_lod)
                         telemetry_agg.update_lod(forced_lod)
 
@@ -2621,7 +2625,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
     async def _process_telemetry(telemetry_data: dict) -> None:
         """Process a telemetry tick: semantic text + LOD decision."""
-        import time as _time
         nonlocal _last_telemetry_signature, _last_telemetry_context_sent_at
         nonlocal _current_location_ctx
 
@@ -2629,7 +2632,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         session_manager.update_ephemeral_context(session_id, ephemeral_ctx)
 
         # Semantic text injection (LOD-aware throttle)
-        now = _time.monotonic()
+        now = time.monotonic()
         if telemetry_agg.should_send(now):
             signature = _build_telemetry_signature(ephemeral_ctx)
             should_inject, reasons = _should_inject_telemetry_context(
@@ -2746,7 +2749,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         Processes session_resumption_update events, transcriptions,
         function calls, and content parts (audio binary / text JSON).
         """
-        nonlocal _transcript_buffer, _transcript_buffer_last_update, _turn_had_vision_content, _model_audio_last_seen_at
+        nonlocal _transcript_buffer, _transcript_buffer_started_at, _turn_had_vision_content, _model_audio_last_seen_at
         nonlocal _last_user_activity_at, _last_interrupt_at, _is_interrupted
 
         def _start_live_events():
@@ -2996,16 +2999,17 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         _turn_had_vision_content = True
                     # Buffer fragments instead of forwarding immediately
                     _transcript_buffer += event.output_transcription.text
-                    _transcript_buffer_last_update = now_mono
+                    if _transcript_buffer_started_at == 0.0:
+                        _transcript_buffer_started_at = now_mono
                     logger.debug("Buffered transcript fragment: %s", event.output_transcription.text[:80])
                     # Flush on sentence boundary
                     if _has_sentence_boundary(_transcript_buffer):
                         if not await _flush_transcript_buffer():
                             break
                         _output_transcription_forwarded = True
-                    # Flush on timeout (stale buffer)
-                    elif (_transcript_buffer_last_update > 0
-                          and (now_mono - _transcript_buffer_last_update) > _TRANSCRIPT_FLUSH_TIMEOUT_SEC):
+                    # Flush on timeout (stale buffer since first fragment)
+                    elif (_transcript_buffer_started_at > 0
+                          and (now_mono - _transcript_buffer_started_at) > _TRANSCRIPT_FLUSH_TIMEOUT_SEC):
                         if not await _flush_transcript_buffer():
                             break
                         _output_transcription_forwarded = True
@@ -3080,10 +3084,26 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 pass
 
     try:
-        await asyncio.wait_for(
-            asyncio.gather(_upstream(), _downstream()),
+        upstream_task = asyncio.create_task(_upstream())
+        downstream_task = asyncio.create_task(_downstream())
+        done, pending = await asyncio.wait(
+            [upstream_task, downstream_task],
             timeout=SESSION_TIMEOUT_SEC,
+            return_when=asyncio.FIRST_COMPLETED,
         )
+        # If one side finishes (normally or with error), cancel the other
+        stop_downstream.set()
+        for task in pending:
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+        # Re-raise any exceptions from the completed tasks
+        for task in done:
+            if task.exception() and not isinstance(task.exception(), asyncio.CancelledError):
+                logger.exception("Session task failed: user=%s session=%s", user_id, session_id,
+                                 exc_info=task.exception())
     except asyncio.TimeoutError:
         logger.info(
             "Session timeout (%ds): user=%s session=%s",
@@ -3120,7 +3140,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         try:
             if _current_location_ctx:
                 place = getattr(_current_location_ctx, "place_name", "")
-                if place:
+                if place and place not in session_meta.locations_visited:
                     session_meta.locations_visited.append(place)
         except Exception:
             logger.debug("ACE session end data failed", exc_info=True)

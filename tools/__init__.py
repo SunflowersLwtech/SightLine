@@ -65,7 +65,10 @@ from tools.ocr_tool import (
     OCR_TOOL_DECLARATIONS,
     extract_text_from_camera,
 )
-from memory.memory_tools import MEMORY_FUNCTIONS
+try:
+    from memory.memory_tools import MEMORY_FUNCTIONS
+except ImportError:
+    MEMORY_FUNCTIONS: dict = {}
 from tools.tool_behavior import ToolBehavior, behavior_to_text, resolve_tool_behavior
 
 
