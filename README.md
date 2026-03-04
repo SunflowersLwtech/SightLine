@@ -502,6 +502,29 @@ In Xcode: `⌘+U` or `Product → Test`
 6. Test face registration → upload photo → verify recognition
 7. Pair Apple Watch → verify heart rate appears in telemetry
 
+### 3.1 Automated Multi-Turn Voice Replay (Gemini TTS)
+
+Use Gemini TTS to build high-quality test utterances, then replay them continuously
+to the websocket endpoint (`activity_start -> audio chunks -> activity_end`).
+
+```bash
+conda activate sightline
+cd SightLine
+
+# Generate + run with built-in turn set
+python scripts/gemini_tts_multiturn_test.py \
+  --ws-url ws://127.0.0.1:8100/ws/test_user/multiturn_001
+
+# Use custom turns
+python scripts/gemini_tts_multiturn_test.py \
+  --turns-file scripts/multiturn_turns.example.json \
+  --ws-url ws://127.0.0.1:8100/ws/test_user/multiturn_002
+```
+
+Outputs:
+- Audio artifacts: `artifacts/multiturn_tts/<timestamp>/audio/*.wav|*.raw`
+- Structured report: `artifacts/multiturn_tts/<timestamp>/report.json`
+
 ### 4. Cloud Run Verification
 
 ```bash

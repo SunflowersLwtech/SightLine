@@ -1,0 +1,20 @@
+[
+  {
+    "id": "warmup_greeting",
+    "text": "你好，请先确认你已经准备好进行语音导航协助。"
+  },
+  {
+    "id": "crosswalk_safety",
+    "text": "假设前方十米是人行横道，请给我两条安全提醒。",
+    "expect_contains": ["安全"]
+  },
+  {
+    "id": "noise_strategy",
+    "text": "如果环境噪声很大，你会如何调整提示方式？请回答两点。"
+  },
+  {
+    "id": "session_summary",
+    "text": "请用三句话总结我们刚才的对话重点。"
+  }
+]
+
