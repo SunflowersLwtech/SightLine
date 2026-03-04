@@ -41,6 +41,9 @@ sightline-backend-sa.json
 build/
 dist/
 *.egg-info/
+artifacts/live_diagnostic_suite/
+artifacts/e2e_multiturn_fix_sample/
+artifacts/e2e_multiturn_quick/
 
 # Xcode / Apple platforms
 DerivedData/
