@@ -566,9 +566,10 @@ class TestValidateAddress:
 
         result = validate_address("some address")
 
-        assert result["success"] is True
+        assert result["success"] is False
         assert result["corrected_address"] == "some address"
         assert result["was_corrected"] is False
+        assert "unavailable" in result["correction_note"].lower()
 
 
 class TestPreviewDestination:
