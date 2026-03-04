@@ -54,6 +54,7 @@ def create_session_service():
     location = os.getenv("GOOGLE_CLOUD_REGION", "us-central1")
     use_vertex = _env_flag("GOOGLE_GENAI_USE_VERTEXAI", default=False)
     db_url = os.getenv("SESSION_DB_URL", "sqlite:///sightline_sessions.db")
+    service_mode = os.getenv("SESSION_SERVICE_MODE", "auto").strip().lower()
 
     try:
         sessions_mod = importlib.import_module("google.adk.sessions")
@@ -61,7 +62,17 @@ def create_session_service():
         logger.exception("google.adk.sessions import failed; no session service available")
         raise
 
-    if use_vertex and hasattr(sessions_mod, "VertexAiSessionService"):
+    InMemory = getattr(sessions_mod, "InMemorySessionService", None)
+    if InMemory is None:
+        raise RuntimeError("google.adk.sessions.InMemorySessionService is unavailable")
+
+    # Explicit override for local debugging / deterministic tests.
+    # Useful when Vertex session service rejects user-provided session IDs.
+    if service_mode == "inmemory":
+        logger.info("Using InMemorySessionService override (SESSION_SERVICE_MODE=inmemory)")
+        return InMemory()
+
+    if (service_mode in {"auto", "vertex"}) and use_vertex and hasattr(sessions_mod, "VertexAiSessionService"):
         Vertex = sessions_mod.VertexAiSessionService
         try:
             service = Vertex(
@@ -83,7 +94,7 @@ def create_session_service():
         except Exception:
             logger.exception("VertexAiSessionService initialization failed; falling back")
 
-    if (not use_vertex) and hasattr(sessions_mod, "DatabaseSessionService"):
+    if (service_mode in {"auto", "database"}) and (not use_vertex) and hasattr(sessions_mod, "DatabaseSessionService"):
         Database = sessions_mod.DatabaseSessionService
         try:
             service = Database(db_url=db_url)
@@ -106,10 +117,6 @@ def create_session_service():
         else:
             logger.info("Using DatabaseSessionService (db_url=%s)", db_url)
             return service
-
-    InMemory = getattr(sessions_mod, "InMemorySessionService", None)
-    if InMemory is None:
-        raise RuntimeError("google.adk.sessions.InMemorySessionService is unavailable")
 
     logger.info("Using InMemorySessionService fallback")
     return InMemory()
@@ -260,6 +267,7 @@ class SessionManager:
             logger.info("Starting fresh session %s (no cached handle)", session_id)
 
         vad_preset = get_lod_vad_preset(lod)
+        aad_disabled = _env_flag("LIVE_AAD_DISABLED", default=True)
 
         # Only pass language_code if it's supported by the native audio model.
         # Unsupported languages (e.g. zh-CN) are handled via system instructions
@@ -296,7 +304,10 @@ class SessionManager:
             ),
             realtime_input_config=types.RealtimeInputConfig(
                 automatic_activity_detection=types.AutomaticActivityDetection(
-                    disabled=False,
+                    # We use explicit activity_start/activity_end from client.
+                    # Keeping server-side AAD disabled avoids turn-stall behavior
+                    # observed with native-audio model under TURN_INCLUDES_ONLY_ACTIVITY.
+                    disabled=aad_disabled,
                     start_of_speech_sensitivity=vad_preset["start_sensitivity"],
                     end_of_speech_sensitivity=vad_preset["end_sensitivity"],
                     prefix_padding_ms=vad_preset["prefix_padding_ms"],

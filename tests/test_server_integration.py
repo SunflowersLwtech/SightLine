@@ -11,6 +11,7 @@ LOD state initialisation, and protocol compliance.
 """
 
 import json
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -137,6 +138,32 @@ class TestSessionManager:
         message = build_vad_runtime_update_message(1)
         assert "[VAD UPDATE]" in message
         assert "silence_duration_ms" in message
+
+    def test_run_config_disables_aad_by_default(self):
+        """Live AAD should default to disabled when client sends activity markers."""
+        from live_api.session_manager import SessionManager
+        mgr = SessionManager()
+        config = mgr.get_run_config("test_aad_default", lod=2)
+        aad = config.realtime_input_config.automatic_activity_detection
+        assert aad is not None
+        assert aad.disabled is True
+
+    def test_run_config_aad_override_via_env(self):
+        """LIVE_AAD_DISABLED=false should re-enable server-side AAD explicitly."""
+        from live_api.session_manager import SessionManager
+        prev = os.environ.get("LIVE_AAD_DISABLED")
+        os.environ["LIVE_AAD_DISABLED"] = "false"
+        try:
+            mgr = SessionManager()
+            config = mgr.get_run_config("test_aad_override", lod=2)
+            aad = config.realtime_input_config.automatic_activity_detection
+            assert aad is not None
+            assert aad.disabled is False
+        finally:
+            if prev is None:
+                os.environ.pop("LIVE_AAD_DISABLED", None)
+            else:
+                os.environ["LIVE_AAD_DISABLED"] = prev
 
 
 # ---------------------------------------------------------------------------

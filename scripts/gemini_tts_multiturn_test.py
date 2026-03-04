@@ -78,6 +78,10 @@ class TurnResult:
     agent_transcripts: list[str]
     interrupted_events: int
     downstream_audio_bytes: int
+    message_type_counts: dict[str, int]
+    tool_events: list[dict[str, Any]]
+    lod_updates: list[dict[str, Any]]
+    activity_debug_events: list[dict[str, Any]]
 
 
 @dataclass
@@ -219,6 +223,14 @@ def _resample_linear_int16(samples: np.ndarray, src_rate: int, dst_rate: int) ->
     return np.clip(np.round(dst), -32768, 32767).astype(np.int16)
 
 
+def _signal_smoothness_score(samples: np.ndarray) -> float:
+    """Lower is typically smoother (speech-like) for adjacent-sample deltas."""
+    if samples.size < 2:
+        return float("inf")
+    diff = np.abs(np.diff(samples.astype(np.int32)))
+    return float(diff.mean())
+
+
 def _extract_inline_audio(response: types.GenerateContentResponse) -> tuple[bytes, str]:
     parts = response.parts or []
     for part in parts:
@@ -302,7 +314,14 @@ def _synthesize_turn_audio(
     elif "audio/pcm" in mime_lower or "audio/l16" in mime_lower:
         src_rate = _parse_sample_rate_from_mime(mime_type, default_rate=24000)
         usable = len(audio_data) - (len(audio_data) % 2)
-        src_samples = np.frombuffer(audio_data[:usable], dtype="<i2").astype(np.int16)
+        if "audio/l16" in mime_lower:
+            # Some providers label L16 but still emit little-endian PCM.
+            # Decode both endian variants and choose the smoother waveform.
+            le = np.frombuffer(audio_data[:usable], dtype="<i2").astype(np.int16)
+            be = np.frombuffer(audio_data[:usable], dtype=">i2").astype(np.int16)
+            src_samples = le if _signal_smoothness_score(le) <= _signal_smoothness_score(be) else be
+        else:
+            src_samples = np.frombuffer(audio_data[:usable], dtype="<i2").astype(np.int16)
         buf = io.BytesIO()
         with wave.open(buf, "wb") as wf:
             wf.setnchannels(1)
@@ -385,6 +404,43 @@ async def _wait_for_type(
             return event
 
 
+async def _await_initial_model_idle(
+    queue: asyncio.Queue[QueueEvent],
+    *,
+    timeout_sec: float,
+    quiet_sec: float,
+) -> bool:
+    """Wait for initial agent greeting/output to finish before replay turns."""
+    deadline = time.monotonic() + timeout_sec
+    saw_agent_output = False
+    last_agent_event_ts: float | None = None
+
+    while True:
+        now = time.monotonic()
+        if saw_agent_output and last_agent_event_ts is not None and (now - last_agent_event_ts) >= quiet_sec:
+            return True
+        if now >= deadline:
+            return saw_agent_output
+
+        wait_for = min(0.25, max(0.01, deadline - now))
+        try:
+            event = await asyncio.wait_for(queue.get(), timeout=wait_for)
+        except asyncio.TimeoutError:
+            continue
+
+        if event.kind == "audio_bytes":
+            saw_agent_output = True
+            last_agent_event_ts = event.ts_mono
+            continue
+
+        if event.kind != "json":
+            continue
+        payload = event.payload if isinstance(event.payload, dict) else {}
+        if str(payload.get("type")) == "transcript" and str(payload.get("role")) == "agent":
+            saw_agent_output = True
+            last_agent_event_ts = event.ts_mono
+
+
 def _drain_queue(queue: asyncio.Queue[QueueEvent]) -> int:
     drained = 0
     while True:
@@ -437,6 +493,10 @@ async def _collect_turn_result(
     failures: list[str] = []
     interrupted_events = 0
     downstream_audio_bytes = 0
+    message_type_counts: dict[str, int] = {}
+    tool_events: list[dict[str, Any]] = []
+    lod_updates: list[dict[str, Any]] = []
+    activity_debug_events: list[dict[str, Any]] = []
 
     first_user_latency: float | None = None
     first_agent_latency: float | None = None
@@ -466,6 +526,7 @@ async def _collect_turn_result(
 
         payload = event.payload if isinstance(event.payload, dict) else {}
         msg_type = str(payload.get("type"))
+        message_type_counts[msg_type] = message_type_counts.get(msg_type, 0) + 1
 
         if msg_type == "transcript":
             role = str(payload.get("role", ""))
@@ -485,6 +546,27 @@ async def _collect_turn_result(
 
         elif msg_type == "interrupted":
             interrupted_events += 1
+
+        elif msg_type == "tool_event":
+            tool_events.append({
+                "tool": payload.get("tool"),
+                "status": payload.get("status"),
+                "behavior": payload.get("behavior"),
+            })
+
+        elif msg_type == "lod_update":
+            lod_updates.append({
+                "lod": payload.get("lod"),
+                "reason": payload.get("reason"),
+            })
+
+        elif msg_type == "debug_activity":
+            data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+            activity_debug_events.append({
+                "event": data.get("event"),
+                "state": data.get("state"),
+                "queue_status": data.get("queue_status"),
+            })
 
         elif msg_type == "error":
             err = payload.get("message") or payload.get("error") or "unknown error"
@@ -513,6 +595,10 @@ async def _collect_turn_result(
         agent_transcripts=agent_transcripts,
         interrupted_events=interrupted_events,
         downstream_audio_bytes=downstream_audio_bytes,
+        message_type_counts=message_type_counts,
+        tool_events=tool_events,
+        lod_updates=lod_updates,
+        activity_debug_events=activity_debug_events,
     )
 
 
@@ -528,6 +614,8 @@ async def _run_multiturn_replay(
     per_turn_timeout_sec: float,
     idle_after_agent_sec: float,
     post_turn_silence_ms: int,
+    initial_idle_timeout_sec: float,
+    initial_idle_quiet_sec: float,
 ) -> list[TurnResult]:
     event_queue: asyncio.Queue[QueueEvent] = asyncio.Queue()
     results: list[TurnResult] = []
@@ -538,6 +626,11 @@ async def _run_multiturn_replay(
             await _wait_for_type(event_queue, "session_ready", timeout_sec=15.0)
             if warmup_sec > 0:
                 await asyncio.sleep(warmup_sec)
+            await _await_initial_model_idle(
+                event_queue,
+                timeout_sec=initial_idle_timeout_sec,
+                quiet_sec=initial_idle_quiet_sec,
+            )
             _ = _drain_queue(event_queue)
 
             chunk_size_bytes = _build_chunk_size_bytes(chunk_ms, sample_rate)
@@ -599,6 +692,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--per-turn-timeout-sec", type=float, default=25.0, help="Max wait per turn for transcripts.")
     parser.add_argument("--idle-after-agent-sec", type=float, default=1.2, help="Turn closes after this long agent transcript silence.")
     parser.add_argument("--post-turn-silence-ms", type=int, default=250, help="Silence gap after each uploaded turn.")
+    parser.add_argument("--initial-idle-timeout-sec", type=float, default=45.0, help="Max wait for initial greeting/output to settle.")
+    parser.add_argument("--initial-idle-quiet-sec", type=float, default=1.5, help="Required quiet window after initial model output.")
     parser.add_argument("--dry-run", action="store_true", help="Resolve config and print plan only.")
     return parser
 
@@ -678,6 +773,8 @@ async def _async_main(args: argparse.Namespace) -> int:
             per_turn_timeout_sec=args.per_turn_timeout_sec,
             idle_after_agent_sec=args.idle_after_agent_sec,
             post_turn_silence_ms=args.post_turn_silence_ms,
+            initial_idle_timeout_sec=args.initial_idle_timeout_sec,
+            initial_idle_quiet_sec=args.initial_idle_quiet_sec,
         )
 
     report = {

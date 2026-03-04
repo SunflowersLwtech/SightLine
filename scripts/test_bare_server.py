@@ -85,6 +85,7 @@ runner = Runner(
 
 def get_bare_run_config() -> RunConfig:
     """Absolutely minimal Live API config."""
+    aad_disabled = os.getenv("LIVE_AAD_DISABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
     return RunConfig(
         streaming_mode=StreamingMode.BIDI,
         response_modalities=[types.Modality.AUDIO],
@@ -104,7 +105,7 @@ def get_bare_run_config() -> RunConfig:
         output_audio_transcription=types.AudioTranscriptionConfig(),
         realtime_input_config=types.RealtimeInputConfig(
             automatic_activity_detection=types.AutomaticActivityDetection(
-                disabled=False,
+                disabled=aad_disabled,
                 start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
                 end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_LOW,
                 prefix_padding_ms=200,

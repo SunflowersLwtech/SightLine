@@ -81,3 +81,15 @@ def test_factory_falls_back_to_in_memory_when_database_unavailable(
     service = create_session_service()
 
     assert isinstance(service, InMemorySessionService)
+
+
+def test_factory_respects_explicit_inmemory_override(monkeypatch: pytest.MonkeyPatch):
+    VertexAiSessionService, DatabaseSessionService, InMemorySessionService = _install_sessions_stub(monkeypatch)
+    monkeypatch.setenv("GOOGLE_GENAI_USE_VERTEXAI", "TRUE")
+    monkeypatch.setenv("SESSION_SERVICE_MODE", "inmemory")
+
+    service = create_session_service()
+
+    assert isinstance(service, InMemorySessionService)
+    assert not isinstance(service, VertexAiSessionService)
+    assert not isinstance(service, DatabaseSessionService)
