@@ -99,6 +99,26 @@ DEMO_USERS = [
             "updated_at": firestore.SERVER_TIMESTAMP,
         },
     },
+    {
+        "doc_id": "e2e-user",
+        "data": {
+            "vision_status": "totally_blind",
+            "blindness_onset": "congenital",
+            "onset_age": None,
+            "has_guide_dog": False,
+            "has_white_cane": True,
+            "tts_speed": 1.5,
+            "verbosity_preference": "detailed",
+            "language": "en-US",
+            "description_priority": "spatial",
+            "color_description": False,
+            "om_level": "intermediate",
+            "travel_frequency": "weekly",
+            "preferred_name": "TestUser",
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "updated_at": firestore.SERVER_TIMESTAMP,
+        },
+    },
 ]
 
 
