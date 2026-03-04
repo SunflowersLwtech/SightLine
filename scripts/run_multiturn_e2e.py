@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+import fnmatch
 import io
 import json
 import logging
@@ -22,6 +23,7 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 import wave
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -1411,6 +1413,7 @@ class TurnResult:
     first_agent_transcript_latency: float | None = None
     collect_duration_sec: float = 0.0
     notes: str = ""
+    request_reconnect: bool = False
 
 
 @dataclass
@@ -1430,7 +1433,32 @@ class ConversationResult:
 # ---------------------------------------------------------------------------
 
 def _create_client() -> genai.Client:
-    """Create a Google AI API client (NOT Vertex AI) for TTS."""
+    """Create a client for TTS/Imagen, preferring Vertex credentials when available."""
+    use_vertex_raw = (os.getenv("GOOGLE_GENAI_USE_VERTEXAI") or "").strip().lower()
+    vertex_explicit_true = use_vertex_raw in {"1", "true", "yes", "on"}
+    vertex_explicit_false = use_vertex_raw in {"0", "false", "no", "off"}
+    project = (os.getenv("GOOGLE_CLOUD_PROJECT") or "").strip()
+    location = (
+        os.getenv("GOOGLE_CLOUD_LOCATION")
+        or os.getenv("GOOGLE_CLOUD_REGION")
+        or "us-central1"
+    ).strip()
+    auto_prefer_vertex = not use_vertex_raw and bool(project)
+    use_vertex = vertex_explicit_true or auto_prefer_vertex
+
+    if use_vertex and project:
+        try:
+            return genai.Client(vertexai=True, project=project, location=location)
+        except Exception as exc:
+            if vertex_explicit_true:
+                log.warning("Vertex client init failed (explicitly requested), falling back to API key: %s", exc)
+            else:
+                log.info("Vertex auto-detect init failed, falling back to API key: %s", exc)
+    elif vertex_explicit_true and not project:
+        log.warning("GOOGLE_GENAI_USE_VERTEXAI=true but GOOGLE_CLOUD_PROJECT is empty; falling back to API key.")
+    elif vertex_explicit_false:
+        log.info("GOOGLE_GENAI_USE_VERTEXAI explicitly disabled; using API key path.")
+
     api_key = (
         os.getenv("_GOOGLE_AI_API_KEY")
         or os.getenv("GEMINI_API_KEY")
@@ -1438,10 +1466,7 @@ def _create_client() -> genai.Client:
         or ""
     ).strip()
     if not api_key:
-        raise RuntimeError("No API key. Set GEMINI_API_KEY or GOOGLE_API_KEY.")
-    # Explicitly disable Vertex AI — TTS uses Google AI API with API key auth.
-    # The env may have GOOGLE_GENAI_USE_VERTEXAI=TRUE for the Live API (orchestrator),
-    # but TTS/Vision sub-agents go through Google AI API.
+        raise RuntimeError("No API key and Vertex init unavailable. Set GOOGLE_GENAI_USE_VERTEXAI or GEMINI_API_KEY.")
     return genai.Client(api_key=api_key, vertexai=False)
 
 
@@ -1494,24 +1519,58 @@ def _parse_rate_from_mime(mime: str) -> int:
     return int(m.group(1)) if m else 24000
 
 
+def _synthesize_pcm_local_fallback(text: str) -> bytes:
+    """Fallback TTS via local macOS `say` + ffmpeg when Gemini quota is exhausted."""
+    tmp_root = Path("/tmp/sightline_runs/tts_local_fallback")
+    tmp_root.mkdir(parents=True, exist_ok=True)
+    token = uuid.uuid4().hex[:10]
+    aiff_path = tmp_root / f"{token}.aiff"
+    pcm_path = tmp_root / f"{token}.pcm16k.raw"
+
+    say_cmd = ["say", "-v", "Samantha", "-o", str(aiff_path), text]
+    say_result = subprocess.run(say_cmd, capture_output=True, text=True)
+    if say_result.returncode != 0:
+        raise RuntimeError(f"local say fallback failed: {say_result.stderr[:200]}")
+
+    ffmpeg_cmd = [
+        "ffmpeg", "-y",
+        "-i", str(aiff_path),
+        "-ac", "1",
+        "-ar", str(TARGET_SAMPLE_RATE),
+        "-f", "s16le",
+        str(pcm_path),
+    ]
+    ffmpeg_result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+    if ffmpeg_result.returncode != 0:
+        raise RuntimeError(f"local ffmpeg fallback failed: {ffmpeg_result.stderr[:200]}")
+    return pcm_path.read_bytes()
+
+
 def synthesize_pcm(client: genai.Client, text: str, voice: str = "Aoede") -> bytes:
     """Synthesize text to 16kHz mono int16 PCM bytes."""
-    response = client.models.generate_content(
-        model=TTS_MODEL,
-        contents=(
-            "Read the following text naturally. Do not add extra words.\n\n"
-            + text
-        ),
-        config=types.GenerateContentConfig(
-            response_modalities=["AUDIO"],
-            speech_config=types.SpeechConfig(
-                voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)
-                ),
-                language_code="en-US",
+    try:
+        response = client.models.generate_content(
+            model=TTS_MODEL,
+            contents=(
+                "Read the following text naturally. Do not add extra words.\n\n"
+                + text
             ),
-        ),
-    )
+            config=types.GenerateContentConfig(
+                response_modalities=["AUDIO"],
+                speech_config=types.SpeechConfig(
+                    voice_config=types.VoiceConfig(
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)
+                    ),
+                    language_code="en-US",
+                ),
+            ),
+        )
+    except Exception as exc:
+        exc_text = str(exc)
+        if "429" in exc_text or "RESOURCE_EXHAUSTED" in exc_text:
+            log.warning("Gemini TTS quota exhausted; using local fallback for this turn.")
+            return _synthesize_pcm_local_fallback(text)
+        raise
     audio_data, mime = _extract_audio(response)
     mime_lower = mime.lower()
 
@@ -1643,6 +1702,11 @@ async def run_conversation(
     timeout_mult: float = 1.0,
     ws_ping_interval: float | None = None,
     ws_ping_timeout: float | None = None,
+    connect_retries: int = 4,
+    connect_backoff_sec: float = 4.0,
+    session_ready_timeout_sec: float = 35.0,
+    turn_retry_on_reconnect: int = 1,
+    inter_turn_delay_sec: float = 1.5,
 ) -> ConversationResult:
     """Run a full multi-turn conversation against the server."""
     conv_id = conversation["id"]
@@ -1655,47 +1719,73 @@ async def run_conversation(
     turn_results: list[TurnResult] = []
     t0_total = time.monotonic()
 
-    try:
-        async with websockets.connect(
-            ws_url,
-            max_size=None,
-            ping_interval=ws_ping_interval,
-            ping_timeout=ws_ping_timeout,
-            close_timeout=10.0,
-        ) as ws:
-            # Wait for session_ready
-            deadline = time.monotonic() + 20.0
-            while True:
-                remain = deadline - time.monotonic()
-                if remain <= 0:
-                    raise TimeoutError("session_ready timeout")
-                raw = await asyncio.wait_for(ws.recv(), timeout=remain)
-                if isinstance(raw, bytes):
-                    continue
-                msg = json.loads(raw)
-                if msg.get("type") == "session_ready":
-                    log.info("[%s] session_ready received", conv_id)
+    async def _open_ws(*, drain_initial_greeting: bool) -> websockets.ClientConnection:
+        last_exc: Exception | None = None
+        attempts = max(1, int(connect_retries))
+        for attempt in range(1, attempts + 1):
+            ws: websockets.ClientConnection | None = None
+            try:
+                ws = await websockets.connect(
+                    ws_url,
+                    max_size=None,
+                    ping_interval=ws_ping_interval,
+                    ping_timeout=ws_ping_timeout,
+                    close_timeout=10.0,
+                    open_timeout=max(5.0, float(session_ready_timeout_sec)),
+                )
+
+                deadline = time.monotonic() + float(session_ready_timeout_sec)
+                while True:
+                    remain = deadline - time.monotonic()
+                    if remain <= 0:
+                        raise TimeoutError("session_ready timeout")
+                    raw = await asyncio.wait_for(ws.recv(), timeout=remain)
+                    if isinstance(raw, bytes):
+                        continue
+                    msg = json.loads(raw)
+                    if msg.get("type") == "session_ready":
+                        log.info("[%s] session_ready received (attempt %d/%d)", conv_id, attempt, attempts)
+                        break
+
+                if drain_initial_greeting:
+                    await _drain_initial_greeting(ws, timeout_sec=15.0)
+                return ws
+            except Exception as exc:
+                last_exc = exc
+                if ws is not None:
+                    try:
+                        await ws.close()
+                    except Exception:
+                        pass
+                if attempt >= attempts:
                     break
+                backoff = max(0.0, float(connect_backoff_sec)) * attempt
+                log.warning(
+                    "[%s] WS connect/session_ready failed (attempt %d/%d): %s; retrying in %.1fs",
+                    conv_id,
+                    attempt,
+                    attempts,
+                    exc,
+                    backoff,
+                )
+                if backoff > 0:
+                    await asyncio.sleep(backoff)
+        raise RuntimeError(f"failed to connect conversation websocket: {last_exc}")
 
-            # Wait for initial model greeting to settle
-            await _drain_initial_greeting(ws, timeout_sec=15.0)
+    ws: websockets.ClientConnection | None = None
+    try:
+        ws = await _open_ws(drain_initial_greeting=True)
 
-            # Run each turn
-            connection_lost = False
-            for i, turn_def in enumerate(turns_def):
-                turn_id = turn_def["id"]
-                text = turn_def["text"]
-                collect_sec = turn_def.get("collect_sec", 25.0) * timeout_mult
-                log.info("[Turn %d/%d] %s: \"%s\"", i + 1, len(turns_def), turn_id, text)
+        # Run each turn with optional reconnect+retry
+        for i, turn_def in enumerate(turns_def):
+            turn_id = turn_def["id"]
+            text = turn_def["text"]
+            collect_sec = turn_def.get("collect_sec", 25.0) * timeout_mult
+            log.info("[Turn %d/%d] %s: \"%s\"", i + 1, len(turns_def), turn_id, text)
 
-                if connection_lost:
-                    turn_results.append(TurnResult(
-                        turn_id=turn_id,
-                        text=text,
-                        failures=["skipped_connection_lost"],
-                    ))
-                    continue
-
+            retry_budget = max(0, int(turn_retry_on_reconnect))
+            tr: TurnResult | None = None
+            while True:
                 try:
                     tr = await _run_single_turn(
                         ws=ws,
@@ -1704,33 +1794,74 @@ async def run_conversation(
                         image_dir=image_dir,
                         collect_sec=collect_sec,
                     )
-                    turn_results.append(tr)
                 except (websockets.exceptions.ConnectionClosed, ConnectionError, OSError) as exc:
-                    log.warning("[%s] Connection lost mid-turn: %s", turn_id, exc)
-                    connection_lost = True
-                    turn_results.append(TurnResult(
+                    if retry_budget > 0:
+                        retry_budget -= 1
+                        log.warning(
+                            "[%s] Connection lost mid-turn (%s). Reconnecting and retrying turn (%d retries left).",
+                            turn_id,
+                            exc,
+                            retry_budget,
+                        )
+                        if ws is not None:
+                            try:
+                                await ws.close()
+                            except Exception:
+                                pass
+                        ws = await _open_ws(drain_initial_greeting=False)
+                        continue
+                    tr = TurnResult(
                         turn_id=turn_id,
                         text=text,
                         failures=[f"connection_lost: {exc}"],
-                    ))
+                    )
+                    break
+
+                if tr.request_reconnect and retry_budget > 0:
+                    retry_budget -= 1
+                    log.warning(
+                        "[%s] Server requested reconnect (go_away/error). Retrying turn (%d retries left).",
+                        turn_id,
+                        retry_budget,
+                    )
+                    if ws is not None:
+                        try:
+                            await ws.close()
+                        except Exception:
+                            pass
+                    ws = await _open_ws(drain_initial_greeting=False)
                     continue
+                break
 
-                status = "PASS" if tr.passed else "FAIL"
-                agent_text = " ".join(tr.agent_transcripts)[:120]
-                log.info(
-                    "[%s] %s | user_lat=%.2fs agent_lat=%.2fs audio=%d | agent: %s",
-                    status, turn_id,
-                    tr.first_user_transcript_latency or -1,
-                    tr.first_agent_transcript_latency or -1,
-                    tr.audio_bytes_received,
-                    agent_text or "(no transcript)",
+            if tr is None:
+                tr = TurnResult(
+                    turn_id=turn_id,
+                    text=text,
+                    failures=["turn_result_missing"],
                 )
-                if tr.failures:
-                    for f in tr.failures:
-                        log.warning("  FAILURE: %s", f)
+            turn_results.append(tr)
 
-                # Brief pause between turns to let model settle
-                await asyncio.sleep(1.5)
+            status = "PASS" if tr.passed else "FAIL"
+            agent_text = " ".join(tr.agent_transcripts)[:120]
+            log.info(
+                "[%s] %s | user_lat=%.2fs agent_lat=%.2fs audio=%d | agent: %s",
+                status, turn_id,
+                tr.first_user_transcript_latency or -1,
+                tr.first_agent_transcript_latency or -1,
+                tr.audio_bytes_received,
+                agent_text or "(no transcript)",
+            )
+            if tr.failures:
+                for f in tr.failures:
+                    log.warning("  FAILURE: %s", f)
+            if tr.warnings:
+                for w in tr.warnings:
+                    if w.startswith("go_away_received"):
+                        log.warning("  WARNING: %s", w)
+
+            # Brief pause between turns to let model settle
+            if inter_turn_delay_sec > 0:
+                await asyncio.sleep(inter_turn_delay_sec)
 
     except Exception as exc:
         log.error("Conversation %s failed: %s", conv_id, exc)
@@ -1740,6 +1871,12 @@ async def run_conversation(
             text=str(exc),
             failures=[f"connection_error: {exc}"],
         ))
+    finally:
+        if ws is not None:
+            try:
+                await ws.close()
+            except Exception:
+                pass
 
     total_duration = time.monotonic() - t0_total
     passed = sum(1 for t in turn_results if t.passed)
@@ -1867,6 +2004,7 @@ async def _run_single_turn(
     # --- Collect responses ---
     _collect_warnings: list[str] = []
     _collect_failures: list[str] = []
+    request_reconnect = False
     deadline = time.monotonic() + collect_sec
     last_agent_ts: float | None = None
 
@@ -1937,11 +2075,13 @@ async def _run_single_turn(
             reason = payload.get("reason", "unknown")
             log.warning("Received go_away: %s", reason)
             _collect_warnings.append(f"go_away_received: {reason}")
+            request_reconnect = True
             break  # Stop collecting, server is about to close
         elif msg_type == "error":
             error_msg = payload.get("message", "unknown error")
             log.warning("Received error: %s", error_msg)
             _collect_failures.append(f"server_error: {error_msg}")
+            request_reconnect = True
             break  # Stop collecting on error
 
     duration = time.monotonic() - t0
@@ -2036,6 +2176,7 @@ async def _run_single_turn(
         first_agent_transcript_latency=first_agent_lat,
         collect_duration_sec=duration,
         notes=turn_def.get("notes", ""),
+        request_reconnect=request_reconnect,
     )
 
 
@@ -2083,6 +2224,37 @@ def _build_issues(turns: list[TurnResult]) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 async def async_main(args: argparse.Namespace) -> int:
+    def _filter_conversations(
+        conversations: list[dict[str, Any]],
+        patterns_csv: str,
+    ) -> list[dict[str, Any]]:
+        raw_patterns = [p.strip() for p in patterns_csv.split(",") if p.strip()]
+        if not raw_patterns:
+            return list(conversations)
+        selected: list[dict[str, Any]] = []
+        for conv in conversations:
+            conv_id = str(conv.get("id", ""))
+            if any(fnmatch.fnmatch(conv_id, p) for p in raw_patterns):
+                selected.append(conv)
+        return selected
+
+    session_1_conversations = list(SESSION_1_CONVERSATIONS)
+    session_2_conversations = list(SESSION_2_CONVERSATIONS)
+    if args.conversations:
+        session_1_conversations = _filter_conversations(session_1_conversations, args.conversations)
+        session_2_conversations = _filter_conversations(session_2_conversations, args.conversations)
+        log.info(
+            "Conversation filter '%s' => session1=%d session2=%d",
+            args.conversations,
+            len(session_1_conversations),
+            len(session_2_conversations),
+        )
+
+    selected_conversations = session_1_conversations + session_2_conversations
+    if not selected_conversations:
+        log.error("No conversations selected. Use --conversations with valid patterns.")
+        return 1
+
     out_dir = Path(args.output_dir).resolve()
     image_dir = out_dir / "images"
     audio_dir = out_dir / "audio"
@@ -2096,7 +2268,7 @@ async def async_main(args: argparse.Namespace) -> int:
     # Step 1: Generate test images (Imagen with ffmpeg fallback)
     log.info("--- Generating test images ---")
     needed_images = set()
-    for conv in ALL_CONVERSATIONS:
+    for conv in selected_conversations:
         for turn in conv["turns"]:
             img = turn.get("send_image")
             if img:
@@ -2111,7 +2283,7 @@ async def async_main(args: argparse.Namespace) -> int:
     pcm_cache: dict[str, bytes] = {}
 
     all_turns = []
-    for conv in ALL_CONVERSATIONS:
+    for conv in selected_conversations:
         all_turns.extend(conv["turns"])
 
     for i, turn in enumerate(all_turns):
@@ -2143,12 +2315,12 @@ async def async_main(args: argparse.Namespace) -> int:
                 await asyncio.sleep(30.0)
 
     # Step 3: Run Session 1 conversations (single WS per conversation)
-    log.info("--- Session 1: Running %d conversations ---", len(SESSION_1_CONVERSATIONS))
+    log.info("--- Session 1: Running %d conversations ---", len(session_1_conversations))
     results: list[ConversationResult] = []
     ws_ping_interval = args.ws_ping_interval if args.ws_ping_interval and args.ws_ping_interval > 0 else None
     ws_ping_timeout = args.ws_ping_timeout if args.ws_ping_timeout and args.ws_ping_timeout > 0 else None
 
-    for conv in SESSION_1_CONVERSATIONS:
+    for conv in session_1_conversations:
         result = await run_conversation(
             ws_base_url=args.server,
             conversation=conv,
@@ -2157,6 +2329,11 @@ async def async_main(args: argparse.Namespace) -> int:
             timeout_mult=args.timeout,
             ws_ping_interval=ws_ping_interval,
             ws_ping_timeout=ws_ping_timeout,
+            connect_retries=args.connect_retries,
+            connect_backoff_sec=args.connect_backoff_sec,
+            session_ready_timeout_sec=args.session_ready_timeout_sec,
+            turn_retry_on_reconnect=args.turn_retry_on_reconnect,
+            inter_turn_delay_sec=args.inter_turn_delay_sec,
         )
         results.append(result)
         log.info(
@@ -2167,32 +2344,40 @@ async def async_main(args: argparse.Namespace) -> int:
             len(result.issues),
             result.total_duration_sec,
         )
-        await asyncio.sleep(3.0)
+        if args.conversation_cooldown_sec > 0:
+            await asyncio.sleep(args.conversation_cooldown_sec)
 
     # Step 4: Run Session 2 (cross-session memory recall)
-    log.info("--- Session 2: Cross-session memory recall ---")
-    log.info("(Conv E stored memories → Conv F should recall them in new WS session)")
+    if session_2_conversations:
+        log.info("--- Session 2: Cross-session memory recall ---")
+        log.info("(Conv E stored memories → Conv F should recall them in new WS session)")
 
-    for conv in SESSION_2_CONVERSATIONS:
-        result = await run_conversation(
-            ws_base_url=args.server,
-            conversation=conv,
-            pcm_cache=pcm_cache,
-            image_dir=image_dir,
-            timeout_mult=args.timeout,
-            ws_ping_interval=ws_ping_interval,
-            ws_ping_timeout=ws_ping_timeout,
-        )
-        results.append(result)
-        log.info(
-            "[CROSS-SESSION] %s: %d/%d passed, %d issues, %.1fs total",
-            result.conversation_id,
-            result.passed_turns,
-            result.total_turns,
-            len(result.issues),
-            result.total_duration_sec,
-        )
-        await asyncio.sleep(3.0)
+        for conv in session_2_conversations:
+            result = await run_conversation(
+                ws_base_url=args.server,
+                conversation=conv,
+                pcm_cache=pcm_cache,
+                image_dir=image_dir,
+                timeout_mult=args.timeout,
+                ws_ping_interval=ws_ping_interval,
+                ws_ping_timeout=ws_ping_timeout,
+                connect_retries=args.connect_retries,
+                connect_backoff_sec=args.connect_backoff_sec,
+                session_ready_timeout_sec=args.session_ready_timeout_sec,
+                turn_retry_on_reconnect=args.turn_retry_on_reconnect,
+                inter_turn_delay_sec=args.inter_turn_delay_sec,
+            )
+            results.append(result)
+            log.info(
+                "[CROSS-SESSION] %s: %d/%d passed, %d issues, %.1fs total",
+                result.conversation_id,
+                result.passed_turns,
+                result.total_turns,
+                len(result.issues),
+                result.total_duration_sec,
+            )
+            if args.conversation_cooldown_sec > 0:
+                await asyncio.sleep(args.conversation_cooldown_sec)
 
     # Step 5: Write report
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -2246,8 +2431,9 @@ async def async_main(args: argparse.Namespace) -> int:
         }
         report["conversations"].append(conv_data)
 
+    enforce_chain_coverage = not bool(args.conversations)
     missing_chain_tools = sorted(required_chain_tools - observed_tools)
-    if missing_chain_tools:
+    if enforce_chain_coverage and missing_chain_tools:
         all_issues.append({
             "id": "MT-CHAIN-001",
             "turn": "SUITE",
@@ -2319,6 +2505,13 @@ def main() -> int:
     p.add_argument("--timeout", type=float, default=1.0, help="Timeout multiplier")
     p.add_argument("--ws-ping-interval", type=float, default=0.0, help="WebSocket ping interval seconds (<=0 disables)")
     p.add_argument("--ws-ping-timeout", type=float, default=0.0, help="WebSocket ping timeout seconds (<=0 disables)")
+    p.add_argument("--conversations", default="", help="Comma-separated fnmatch patterns for conversation IDs (e.g. 'conv_mixed_*,conv_narrative_*').")
+    p.add_argument("--connect-retries", type=int, default=4, help="Retries for websocket connect/session_ready handshake.")
+    p.add_argument("--connect-backoff-sec", type=float, default=4.0, help="Base backoff seconds between connect retries.")
+    p.add_argument("--session-ready-timeout-sec", type=float, default=35.0, help="Timeout waiting for session_ready.")
+    p.add_argument("--turn-retry-on-reconnect", type=int, default=1, help="How many times to retry a turn after reconnect/go_away.")
+    p.add_argument("--inter-turn-delay-sec", type=float, default=1.5, help="Delay between turns.")
+    p.add_argument("--conversation-cooldown-sec", type=float, default=8.0, help="Delay between conversations to avoid local capacity overlap.")
     args = p.parse_args()
     try:
         return asyncio.run(async_main(args))

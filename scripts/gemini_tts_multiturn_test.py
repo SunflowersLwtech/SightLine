@@ -249,19 +249,31 @@ def _extract_inline_audio(response: types.GenerateContentResponse) -> tuple[byte
 
 
 def _create_genai_client() -> genai.Client:
-    use_vertex = _bool_env("GOOGLE_GENAI_USE_VERTEXAI", default=False)
+    use_vertex_raw = (os.getenv("GOOGLE_GENAI_USE_VERTEXAI") or "").strip().lower()
+    vertex_explicit_true = use_vertex_raw in {"1", "true", "yes", "on"}
+    project = (os.getenv("GOOGLE_CLOUD_PROJECT") or "").strip()
+    location = (
+        os.getenv("GOOGLE_CLOUD_LOCATION")
+        or os.getenv("GOOGLE_CLOUD_REGION")
+        or "us-central1"
+    ).strip()
+    auto_prefer_vertex = not use_vertex_raw and bool(project)
+    use_vertex = vertex_explicit_true or auto_prefer_vertex
+
     if use_vertex:
-        project = (os.getenv("GOOGLE_CLOUD_PROJECT") or "").strip()
-        location = (
-            os.getenv("GOOGLE_CLOUD_LOCATION")
-            or os.getenv("GOOGLE_CLOUD_REGION")
-            or "us-central1"
-        ).strip()
         if not project:
-            raise RuntimeError(
-                "GOOGLE_GENAI_USE_VERTEXAI=true but GOOGLE_CLOUD_PROJECT is empty."
-            )
-        return genai.Client(vertexai=True, project=project, location=location)
+            if vertex_explicit_true:
+                raise RuntimeError(
+                    "GOOGLE_GENAI_USE_VERTEXAI=true but GOOGLE_CLOUD_PROJECT is empty."
+                )
+        else:
+            try:
+                return genai.Client(vertexai=True, project=project, location=location)
+            except Exception as exc:
+                if vertex_explicit_true:
+                    print(f"[warn] Vertex client init failed (explicit), falling back to API key: {exc}")
+                else:
+                    print(f"[info] Vertex auto-detect failed, falling back to API key: {exc}")
 
     api_key = (
         os.getenv("GEMINI_API_KEY")

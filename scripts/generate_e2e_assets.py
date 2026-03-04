@@ -165,7 +165,32 @@ def _resolve_api_key() -> str:
 
 
 def _create_genai_client() -> genai.Client:
-    """Create a google-genai Client using the first available API key."""
+    """Create a google-genai client, preferring Vertex when configured/available."""
+    use_vertex_raw = (os.getenv("GOOGLE_GENAI_USE_VERTEXAI") or "").strip().lower()
+    vertex_explicit_true = use_vertex_raw in {"1", "true", "yes", "on"}
+    vertex_explicit_false = use_vertex_raw in {"0", "false", "no", "off"}
+    project = (os.getenv("GOOGLE_CLOUD_PROJECT") or "").strip()
+    location = (
+        os.getenv("GOOGLE_CLOUD_LOCATION")
+        or os.getenv("GOOGLE_CLOUD_REGION")
+        or "us-central1"
+    ).strip()
+    auto_prefer_vertex = not use_vertex_raw and bool(project)
+    use_vertex = vertex_explicit_true or auto_prefer_vertex
+
+    if use_vertex and project:
+        try:
+            return genai.Client(vertexai=True, project=project, location=location)
+        except Exception as exc:
+            if vertex_explicit_true:
+                log.warning("Vertex client init failed (explicit), falling back to API key: %s", exc)
+            else:
+                log.info("Vertex auto-detect failed, falling back to API key: %s", exc)
+    elif vertex_explicit_true and not project:
+        log.warning("GOOGLE_GENAI_USE_VERTEXAI=true but GOOGLE_CLOUD_PROJECT is empty; using API key.")
+    elif vertex_explicit_false:
+        log.info("GOOGLE_GENAI_USE_VERTEXAI explicitly disabled; using API key.")
+
     return genai.Client(api_key=_resolve_api_key())
 
 

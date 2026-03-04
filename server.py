@@ -165,6 +165,7 @@ VISION_REPEAT_SUPPRESS_SEC = 18.0
 OCR_REPEAT_SUPPRESS_SEC = 20.0
 VISION_PREFEEDBACK_COOLDOWN_SEC = 12.0
 OCR_PREFEEDBACK_COOLDOWN_SEC = 15.0
+PASSIVE_SPEECH_GUARD_SEC = 8.0
 
 # Regex to strip internal context tags before sending to client
 _INTERNAL_TAG_RE = re.compile(
@@ -1429,7 +1430,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     _last_interrupt_at: float = 0.0
     _INTERRUPT_DEBOUNCE_SEC = 1.0
     _downstream_retry_count: int = 0
-    _DOWNSTREAM_MAX_RETRIES = 2
+    _DOWNSTREAM_MAX_RETRIES = 5
 
     # Adaptive face detection: skip cycles when no faces are consistently detected
     _face_consecutive_misses: int = 0
@@ -1940,6 +1941,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         nonlocal _vision_in_progress, _last_vision_context_text
         nonlocal _last_vision_context_sent_at, _last_vision_prefeedback_at
         nonlocal _first_vision_after_camera
+        nonlocal _last_user_activity_at
         if not _vision_available:
             await _emit_tool_event(
                 "analyze_scene",
@@ -2044,6 +2046,16 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         speak = False
                         _first_vision_after_camera = False  # type: ignore[has-type]
                         logger.info("First vision post-camera: forced silent injection")
+
+                    # Passive mode guard: if there has been no user speech/activity
+                    # recently, keep vision updates silent to avoid unsolicited narration.
+                    idle_for = time.monotonic() - _last_user_activity_at
+                    if idle_for > PASSIVE_SPEECH_GUARD_SEC:
+                        speak = False
+                        logger.info(
+                            "Vision passive-guard: forcing silent injection after %.1fs user inactivity",
+                            idle_for,
+                        )
 
                     if not speak:
                         vision_text = "<<<SILENT_SENSOR_DATA>>>\n" + vision_text + "\n<<<END_SILENT_SENSOR_DATA>>>"
@@ -2880,18 +2892,51 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                                      (now_mono - _last_interrupt_at) * 1000)
                     else:
                         model_was_speaking = (
-                            _model_audio_last_seen_at > 0
-                            and (now_mono - _model_audio_last_seen_at) < 2.0
+                            (
+                                _model_audio_last_seen_at > 0
+                                and (now_mono - _model_audio_last_seen_at) < 2.0
+                            )
+                            or ctx_queue.model_speaking
                         )
                         if model_was_speaking:
                             _is_interrupted = True
                             _last_interrupt_at = now_mono
                             _model_audio_last_seen_at = 0.0
                             ctx_queue._transition_to(ModelState.IDLE)
-                            logger.info("Client barge-in — suppressing audio forwarding")
+                        sent_interrupted = await _safe_send_json({
+                            "type": MessageType.INTERRUPTED,
+                            "source": "client_barge_in",
+                            "accepted": model_was_speaking,
+                        })
+                        if model_was_speaking:
+                            if sent_interrupted:
+                                logger.info(
+                                    "Client barge-in — suppressing audio forwarding: user=%s session=%s state=%s",
+                                    user_id,
+                                    session_id,
+                                    ctx_queue.state.value,
+                                )
+                            else:
+                                logger.warning(
+                                    "Client barge-in accepted but interrupted event send failed: user=%s session=%s",
+                                    user_id,
+                                    session_id,
+                                )
                         else:
-                            logger.info("Client barge-in ignored — model not speaking (last audio %.1fs ago)",
-                                        now_mono - _model_audio_last_seen_at if _model_audio_last_seen_at > 0 else -1)
+                            if sent_interrupted:
+                                logger.info(
+                                    "Client barge-in ignored — model not speaking (last audio %.1fs ago): user=%s session=%s state=%s",
+                                    now_mono - _model_audio_last_seen_at if _model_audio_last_seen_at > 0 else -1,
+                                    user_id,
+                                    session_id,
+                                    ctx_queue.state.value,
+                                )
+                            else:
+                                logger.warning(
+                                    "Client barge-in ignored and interrupted status event send failed: user=%s session=%s",
+                                    user_id,
+                                    session_id,
+                                )
 
                 else:
                     logger.warning("Unknown upstream message type: %s", message.get("type"))
@@ -3477,8 +3522,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             logger.info("Client disconnected (downstream): user=%s session=%s", user_id, session_id)
         except Exception as exc:
             exc_text = str(exc).lower()
+            is_keepalive_timeout = "keepalive ping timeout" in exc_text
             if (
-                "keepalive ping timeout" in exc_text
+                is_keepalive_timeout
                 and _downstream_retry_count < _DOWNSTREAM_MAX_RETRIES
                 and websocket.client_state == WebSocketState.CONNECTED
             ):
@@ -3499,6 +3545,25 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 })
                 await asyncio.sleep(backoff_sec)
                 return await _downstream()
+
+            if is_keepalive_timeout:
+                logger.warning(
+                    "Live API keepalive timeout persisted after %d retries; requesting client reconnect: user=%s session=%s",
+                    _downstream_retry_count,
+                    user_id,
+                    session_id,
+                )
+                await _safe_send_json({
+                    "type": MessageType.GO_AWAY,
+                    "retry_ms": 2000,
+                    "message": "Live stream timeout. Please reconnect.",
+                })
+                stop_downstream.set()
+                try:
+                    await websocket.close(code=1012, reason="live_keepalive_timeout")
+                except Exception:
+                    pass
+                return
 
             stop_downstream.set()
             logger.exception("Error in downstream handler: user=%s session=%s", user_id, session_id)
