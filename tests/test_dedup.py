@@ -34,6 +34,13 @@ class TestToolCallDeduplicator:
         assert ok is False
         assert "repeat" in reason or "duplicate" in reason
 
+    def test_extract_text_from_camera_blocked_within_same_turn(self):
+        d = ToolCallDeduplicator(cooldown_sec=5.0)
+        d.should_execute("extract_text_from_camera", {"hint": "menu"})
+        ok, reason = d.should_execute("extract_text_from_camera", {"hint": "price"})
+        assert ok is False
+        assert "repeat" in reason or "duplicate" in reason
+
     def test_non_target_tool_different_args_still_allowed(self):
         d = ToolCallDeduplicator(cooldown_sec=5.0)
         ok1, _ = d.should_execute("remember_entity", {"name": "Alice"})

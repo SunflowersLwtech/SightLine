@@ -25,6 +25,7 @@ class ToolCallDeduplicator:
     SINGLE_CALL_TOOLS = {
         "navigate_to", "nearby_search", "maps_query",
         "google_search", "get_walking_directions", "get_location_info",
+        "extract_text_from_camera",
     }
 
     def __init__(self, cooldown_sec: float = 8.0) -> None:
