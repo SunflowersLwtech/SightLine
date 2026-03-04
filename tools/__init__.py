@@ -26,6 +26,8 @@ from tools.face_tools import (
     register_face,
 )
 from tools.navigation import (
+    ACTIVE_NAVIGATION_TOOLS,
+    LOCATION_QUERY_TOOLS,
     NAVIGATION_FUNCTIONS,
     NAVIGATION_TOOL_DECLARATIONS,
     bearing_between,
@@ -155,6 +157,8 @@ __all__ = [
     "format_clock_direction",
     "NAVIGATION_TOOL_DECLARATIONS",
     "NAVIGATION_FUNCTIONS",
+    "ACTIVE_NAVIGATION_TOOLS",
+    "LOCATION_QUERY_TOOLS",
     # Search
     "google_search",
     "SEARCH_TOOL_DECLARATIONS",

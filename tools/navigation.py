@@ -916,7 +916,8 @@ NAVIGATION_TOOL_DECLARATIONS = [
         "description": (
             "Get step-by-step walking directions to a destination using clock-position "
             "directional cues (e.g. 'at 2 o'clock, 50 meters'). Includes slope warnings "
-            "for steep grades. Always use this when the user asks how to get somewhere."
+            "for steep grades. Always use this when the user asks how to get somewhere. "
+            "INVOCATION CONDITIONS: Call ONLY after user explicitly confirmed a destination."
         ),
         "parameters": {
             "type": "object",
@@ -968,7 +969,8 @@ NAVIGATION_TOOL_DECLARATIONS = [
         "description": (
             "Search for nearby places like restaurants, cafes, pharmacies, bus stops, etc. "
             "Returns accessibility information (wheelchair access) for each place. "
-            "Use when the user asks to find a specific type of place nearby."
+            "Use when the user asks to find a specific type of place nearby. "
+            "INVOCATION CONDITIONS: Call ONCE per search. Do NOT also call maps_query."
         ),
         "parameters": {
             "type": "object",
@@ -1097,4 +1099,13 @@ NAVIGATION_FUNCTIONS = {
     "get_walking_directions": get_walking_directions,
     "preview_destination": preview_destination,
     "validate_address": validate_address,
+}
+
+# Tier 1: Active navigation — requires explicit user intent
+ACTIVE_NAVIGATION_TOOLS = {"navigate_to", "get_walking_directions"}
+
+# Tier 2: Location queries — allowed with implicit intent
+LOCATION_QUERY_TOOLS = {
+    "get_location_info", "nearby_search", "reverse_geocode",
+    "preview_destination", "validate_address",
 }

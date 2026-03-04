@@ -115,9 +115,9 @@ class TestSessionManager:
         config = mgr.get_run_config("test", lod=2)
         compression = config.context_window_compression
         assert compression is not None
-        assert compression.trigger_tokens == 100000
+        assert compression.trigger_tokens == 80000  # E2E-006: lowered from 100K
         assert compression.sliding_window is not None
-        assert compression.sliding_window.target_tokens == 80000
+        assert compression.sliding_window.target_tokens == 50000  # E2E-006: lowered from 80K
 
     def test_runtime_vad_update_payload_contract(self):
         """Runtime VAD updates should expose explicit payload+capability metadata."""

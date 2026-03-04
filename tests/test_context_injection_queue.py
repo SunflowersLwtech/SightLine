@@ -368,7 +368,7 @@ class TestSilentWrapping:
         assert len(queue._queue) == 2
 
     def test_silent_flush_force(self, queue, lrq):
-        """flush(force=True) sends silent-only items with DO NOT SPEAK prefix."""
+        """flush(force=True) sends silent-only items with INTERNAL_CONTEXT wrapper."""
         queue.set_model_speaking(True)
         queue.enqueue("lod", "lod update", priority=3, speak=False)
         queue.enqueue("telemetry", "sensor", priority=8, speak=False)
@@ -376,7 +376,8 @@ class TestSilentWrapping:
         assert result is True
         assert len(lrq.sent) == 1
         text = lrq.sent[0].parts[0].text
-        assert text.startswith("[CONTEXT UPDATE - DO NOT SPEAK]")
+        assert text.startswith("<<<INTERNAL_CONTEXT>>>")
+        assert text.endswith("<<<END_INTERNAL_CONTEXT>>>")
         # Queue should be cleared
         assert len(queue._queue) == 0
 
@@ -389,7 +390,7 @@ class TestSilentWrapping:
         assert result is True
         assert len(lrq.sent) == 1
         text = lrq.sent[0].parts[0].text
-        assert not text.startswith("[CONTEXT UPDATE - DO NOT SPEAK]")
+        assert not text.startswith("<<<INTERNAL_CONTEXT>>>")
         assert "scene" in text
         assert "sensor" in text
 
@@ -482,7 +483,8 @@ class TestMaxAge:
         assert queue.check_max_age() is True
         assert len(lrq.sent) == 1
         text = lrq.sent[0].parts[0].text
-        assert text.startswith("[CONTEXT UPDATE - DO NOT SPEAK]")
+        assert text.startswith("<<<INTERNAL_CONTEXT>>>")
+        assert text.endswith("<<<END_INTERNAL_CONTEXT>>>")
 
 
 # ---------------------------------------------------------------------------

@@ -207,6 +207,51 @@ def _is_repeated_text(
 
 
 # ---------------------------------------------------------------------------
+# Token Budget Monitor (E2E-006) — logs context window utilization
+# ---------------------------------------------------------------------------
+
+
+class TokenBudgetMonitor:
+    """Track and log token usage from Gemini usage_metadata events."""
+
+    _WARN_THRESHOLD = 0.70   # 70% utilization
+    _CRIT_THRESHOLD = 0.85   # 85% utilization
+    _CONTEXT_LIMIT = 128_000  # Gemini Live API context window
+
+    def __init__(self) -> None:
+        self._last_total: int = 0
+        self._warned: bool = False
+        self._critical: bool = False
+
+    def update(self, usage_metadata) -> None:
+        """Extract token counts from usage_metadata and log utilization."""
+        if usage_metadata is None:
+            return
+        total = getattr(usage_metadata, "total_token_count", 0) or 0
+        if total <= 0:
+            return
+        self._last_total = total
+        ratio = total / self._CONTEXT_LIMIT
+
+        if ratio >= self._CRIT_THRESHOLD and not self._critical:
+            self._critical = True
+            logger.critical(
+                "Token budget CRITICAL: %d / %d (%.0f%%)",
+                total, self._CONTEXT_LIMIT, ratio * 100,
+            )
+        elif ratio >= self._WARN_THRESHOLD and not self._warned:
+            self._warned = True
+            logger.warning(
+                "Token budget WARNING: %d / %d (%.0f%%)",
+                total, self._CONTEXT_LIMIT, ratio * 100,
+            )
+
+    @property
+    def last_total(self) -> int:
+        return self._last_total
+
+
+# ---------------------------------------------------------------------------
 # Context Injection Queue — batches non-urgent context to avoid interrupting
 # the model mid-speech (clientContent unconditionally interrupts generation).
 # ---------------------------------------------------------------------------
@@ -341,11 +386,20 @@ class ContextInjectionQueue:
 
     # -- Immediate bypass (safety / gestures / function responses) -----------
 
-    def inject_immediate(self, content: "types.Content") -> None:
-        """Send directly to LiveRequestQueue, bypassing the queue."""
+    def inject_immediate(self, content: "types.Content", is_function_response: bool = False) -> None:
+        """Send directly to LiveRequestQueue, bypassing the queue.
+
+        Args:
+            content: The Content to send.
+            is_function_response: If True, skip state transition to GENERATING.
+                Function responses go through LiveClientToolResponse path which
+                doesn't immediately trigger model generation — the state
+                transition would block subsequent context flushes.
+        """
         self._lrq.send_content(content)
-        # We just sent content → model will start generating
-        self._transition_to(ModelState.GENERATING)
+        if not is_function_response:
+            # We just sent content → model will start generating
+            self._transition_to(ModelState.GENERATING)
 
     # -- Queued injection ----------------------------------------------------
 
@@ -444,7 +498,7 @@ class ContextInjectionQueue:
 
         merged_text = "\n\n".join(merged_parts)
         if all_silent:
-            merged_text = "[CONTEXT UPDATE - DO NOT SPEAK]\n" + merged_text
+            merged_text = "<<<INTERNAL_CONTEXT>>>\n" + merged_text + "\n<<<END_INTERNAL_CONTEXT>>>"
 
         content = types.Content(
             parts=[types.Part(text=merged_text)],
@@ -1002,6 +1056,22 @@ def _has_navigation_intent(text: str) -> bool:
     return any(phrase in lowered for phrase in _NAVIGATION_INTENT_PHRASES)
 
 
+_LOCATION_QUERY_PHRASES = {
+    "around me", "around here", "nearby", "near me", "near here",
+    "what's here", "what is here", "where am i", "where are we",
+    "what's around", "what is around", "what's close", "find",
+    "search for", "is there a", "any", "closest", "look up",
+}
+
+
+def _has_location_query_intent(text: str) -> bool:
+    """Heuristic detector for implicit location query intent."""
+    lowered = _normalize_text_for_dedupe(text)
+    if not lowered:
+        return False
+    return any(phrase in lowered for phrase in _LOCATION_QUERY_PHRASES)
+
+
 def _recent_user_utterances(
     transcript_history: deque,
     *,
@@ -1027,7 +1097,17 @@ def _allow_navigation_tool_call(
     func_args: dict,
     transcript_history: deque,
 ) -> tuple[bool, str]:
-    """Gate navigation calls to explicit user requests only."""
+    """Gate navigation calls with two tiers:
+
+    Tier 1 (ACTIVE_NAVIGATION_TOOLS): navigate_to, get_walking_directions
+        → require explicit navigation intent in recent user utterances.
+
+    Tier 2 (LOCATION_QUERY_TOOLS): get_location_info, nearby_search, etc.
+        → allowed with explicit OR implicit location query intent,
+          or general question patterns (what/where/find/any).
+    """
+    from tools.navigation import ACTIVE_NAVIGATION_TOOLS, LOCATION_QUERY_TOOLS
+
     if func_name not in NAVIGATION_FUNCTIONS:
         return True, "not_navigation_tool"
 
@@ -1035,17 +1115,32 @@ def _allow_navigation_tool_call(
     if not recent_user:
         return False, "no_recent_user_transcript"
 
-    if any(_has_navigation_intent(text) for text in recent_user):
-        return True, "explicit_navigation_intent"
+    # Tier 2: Location queries — explicit or implicit intent
+    if func_name in LOCATION_QUERY_TOOLS:
+        if any(_has_navigation_intent(t) for t in recent_user):
+            return True, "explicit_navigation_intent"
+        if any(_has_location_query_intent(t) for t in recent_user):
+            return True, "implicit_location_query_intent"
+        # General question patterns also allowed for location queries
+        if any(
+            "?" in t or any(w in t.lower() for w in ("what", "where", "find", "any"))
+            for t in recent_user
+        ):
+            return True, "general_query_intent"
 
-    destination = str(func_args.get("destination", "")).strip().lower()
-    if destination:
-        for text in recent_user:
-            lowered = text.lower()
-            if destination in lowered and any(
-                hint in lowered for hint in ("how", "way", "get", "go", "route", "direction")
-            ):
-                return True, "destination_followup_navigation_intent"
+    # Tier 1: Active navigation — explicit intent only
+    if func_name in ACTIVE_NAVIGATION_TOOLS:
+        if any(_has_navigation_intent(t) for t in recent_user):
+            return True, "explicit_navigation_intent"
+        # Destination followup heuristic
+        destination = str(func_args.get("destination", "")).strip().lower()
+        if destination:
+            for text in recent_user:
+                lowered = text.lower()
+                if destination in lowered and any(
+                    hint in lowered for hint in ("how", "way", "get", "go", "route", "direction")
+                ):
+                    return True, "destination_followup_navigation_intent"
 
     return False, "navigation_tool_requires_explicit_user_request"
 
@@ -1072,6 +1167,31 @@ def _json_safe(value):
         return value
     except TypeError:
         return json.loads(json.dumps(value, default=str))
+
+
+# ---------------------------------------------------------------------------
+# Tool result truncation (E2E-006)
+# ---------------------------------------------------------------------------
+
+_MAX_TOOL_RESULT_CHARS = 4000
+
+
+def _truncate_tool_result(result: dict, max_chars: int = _MAX_TOOL_RESULT_CHARS) -> dict:
+    """Truncate oversized string values in tool results to prevent token overflow."""
+    truncated = {}
+    for k, v in result.items():
+        if isinstance(v, str) and len(v) > max_chars:
+            truncated[k] = v[:max_chars] + "\u2026 [truncated]"
+        elif isinstance(v, dict):
+            truncated[k] = _truncate_tool_result(v, max_chars)
+        elif isinstance(v, list):
+            truncated[k] = [
+                _truncate_tool_result(item, max_chars) if isinstance(item, dict) else item
+                for item in v
+            ]
+        else:
+            truncated[k] = v
+    return truncated
 
 
 def _extract_function_calls(event) -> list:
@@ -1192,7 +1312,8 @@ async def _dispatch_function_call(
             }
 
     try:
-        return await asyncio.to_thread(ALL_FUNCTIONS[func_name], **func_args)
+        raw_result = await asyncio.to_thread(ALL_FUNCTIONS[func_name], **func_args)
+        return _truncate_tool_result(raw_result) if isinstance(raw_result, dict) else raw_result
     except Exception:
         logger.exception("Tool %s raised an exception", func_name)
         return {
@@ -1529,6 +1650,13 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     live_request_queue = LiveRequestQueue()
     ctx_queue = ContextInjectionQueue(live_request_queue)
     ctx_queue.start_background_flush_task()
+    token_monitor = TokenBudgetMonitor()
+
+    # Tool call deduplication (E2E-002 / E2E-003)
+    from tools.dedup import ToolCallDeduplicator, MutualExclusionFilter, AudioGate
+    tool_dedup = ToolCallDeduplicator()
+    tool_mutex = MutualExclusionFilter()
+    audio_gate = AudioGate()
 
     run_config = session_manager.get_run_config(
         session_id, lod=session_ctx.current_lod,
@@ -1892,7 +2020,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         logger.info("First vision post-camera: forced silent injection")
 
                     if not speak:
-                        vision_text = "[SILENT - context only, do not speak aloud]\n" + vision_text
+                        vision_text = "<<<SILENT_SENSOR_DATA>>>\n" + vision_text + "\n<<<END_SILENT_SENSOR_DATA>>>"
                     ctx_queue.enqueue(
                         category="vision",
                         text=vision_text,
@@ -2162,7 +2290,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 )
 
                 if not speak:
-                    ocr_text = "[SILENT - context only, do not speak aloud]\n" + ocr_text
+                    ocr_text = "<<<SILENT_SENSOR_DATA>>>\n" + ocr_text + "\n<<<END_SILENT_SENSOR_DATA>>>"
                 ctx_queue.enqueue(
                     category="ocr",
                     text=ocr_text,
@@ -2882,6 +3010,11 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     break
                 _output_transcription_forwarded = False
 
+                # --- Token budget monitoring (E2E-006) ---
+                _usage = getattr(event, "usage_metadata", None)
+                if _usage is not None:
+                    token_monitor.update(_usage)
+
                 # --- Session resumption update ---
                 if event.live_session_resumption_update:
                     update = event.live_session_resumption_update
@@ -2954,6 +3087,19 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     else:
                         # Confirmed: model is truly done
                         ctx_queue.on_turn_complete()
+                        # Inject turn boundary to prevent carry-forward (E2E-004)
+                        ctx_queue.enqueue(
+                            category="turn_boundary",
+                            text=(
+                                "<<<INTERNAL_CONTEXT>>>\n"
+                                "[TURN BOUNDARY] Previous request complete. "
+                                "Await user's next request. Do not carry forward "
+                                "tool-calling intent from previous turn.\n"
+                                "<<<END_INTERNAL_CONTEXT>>>"
+                            ),
+                            priority=1,
+                            speak=False,
+                        )
                         # Flush queued context injections
                         ctx_queue.flush_or_defer_first_turn(camera_active=_client_camera_active)
 
@@ -3043,6 +3189,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 # --- Function calls from Gemini (Phase 3) ---
                 function_calls = _extract_function_calls(event)
                 if function_calls:
+                    tool_mutex.reset()  # Reset mutex per batch
                     for fc in function_calls:
                         # Guard: intercept hallucinated tool calls
                         if fc.name not in ALL_FUNCTIONS:
@@ -3073,10 +3220,42 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                             ctx_queue.inject_immediate(types.Content(
                                 parts=[types.Part(function_response=noop_response)],
                                 role="user",
-                            ))
+                            ), is_function_response=True)
                             continue
 
                         call_args = dict(fc.args) if fc.args else {}
+
+                        # Guard: dedup + mutual exclusion (E2E-002 / E2E-003)
+                        dedup_ok, dedup_reason = tool_dedup.should_execute(fc.name, call_args)
+                        if not dedup_ok:
+                            from google.genai.types import FunctionResponse as _FR
+                            skip_fr = _FR(name=fc.name, response={
+                                "status": "skipped",
+                                "reason": dedup_reason,
+                                "message": "Duplicate call skipped. Use the result from the previous call.",
+                            })
+                            ctx_queue.inject_immediate(types.Content(
+                                parts=[types.Part(function_response=skip_fr)],
+                                role="user",
+                            ), is_function_response=True)
+                            logger.info("Dedup skipped %s: %s", fc.name, dedup_reason)
+                            continue
+
+                        mutex_ok, mutex_reason = tool_mutex.should_execute(fc.name)
+                        if not mutex_ok:
+                            from google.genai.types import FunctionResponse as _FR
+                            skip_fr = _FR(name=fc.name, response={
+                                "status": "skipped",
+                                "reason": mutex_reason,
+                                "message": "Mutually exclusive tool already called in this batch.",
+                            })
+                            ctx_queue.inject_immediate(types.Content(
+                                parts=[types.Part(function_response=skip_fr)],
+                                role="user",
+                            ), is_function_response=True)
+                            logger.info("Mutex skipped %s: %s", fc.name, mutex_reason)
+                            continue
+
                         user_speaking = session_ctx.current_activity_state == "user_speaking"
                         behavior = resolve_tool_behavior(
                             tool_name=fc.name,
@@ -3127,7 +3306,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                                 types.Content(
                                     parts=[types.Part(function_response=blocked_fr)],
                                     role="user",
-                                )
+                                ),
+                                is_function_response=True,
                             )
                             logger.warning("Blocked %s tool call: %s", fc.name, block_reason)
                             continue
@@ -3138,12 +3318,16 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                             status="invoked",
                             data={"args": _json_safe(call_args)},
                         )
-                        result = await _dispatch_function_call(
-                            fc.name,
-                            call_args,
-                            session_id,
-                            user_id,
-                        )
+                        audio_gate.enter()
+                        try:
+                            result = await _dispatch_function_call(
+                                fc.name,
+                                call_args,
+                                session_id,
+                                user_id,
+                            )
+                        finally:
+                            audio_gate.exit()
                         await _safe_send_json({
                             "type": MessageType.TOOL_RESULT,
                             "tool": fc.name,
@@ -3191,7 +3375,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                                      "Deliver the full safety information before yielding."
                             ))
                         content = types.Content(parts=parts, role="user")
-                        ctx_queue.inject_immediate(content)
+                        ctx_queue.inject_immediate(content, is_function_response=True)
                         logger.info("Sent function response for %s (behavior=%s)", fc.name, behavior_to_text(behavior))
 
                 # --- Output transcription (agent speech-to-text) — buffered ---

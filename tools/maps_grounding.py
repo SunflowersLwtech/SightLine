@@ -180,7 +180,8 @@ MAPS_GROUNDING_TOOL_DECLARATIONS = [
             "questions like 'What good restaurants are nearby?', 'Is there an "
             "accessible pharmacy open now?', 'What are the reviews for this place?'. "
             "Different from nearby_search — this provides richer, more conversational "
-            "answers with reviews and details. Behavior: WHEN_IDLE."
+            "answers with reviews and details. Behavior: WHEN_IDLE. "
+            "INVOCATION CONDITIONS: Call ONCE per question. Do NOT also call nearby_search."
         ),
         "parameters": {
             "type": "object",

@@ -299,8 +299,8 @@ class SessionManager:
             output_audio_transcription=types.AudioTranscriptionConfig(),
             session_resumption=session_resumption,
             context_window_compression=types.ContextWindowCompressionConfig(
-                trigger_tokens=100_000,
-                sliding_window=types.SlidingWindow(target_tokens=80_000),
+                trigger_tokens=80_000,     # 62% of 128K — 48K headroom
+                sliding_window=types.SlidingWindow(target_tokens=50_000),  # 39%
             ),
             realtime_input_config=types.RealtimeInputConfig(
                 automatic_activity_detection=types.AutomaticActivityDetection(
