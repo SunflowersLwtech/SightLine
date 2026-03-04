@@ -1,5 +1,6 @@
 """WebSocket contract tests for activity_start/activity_end observability."""
 
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -38,15 +39,19 @@ class FakeLiveRequestQueue:
 
 
 class FakeRunner:
-    """Returns an empty async event stream so downstream exits cleanly."""
+    """Returns an async event stream that stays alive until cancelled."""
 
     @staticmethod
     def run_live(**_kwargs):
-        async def _empty_stream():
-            if False:
-                yield None
+        async def _idle_stream():
+            try:
+                while True:
+                    await asyncio.sleep(3600)
+                    yield  # never reached; keeps it an async generator
+            except (asyncio.CancelledError, GeneratorExit):
+                return
 
-        return _empty_stream()
+        return _idle_stream()
 
 
 def _receive_until_type(ws, message_type: str, max_reads: int = 6) -> dict:
