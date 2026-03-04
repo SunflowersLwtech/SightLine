@@ -286,11 +286,8 @@ def _synthesize_turn_audio(
     target_rate: int,
     output_dir: Path,
 ) -> GeneratedTurnAudio:
-    prompt = (
-        "Read the following text naturally. "
-        "Do not add any extra words, headers, or explanations.\n\n"
-        f"{turn.text}"
-    )
+    # Keep prompt minimal to avoid instruction bleed being spoken in output.
+    prompt = turn.text.strip()
     speech_config = types.SpeechConfig(
         voice_config=types.VoiceConfig(
             prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)

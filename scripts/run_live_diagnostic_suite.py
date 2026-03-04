@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
+import shutil
 import subprocess
 import time
 from dataclasses import dataclass
@@ -71,12 +73,34 @@ def _prepare_image_fixture(repo_root: Path, out_dir: Path) -> Path:
 def _generate_gemini_tts_fixtures(repo_root: Path, out_dir: Path, voice: str, language: str) -> dict[str, str]:
     turns = [
         {"id": "baseline_ready", "text": "Hello, please confirm you are ready to guide me safely."},
-        {"id": "search_weather", "text": "Use the google_search tool and tell me today's weather in Kuala Lumpur in one sentence."},
-        {"id": "nav_central_park", "text": "Use the get_walking_directions tool for Times Square to Central Park and give short walking guidance."},
+        {"id": "search_weather", "text": "What's the weather in Kuala Lumpur today? Please answer in one sentence."},
+        {"id": "nav_central_park", "text": "Please give me walking directions from Times Square to Central Park in one short sentence."},
         {"id": "context_followup", "text": "Please summarize what you just perceived and what I should do next."},
         {"id": "memory_set", "text": "Please remember this destination: Central Park."},
         {"id": "memory_recall", "text": "What destination did I just tell you? Answer briefly."},
     ]
+    required_ids = [str(t["id"]) for t in turns]
+
+    def _cached_pcm_map(cache_fixtures_dir: Path) -> dict[str, str] | None:
+        audio_dir = cache_fixtures_dir / "audio"
+        mapping: dict[str, str] = {}
+        for turn_id in required_ids:
+            pcm_path = (audio_dir / f"{turn_id}.pcm16000.raw").resolve()
+            if not pcm_path.exists():
+                return None
+            mapping[turn_id] = str(pcm_path)
+        return mapping
+
+    turns_fingerprint = hashlib.sha1(
+        json.dumps(turns, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:10]
+    cache_root = Path(os.getenv("SIGHTLINE_TTS_CACHE_DIR", "/tmp/sightline_runs/tts_fixture_cache"))
+    cache_key = f"{voice}_{language}_{turns_fingerprint}".replace("/", "_")
+    cache_fixtures_dir = cache_root / cache_key / "tts_fixtures"
+    cached_map = _cached_pcm_map(cache_fixtures_dir)
+    if cached_map:
+        return cached_map
+
     turns_path = out_dir / "suite_turns.json"
     turns_path.write_text(json.dumps(turns, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -93,14 +117,31 @@ def _generate_gemini_tts_fixtures(repo_root: Path, out_dir: Path, voice: str, la
         "--language-code",
         language,
     ]
-    result = _run_cmd(cmd, repo_root)
-    if result.returncode != 0:
+
+    attempts = 3
+    result: subprocess.CompletedProcess[str] | None = None
+    for attempt in range(attempts):
+        result = _run_cmd(cmd, repo_root)
+        if result.returncode == 0:
+            break
+        combined = (result.stdout or "") + "\n" + (result.stderr or "")
+        transient_quota = "RESOURCE_EXHAUSTED" in combined or "429" in combined
+        cached_map = _cached_pcm_map(cache_fixtures_dir)
+        if transient_quota and cached_map:
+            print("[suite] TTS quota hit; falling back to cached fixtures")
+            return cached_map
+        if transient_quota and attempt + 1 < attempts:
+            backoff_sec = 20 * (attempt + 1)
+            print(f"[suite] TTS quota hit; retrying in {backoff_sec}s (attempt {attempt + 2}/{attempts})")
+            time.sleep(backoff_sec)
+            continue
         raise RuntimeError(
             "Gemini TTS fixture generation failed:\n"
-            + (result.stdout or "")
-            + "\n"
-            + (result.stderr or "")
+            + combined
         )
+
+    if result is None or result.returncode != 0:
+        raise RuntimeError("Gemini TTS fixture generation failed with no result.")
 
     report_path = out_dir / "tts_fixtures" / "report.json"
     report = json.loads(report_path.read_text(encoding="utf-8"))
@@ -110,6 +151,12 @@ def _generate_gemini_tts_fixtures(repo_root: Path, out_dir: Path, voice: str, la
         pcm_path = str(turn.get("pcm_path", "")).strip()
         if turn_id and pcm_path:
             pcm_by_id[turn_id] = pcm_path
+
+    if all(turn_id in pcm_by_id and Path(pcm_by_id[turn_id]).exists() for turn_id in required_ids):
+        cache_fixtures_dir.parent.mkdir(parents=True, exist_ok=True)
+        if cache_fixtures_dir.exists():
+            shutil.rmtree(cache_fixtures_dir)
+        shutil.copytree(out_dir / "tts_fixtures", cache_fixtures_dir)
     return pcm_by_id
 
 
@@ -674,6 +721,8 @@ async def _run_suite_once(
     *,
     repo_root: Path,
     ws_base_url: str,
+    user_id: str,
+    session_prefix: str,
     out_dir: Path,
     voice: str,
     language: str,
@@ -687,7 +736,7 @@ async def _run_suite_once(
     image_path = _prepare_image_fixture(repo_root, out_dir)
 
     def ws_url(session: str) -> str:
-        return f"{ws_base_url.rstrip('/')}/test_user/{session}"
+        return f"{ws_base_url.rstrip('/')}/{user_id}/{session_prefix}{session}"
 
     scenarios: dict[str, ScenarioResult] = {}
 
@@ -783,11 +832,11 @@ async def _run_suite_once(
         else {"exists": False}
     )
     expected_sessions = [
-        "suite_audio_ingest",
-        "suite_tool_search",
-        "suite_tool_navigation",
-        "suite_context_lod_vision",
-        "suite_multiturn_memory",
+        f"{session_prefix}suite_audio_ingest",
+        f"{session_prefix}suite_tool_search",
+        f"{session_prefix}suite_tool_navigation",
+        f"{session_prefix}suite_context_lod_vision",
+        f"{session_prefix}suite_multiturn_memory",
     ]
     log_engine_check = _run_log_engine_checks(
         log_summary=log_summary,
@@ -823,6 +872,8 @@ async def _run_suite_once(
     report = {
         "created_at": datetime.now(timezone.utc).isoformat(),
         "ws_base_url": ws_base_url,
+        "user_id": user_id,
+        "session_prefix": session_prefix,
         "voice": voice,
         "language": language,
         "all_passed": all_passed,
@@ -838,6 +889,8 @@ async def _run_suite_once(
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Run continuous SightLine live diagnostics.")
     p.add_argument("--ws-base-url", default="ws://127.0.0.1:8100/ws", help="WebSocket base URL without trailing user/session.")
+    p.add_argument("--user-id", default="test_user", help="User id used in ws path /ws/{user_id}/{session_id}.")
+    p.add_argument("--session-prefix", default="", help="Prefix added to every diagnostic session id for isolation.")
     p.add_argument("--output-root", type=Path, default=Path("artifacts/live_diagnostic_suite"))
     p.add_argument("--voice", default="Aoede")
     p.add_argument("--language", default="en-US")
@@ -845,7 +898,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--loops", type=int, default=1, help="How many full suite loops to run.")
     p.add_argument("--sleep-between-sec", type=float, default=60.0, help="Sleep between loops.")
     p.add_argument("--log-settle-sec", type=float, default=4.0, help="Wait before log analysis to avoid write-delay false negatives.")
-    p.add_argument("--log-lifecycle-wait-sec", type=float, default=30.0, help="Extra wait window for delayed session_meta end/cleanup logs.")
+    p.add_argument("--log-lifecycle-wait-sec", type=float, default=60.0, help="Extra wait window for delayed session_meta end/cleanup logs.")
     return p
 
 
@@ -854,6 +907,9 @@ async def _async_main(args: argparse.Namespace) -> int:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     root = (args.output_root / stamp).resolve()
     root.mkdir(parents=True, exist_ok=True)
+    session_prefix = str(args.session_prefix or f"diag_{stamp}_")
+    if session_prefix and not session_prefix.endswith("_"):
+        session_prefix = f"{session_prefix}_"
 
     last_report: dict[str, Any] | None = None
     for idx in range(args.loops):
@@ -862,6 +918,8 @@ async def _async_main(args: argparse.Namespace) -> int:
         report = await _run_suite_once(
             repo_root=repo_root,
             ws_base_url=args.ws_base_url,
+            user_id=str(args.user_id).strip() or "test_user",
+            session_prefix=session_prefix,
             out_dir=loop_dir,
             voice=args.voice,
             language=args.language,

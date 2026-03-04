@@ -52,6 +52,44 @@ MAGIC_AUDIO = 0x01
 MAGIC_IMAGE = 0x02
 TTS_MODEL = "gemini-2.5-flash-preview-tts"
 TARGET_SAMPLE_RATE = 16000
+IMAGEN_MODEL = "imagen-4.0-fast-generate-001"
+
+# Scene prompts for Imagen image generation
+SCENE_PROMPTS = {
+    "street_scene": (
+        "A busy city sidewalk during daytime with pedestrians walking, storefronts visible, "
+        "crosswalk ahead, and a street sign. Realistic first-person pedestrian perspective photo."
+    ),
+    "text_sign": (
+        "A close-up photo of a restaurant menu board on a wall with clearly readable text: "
+        "'Today Special: Grilled Salmon $15, Caesar Salad $9, Coffee $4'. Realistic photo."
+    ),
+    "hazard_scene": (
+        "A wet sidewalk with a large puddle, construction barrier with orange cones, "
+        "and a yellow CAUTION WET FLOOR sign. First-person perspective photo."
+    ),
+    "park_scene": (
+        "A sunny park with a paved walking path, green grass, two benches with people sitting, "
+        "a small fountain, and trees. First-person perspective daytime photo."
+    ),
+    "building_scene": (
+        "A modern building entrance with glass doors, a wheelchair accessible ramp, "
+        "and a directory sign showing floor numbers. First-person perspective photo."
+    ),
+}
+
+# Markers that should never appear in agent speech (context tag leak detection)
+_LEAKED_MARKERS = [
+    "[CONTEXT UPDATE", "[SILENT", "[DO NOT SPEAK", "[TELEMETRY",
+    "[LOD UPDATE", "[VISION ANALYSIS", "<<<INTERNAL_CONTEXT>>>",
+    "<<<SILENT_SENSOR_DATA>>>", "<<<END_",
+]
+
+# Mutex tool groups — at most one tool from each group per turn
+_MUTEX_TOOL_GROUPS = [
+    {"nearby_search", "maps_query"},
+    {"navigate_to", "get_walking_directions"},
+]
 
 # ---------------------------------------------------------------------------
 # Multi-turn conversation definitions
@@ -84,7 +122,9 @@ CONVERSATION_A = {
                 "gps": {"latitude": 40.7580, "longitude": -73.9855, "accuracy": 5.0},
             },
             "send_gesture": None,
+            "send_video_frames": 3,
             "expect_agent_response": True,
+            "expect_not_blocked": ["get_location_info", "nearby_search"],
             "collect_sec": 30.0,
             "notes": "Vision query with image + telemetry context",
         },
@@ -94,6 +134,7 @@ CONVERSATION_A = {
             "send_image": "text_sign",
             "send_telemetry": None,
             "send_gesture": None,
+            "send_video_frames": 2,
             "expect_agent_response": True,
             "expect_tool": "extract_text_from_camera",
             "collect_sec": 30.0,
@@ -351,7 +392,132 @@ CONVERSATION_B = {
     ],
 }
 
-ALL_CONVERSATIONS = [CONVERSATION_A, CONVERSATION_B]
+# Conversation C: Defect regression suite (E2E-001 through E2E-007)
+CONVERSATION_C = {
+    "id": "conv_defect_regression",
+    "description": "Defect regression: dedup, tag leak, nav blocking, token stability",
+    "turns": [
+        {
+            "id": "C01_location_query",
+            "text": "Where am I right now?",
+            "send_image": "street_scene",
+            "send_telemetry": {
+                "motion_state": "stationary",
+                "step_cadence": 0,
+                "ambient_noise_db": 55,
+                "heading": 180,
+                "gps": {"latitude": 40.7580, "longitude": -73.9855, "accuracy": 5.0},
+            },
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_not_blocked": ["get_location_info", "nearby_search"],
+            "collect_sec": 25.0,
+            "notes": "E2E-007: location query should NOT be blocked",
+        },
+        {
+            "id": "C02_whats_nearby",
+            "text": "What's nearby? Any restaurants?",
+            "send_image": "street_scene",
+            "send_telemetry": {
+                "motion_state": "stationary",
+                "step_cadence": 0,
+                "ambient_noise_db": 55,
+                "heading": 180,
+                "gps": {"latitude": 40.7580, "longitude": -73.9855, "accuracy": 5.0},
+            },
+            "send_gesture": None,
+            "send_video_frames": 3,
+            "expect_agent_response": True,
+            "expect_not_blocked": ["nearby_search", "maps_query"],
+            "collect_sec": 30.0,
+            "notes": "E2E-002/003: should call ONE of nearby_search/maps_query, not both",
+        },
+        {
+            "id": "C03_read_menu",
+            "text": "Read that menu for me.",
+            "send_image": "text_sign",
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "extract_text_from_camera",
+            "collect_sec": 30.0,
+            "notes": "E2E-005: tool result should be spoken in this turn",
+        },
+        {
+            "id": "C04_navigate_cafe",
+            "text": "Take me to the closest cafe.",
+            "send_image": None,
+            "send_telemetry": {
+                "motion_state": "stationary",
+                "step_cadence": 0,
+                "ambient_noise_db": 55,
+                "heading": 180,
+                "gps": {"latitude": 40.7580, "longitude": -73.9855, "accuracy": 5.0},
+            },
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "navigate_to",
+            "collect_sec": 35.0,
+            "notes": "E2E-002: navigate_to called at most once",
+        },
+        {
+            "id": "C05_whats_ahead_video",
+            "text": "What's ahead of me?",
+            "send_image": "hazard_scene",
+            "send_telemetry": None,
+            "send_gesture": None,
+            "send_video_frames": 4,
+            "expect_agent_response": True,
+            "collect_sec": 30.0,
+            "notes": "E2E-001/004: context tags must not leak in agent speech",
+        },
+        {
+            "id": "C06_context_silence",
+            "text": "Tell me more about this area.",
+            "send_image": "park_scene",
+            "send_telemetry": {
+                "motion_state": "walking",
+                "step_cadence": 90,
+                "ambient_noise_db": 45,
+                "heading": 90,
+                "gps": {"latitude": 40.7585, "longitude": -73.9850, "accuracy": 5.0},
+            },
+            "send_gesture": None,
+            "send_video_frames": 3,
+            "expect_agent_response": True,
+            "collect_sec": 30.0,
+            "notes": "E2E-004: context injection should not be echoed",
+        },
+        {
+            "id": "C07_search_then_nav",
+            "text": "Find me a pharmacy nearby and then navigate there.",
+            "send_image": None,
+            "send_telemetry": {
+                "motion_state": "stationary",
+                "step_cadence": 0,
+                "ambient_noise_db": 55,
+                "heading": 180,
+                "gps": {"latitude": 40.7580, "longitude": -73.9855, "accuracy": 5.0},
+            },
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "collect_sec": 40.0,
+            "notes": "E2E-002/003: mutex should prevent nearby_search + maps_query both firing",
+        },
+        {
+            "id": "C08_final_stability",
+            "text": "Thanks, that's all for now. Goodbye.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "collect_sec": 15.0,
+            "notes": "E2E-006: session should remain stable through turn 8",
+        },
+    ],
+}
+
+ALL_CONVERSATIONS = [CONVERSATION_A, CONVERSATION_B, CONVERSATION_C]
 
 
 # ---------------------------------------------------------------------------
@@ -500,11 +666,68 @@ def synthesize_pcm(client: genai.Client, text: str, voice: str = "Aoede") -> byt
 
 
 # ---------------------------------------------------------------------------
-# Synthetic image generation
+# Image helpers
 # ---------------------------------------------------------------------------
 
-def _generate_synthetic_image(scene_id: str, output_dir: Path) -> Path:
-    """Generate a synthetic JPEG image using ffmpeg."""
+_IMG_MAX_DIM = 640
+_IMG_JPEG_QUALITY = 80
+
+
+def _compress_image(path: Path) -> None:
+    """Resize + recompress an image to ≤640px and JPEG quality 80.
+
+    Keeps images small enough for WebSocket streaming without overwhelming
+    the server or Live API.  Uses opencv-python-headless (already a dep).
+    """
+    import cv2
+
+    img = cv2.imread(str(path))
+    if img is None:
+        return
+    h, w = img.shape[:2]
+    if max(h, w) > _IMG_MAX_DIM:
+        scale = _IMG_MAX_DIM / max(h, w)
+        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+    cv2.imwrite(str(path), img, [cv2.IMWRITE_JPEG_QUALITY, _IMG_JPEG_QUALITY])
+
+
+def _generate_synthetic_image(
+    scene_id: str,
+    output_dir: Path,
+    *,
+    client: genai.Client | None = None,
+) -> Path:
+    """Generate a test image: try Imagen first, fall back to ffmpeg.
+
+    Images are cached — if the file already exists it is returned immediately.
+    """
+    out_path = output_dir / f"{scene_id}.jpg"
+
+    if out_path.exists():
+        return out_path
+
+    # --- Try Imagen ---
+    prompt = SCENE_PROMPTS.get(scene_id)
+    if client and prompt:
+        try:
+            log.info("[imagen] generating %s ...", scene_id)
+            response = client.models.generate_images(
+                model=IMAGEN_MODEL,
+                prompt=prompt,
+                config={"number_of_images": 1},
+            )
+            if response.generated_images:
+                image_bytes = response.generated_images[0].image.image_bytes
+                if image_bytes:
+                    out_path.write_bytes(image_bytes)
+                    _compress_image(out_path)
+                    log.info("[imagen] saved %s (%d bytes)", out_path.name, out_path.stat().st_size)
+                    return out_path
+            log.warning("[imagen] empty response for %s, falling back to ffmpeg", scene_id)
+        except Exception as exc:
+            log.warning("[imagen] failed for %s (%s), falling back to ffmpeg", scene_id, exc)
+
+    # --- Fallback: ffmpeg synthetic image ---
     colors = {
         "street_scene": "0x4488BB",
         "text_sign": "0x228844",
@@ -513,12 +736,7 @@ def _generate_synthetic_image(scene_id: str, output_dir: Path) -> Path:
         "building_scene": "0x666699",
     }
     color = colors.get(scene_id, "0x888888")
-    out_path = output_dir / f"{scene_id}.jpg"
 
-    if out_path.exists():
-        return out_path
-
-    # Try ffmpeg with text overlay
     cmd = [
         "ffmpeg", "-y", "-f", "lavfi",
         "-i", f"color=c={color}:s=640x480:d=1",
@@ -530,7 +748,7 @@ def _generate_synthetic_image(scene_id: str, output_dir: Path) -> Path:
     if r.returncode == 0:
         return out_path
 
-    # Fallback: plain color
+    # Fallback: plain color (no text overlay)
     cmd2 = [
         "ffmpeg", "-y", "-f", "lavfi",
         "-i", f"color=c={color}:s=640x480:d=1",
@@ -715,21 +933,40 @@ async def _run_single_turn(
         await ws.send(json.dumps({"type": "gesture", "gesture": turn_def["send_gesture"]}))
 
     # 3. Image (before audio so vision pipeline starts)
+    img_bytes_for_frames: bytes | None = None
     if turn_def.get("send_image"):
         img_id = turn_def["send_image"]
         img_path = image_dir / f"{img_id}.jpg"
         if img_path.exists():
-            img_bytes = img_path.read_bytes()
-            await ws.send(bytes([MAGIC_IMAGE]) + img_bytes)
+            img_bytes_for_frames = img_path.read_bytes()
+            await ws.send(bytes([MAGIC_IMAGE]) + img_bytes_for_frames)
         else:
             log.warning("Image not found: %s", img_path)
 
-    # 4. Audio (the user's voice)
+    # 4. Audio + optional video frame streaming
+    send_video_frames = turn_def.get("send_video_frames", 0)
     await ws.send(json.dumps({"type": "activity_start"}))
+
+    audio_start = time.monotonic()
+    audio_duration = len(pcm) / 2.0 / 16000.0
+    if img_bytes_for_frames and send_video_frames:
+        frame_interval = audio_duration / max(send_video_frames, 1)
+    else:
+        frame_interval = float("inf")
+    frames_sent = 0
+
     for offset in range(0, len(pcm), 1280):
         chunk = pcm[offset: offset + 1280]
         await ws.send(bytes([MAGIC_AUDIO]) + chunk)
         await asyncio.sleep((len(chunk) / 2.0) / 16000.0)
+
+        # Interleave video frames at ~1 FPS during audio streaming
+        if img_bytes_for_frames and frames_sent < send_video_frames:
+            elapsed = time.monotonic() - audio_start
+            if elapsed >= frame_interval * (frames_sent + 1):
+                await ws.send(bytes([MAGIC_IMAGE]) + img_bytes_for_frames)
+                frames_sent += 1
+
     await ws.send(json.dumps({"type": "activity_end"}))
 
     # --- Collect responses ---
@@ -828,6 +1065,45 @@ async def _run_single_turn(
         if ocr_tools and not turn_def.get("expect_tool") == "extract_text_from_camera":
             warnings.append("unwanted_ocr_triggered_on_vision_query")
 
+    # --- Defect-specific assertions ---
+
+    # E2E-001 / E2E-004: Context tag leak detection
+    for marker in _LEAKED_MARKERS:
+        if any(marker.lower() in t.lower() for t in agent_transcripts):
+            failures.append(f"context_tag_leaked: {marker}")
+
+    # E2E-002 / E2E-003: Duplicate tool call detection
+    tool_call_counts: dict[str, int] = {}
+    for e in tool_events:
+        if e.get("status") == "invoked":
+            name = e.get("tool", "")
+            tool_call_counts[name] = tool_call_counts.get(name, 0) + 1
+    for name, count in tool_call_counts.items():
+        if count > 1:
+            failures.append(f"duplicate_tool_call: {name} called {count}x")
+
+    # E2E-002 / E2E-003: Mutex tool group violation detection
+    invoked_tools = {e["tool"] for e in tool_events if e.get("status") == "invoked" and e.get("tool")}
+    for group in _MUTEX_TOOL_GROUPS:
+        overlap = invoked_tools & group
+        if len(overlap) > 1:
+            failures.append(f"mutex_violation: {sorted(overlap)} both called")
+
+    # E2E-005: Tool result delivery — if tool expected and result returned, agent must speak
+    if expected_tool and tool_results:
+        if not agent_transcripts:
+            failures.append("tool_result_not_spoken")
+
+    # E2E-007: Navigation over-blocking detection
+    expect_not_blocked = turn_def.get("expect_not_blocked")
+    if expect_not_blocked:
+        blocked_tools = [
+            e for e in tool_events
+            if e.get("status") == "blocked" and e.get("tool") in expect_not_blocked
+        ]
+        if blocked_tools:
+            failures.append(f"over_blocked: {[e['tool'] for e in blocked_tools]}")
+
     return TurnResult(
         turn_id=turn_id,
         text=text,
@@ -900,8 +1176,11 @@ async def async_main(args: argparse.Namespace) -> int:
     image_dir.mkdir(exist_ok=True)
     audio_dir.mkdir(exist_ok=True)
 
-    # Step 1: Generate synthetic test images
-    log.info("--- Generating synthetic test images ---")
+    # Create API client (used for Imagen + TTS)
+    client = _create_client()
+
+    # Step 1: Generate test images (Imagen with ffmpeg fallback)
+    log.info("--- Generating test images ---")
     needed_images = set()
     for conv in ALL_CONVERSATIONS:
         for turn in conv["turns"]:
@@ -910,12 +1189,11 @@ async def async_main(args: argparse.Namespace) -> int:
                 needed_images.add(img)
 
     for img_id in sorted(needed_images):
-        path = _generate_synthetic_image(img_id, image_dir)
+        path = _generate_synthetic_image(img_id, image_dir, client=client)
         log.info("Image ready: %s (%d bytes)", path.name, path.stat().st_size)
 
     # Step 2: Generate TTS audio for all turns
     log.info("--- Generating TTS audio for all turns ---")
-    client = _create_client()
     pcm_cache: dict[str, bytes] = {}
 
     all_turns = []
