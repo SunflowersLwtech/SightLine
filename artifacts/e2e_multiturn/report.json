@@ -1,0 +1,1762 @@
+{
+  "suite_id": "multiturn_e2e_20260304_193914",
+  "created_at": "2026-03-04T11:39:14.973779+00:00",
+  "server_url": "ws://127.0.0.1:8100",
+  "conversations": [
+    {
+      "id": "conv_mixed_full",
+      "description": "Full mixed conversation: greeting → vision → OCR → nav → search → memory → follow-up",
+      "total_turns": 12,
+      "passed": 12,
+      "failed": 0,
+      "duration_sec": 247.5,
+      "turns": [
+        {
+          "turn_id": "A01_greeting",
+          "text": "Hello, I just stepped outside. Can you help me today?",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "Hello. I just stepped outside. Can you help me today?",
+            "Hello. I just stepped outside. Can you help me today?"
+          ],
+          "agent_transcripts": [
+            "Hello. I'm",
+            "ready when you are.",
+            "Hello. I'm ready when you are.",
+            "I can certainly help you.",
+            "It looks like you're on a sidewalk in downtown Los Angeles, near Maple Street.",
+            "Where are you headed?",
+            "I can certainly help you. It looks like you're on a sidewalk in downtown Los Angeles, near Maple Street. Where are you headed?",
+            "your location.",
+            "You're currently at 2120 Estrella Ave in Los Angeles, near the Ministerios Manantial De Amor church.",
+            "How can I help?",
+            "your location. You're currently at 2120 Estrella Ave in Los Angeles, near the Ministerios Manantial De Amor church. How can I help?"
+          ],
+          "tool_events": [
+            {
+              "tool": "get_location_info",
+              "status": "blocked",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "tool": "get_location_info",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "status": "blocked",
+                "reason": "navigation_tool_requires_explicit_user_request",
+                "message": "Navigation tools require an explicit navigation request from the user in this session."
+              }
+            },
+            {
+              "_type": "navigation_result",
+              "type": "navigation_result",
+              "summary": "",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "status": "blocked",
+                "reason": "navigation_tool_requires_explicit_user_request",
+                "message": "Navigation tools require an explicit navigation request from the user in this session."
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2,
+            "transcript": 13,
+            "tool_event": 1,
+            "tool_result": 1,
+            "navigation_result": 1
+          },
+          "audio_bytes_received": 72,
+          "first_user_transcript_latency": 4.212447708006948,
+          "first_agent_transcript_latency": 3.605904208001448,
+          "collect_duration_sec": 14.207760290999431,
+          "notes": "Initial greeting, expect warm response"
+        },
+        {
+          "turn_id": "A02_whats_around",
+          "text": "What's around me right now?",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "What's around me right now?",
+            "What's around me right now?"
+          ],
+          "agent_transcripts": [
+            "You are on a sidewalk near 2120 Estrella Ave.",
+            "There's a church 27 meters to your left and another one a bit further down the street, also to your left.",
+            "You are on a sidewalk near 2120 Estrella Ave. There's a church 27 meters to your left and another one a bit further down the street, also to your left.",
+            "You are at 2120 Estrella Ave.",
+            "There is a church 27 meters away and another one 86 meters away.",
+            "You are at 2120 Estrella Ave. There is a church 27 meters away and another one 86 meters away.",
+            "You are currently on Estrella Ave.",
+            "About 110 meters away, at your 2 o'clock, is the New Designs Charter School.",
+            "There are also several car dealerships and a UPS Store nearby on Figueroa Street.",
+            "You are currently on Estrella Ave. About 110 meters away, at your 2 o'clock, is the New Designs Charter School. There are also several car dealerships and a UPS Store nearby on Figueroa Street.",
+            "You're standing in the heart of Times Square, right in the middle of things.",
+            "The atmosphere is incredibly busy with a lot of pedestrian traffic around you.",
+            "Facing south, you're surrounded by the towering buildings that define the area.",
+            "Although you can't see them, there are massive digital screens covering these buildings, creating the bright lights you might hear about.",
+            "You're standing in the heart of Times Square, right in the middle of things. The atmosphere is incredibly busy with a lot of pedestrian traffic around you. Facing south, you're surrounded by the towering buildings that define the area. Although you can't see them, there are massive digital screens covering these buildings, creating the bright lights you might hear about."
+          ],
+          "tool_events": [
+            {
+              "tool": "analyze_scene",
+              "status": "queued",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "identify_person",
+              "status": "queued",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "identify_person",
+              "status": "completed",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "get_location_info",
+              "status": "blocked",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "nearby_search",
+              "status": "blocked",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "analyze_scene",
+              "status": "completed",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "tool": "get_location_info",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "status": "blocked",
+                "reason": "navigation_tool_requires_explicit_user_request",
+                "message": "Navigation tools require an explicit navigation request from the user in this session."
+              }
+            },
+            {
+              "_type": "navigation_result",
+              "type": "navigation_result",
+              "summary": "",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "status": "blocked",
+                "reason": "navigation_tool_requires_explicit_user_request",
+                "message": "Navigation tools require an explicit navigation request from the user in this session."
+              }
+            },
+            {
+              "tool": "nearby_search",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "status": "blocked",
+                "reason": "navigation_tool_requires_explicit_user_request",
+                "message": "Navigation tools require an explicit navigation request from the user in this session."
+              }
+            },
+            {
+              "_type": "navigation_result",
+              "type": "navigation_result",
+              "summary": "",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "status": "blocked",
+                "reason": "navigation_tool_requires_explicit_user_request",
+                "message": "Navigation tools require an explicit navigation request from the user in this session."
+              }
+            },
+            {
+              "_type": "vision_result",
+              "type": "vision_result",
+              "summary": "The image is a solid, uniform field of medium blue color. There are no objects, people, text, or discernible features present. It appears to be a plain blue background or a digital color swatch.",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "safety_warnings": [],
+                "navigation_info": {
+                  "entrances": [],
+                  "paths": [],
+                  "landmarks": []
+                },
+                "scene_description": "The image is a solid, uniform field of medium blue color. There are no objects, people, text, or discernible features present. It appears to be a plain blue background or a digital color swatch.",
+                "detected_text": null,
+                "people_count": 0,
+                "confidence": 1.0
+              }
+            }
+          ],
+          "lod_updates": [
+            {
+              "lod": 3,
+              "reason": "Rule1:stationary→LOD3 + Rule4:concise_pref→-1 + Rule5b:unfamiliar(0.00)→+1 → LOD 3"
+            }
+          ],
+          "frame_acks": [
+            {
+              "queued_agents": [
+                "vision",
+                "face"
+              ]
+            }
+          ],
+          "message_counts": {
+            "lod_update": 1,
+            "debug_lod": 1,
+            "tool_event": 6,
+            "identity_update": 1,
+            "frame_ack": 1,
+            "debug_activity": 2,
+            "face_debug": 1,
+            "transcript": 17,
+            "tool_result": 2,
+            "navigation_result": 2,
+            "vision_result": 1,
+            "vision_debug": 1
+          },
+          "audio_bytes_received": 196,
+          "first_user_transcript_latency": 8.33004654099932,
+          "first_agent_transcript_latency": 10.713245708000613,
+          "collect_duration_sec": 29.673422416002722,
+          "notes": "Vision query with image + telemetry context"
+        },
+        {
+          "turn_id": "A03_read_sign",
+          "text": "Can you read that sign for me?",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "Can you read that sign for me?",
+            "Can you read that sign for me?"
+          ],
+          "agent_transcripts": [
+            "I'm not seeing a clear sign from here.",
+            "Could you pan the camera a bit?",
+            "I'm not seeing a clear sign from here. Could you pan the camera a bit?",
+            "I'm not detecting any text right now.",
+            "Are you looking for a specific sign?",
+            "I'm not detecting any text right now. Are you looking for a specific sign?"
+          ],
+          "tool_events": [
+            {
+              "tool": "analyze_scene",
+              "status": "queued",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "identify_person",
+              "status": "queued",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "identify_person",
+              "status": "completed",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "extract_text_from_camera",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "analyze_scene",
+              "status": "completed",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "_type": "vision_result",
+              "type": "vision_result",
+              "summary": "The image is a solid, uniform field of green color. There are no objects, people, text, or discernible features present. It appears to be a plain green background or a digital color swatch.",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "safety_warnings": [],
+                "navigation_info": {
+                  "entrances": [],
+                  "paths": [],
+                  "landmarks": []
+                },
+                "scene_description": "The image is a solid, uniform field of green color. There are no objects, people, text, or discernible features present. It appears to be a plain green background or a digital color swatch.",
+                "detected_text": null,
+                "people_count": 0,
+                "confidence": 1.0
+              }
+            },
+            {
+              "tool": "extract_text_from_camera",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "text": "",
+                "text_type": "unknown",
+                "items": [],
+                "confidence": 0.0
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [
+            {
+              "queued_agents": [
+                "vision",
+                "face"
+              ]
+            }
+          ],
+          "message_counts": {
+            "tool_event": 5,
+            "identity_update": 1,
+            "frame_ack": 1,
+            "debug_activity": 2,
+            "face_debug": 1,
+            "transcript": 8,
+            "vision_result": 1,
+            "vision_debug": 1,
+            "tool_result": 1
+          },
+          "audio_bytes_received": 34,
+          "first_user_transcript_latency": 2.3929754590208177,
+          "first_agent_transcript_latency": 7.031125167006394,
+          "collect_duration_sec": 13.036722042015754,
+          "notes": "Explicit OCR request — should trigger extract_text_from_camera"
+        },
+        {
+          "turn_id": "A04_navigate",
+          "text": "Navigate me to the nearest pharmacy please.",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "Navigate me to the nearest pharmacy, please.",
+            "Navigate me to the nearest pharmacy, please."
+          ],
+          "agent_transcripts": [
+            "The closest pharmacy is a Walgreens 63 meters away at your 12 o'clock.",
+            "It has a wheelchair accessible entrance.",
+            "The closest pharmacy is a Walgreens 63 meters away at your 12 o'clock. It has a wheelchair accessible entrance.",
+            "The closest pharmacy is a Walgreens 63 meters away at your 12 o'clock.",
+            "It has a wheelchair accessible entrance.",
+            "The closest pharmacy is a Walgreens 63 meters away at your 12 o'clock. It has a wheelchair accessible entrance.",
+            "The closest pharmacy is a Walgreens 58 meters away, at your 10 o'clock.",
+            "It's wheelchair accessible.",
+            "Would you like directions there?",
+            "The closest pharmacy is a Walgreens 58 meters away, at your 10 o'clock. It's wheelchair accessible. Would you like directions there?",
+            "The closest pharmacy is a Walgreens 58 meters away, at your 4 o'clock.",
+            "It's wheelchair accessible.",
+            "The closest pharmacy is a Walgreens 58 meters away, at your 4 o'clock. It's wheelchair accessible.",
+            "The closest pharmacy is a Walgreens 63 meters away at your 12 o'clock.",
+            "It has a wheelchair accessible entrance.",
+            "The closest pharmacy is a Walgreens 63 meters away at your 12 o'clock. It has a wheelchair accessible entrance.",
+            "The closest pharmacy is a Walgreens 63 meters away at your 12 o'clock.",
+            "It has a wheelchair accessible entrance.",
+            "The closest pharmacy is a Walgreens 63 meters away at your 12 o'clock. It has a wheelchair accessible entrance."
+          ],
+          "tool_events": [
+            {
+              "tool": "navigate_to",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "nearby_search",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "maps_query",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "navigate_to",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "navigate_to",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "tool": "navigate_to",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": false,
+                "error": "No walking route found to that destination."
+              }
+            },
+            {
+              "_type": "navigation_result",
+              "type": "navigation_result",
+              "summary": "",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": false,
+                "error": "No walking route found to that destination."
+              }
+            },
+            {
+              "tool": "nearby_search",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "query": "pharmacy",
+                "count": 1,
+                "places": [
+                  {
+                    "name": "Walgreens",
+                    "address": "158 W 45th St, New York, NY 10036, USA",
+                    "types": [
+                      "pharmacy",
+                      "health",
+                      "store",
+                      "point_of_interest",
+                      "establishment"
+                    ],
+                    "rating": null,
+                    "distance_meters": 63,
+                    "accessibility": {
+                      "wheelchair_entrance": true,
+                      "wheelchair_parking": null,
+                      "wheelchair_restroom": null,
+                      "wheelchair_seating": null
+                    },
+                    "plus_code": "87G8Q258+22"
+                  }
+                ]
+              }
+            },
+            {
+              "_type": "navigation_result",
+              "type": "navigation_result",
+              "summary": "",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "query": "pharmacy",
+                "count": 1,
+                "places": [
+                  {
+                    "name": "Walgreens",
+                    "address": "158 W 45th St, New York, NY 10036, USA",
+                    "types": [
+                      "pharmacy",
+                      "health",
+                      "store",
+                      "point_of_interest",
+                      "establishment"
+                    ],
+                    "rating": null,
+                    "distance_meters": 63,
+                    "accessibility": {
+                      "wheelchair_entrance": true,
+                      "wheelchair_parking": null,
+                      "wheelchair_restroom": null,
+                      "wheelchair_seating": null
+                    },
+                    "plus_code": "87G8Q258+22"
+                  }
+                ]
+              }
+            },
+            {
+              "tool": "maps_query",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "answer": "The closest pharmacy to your current location (40.758000, -73.985500) is a CVS Pharmacy located at 1440 Broadway, New York, NY 10018, USA. It is approximately 533 meters away, with an estimated travel time of 2.9 minutes.\n\nThis CVS Pharmacy offers delivery and is wheelchair accessible. It is operational and accepts credit cards, debit cards, and NFC payments.\n\nPlease note its pharmacy hours:\n*   Monday - Friday: 9:00 AM – 1:30 PM, then 2:00 PM – 7:00 PM\n*   Saturday: 10:00 AM – 1:30 PM, then 2:00 PM – 6:00 PM\n*   Sunday: 11:00 AM – 1:30 PM, then 2:00 PM – 5:00 PM",
+                "sources": [
+                  {
+                    "title": "Google Maps",
+                    "snippet": "It is approximately 533 meters away, with an estimated travel time of 2.9 minutes."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "This CVS Pharmacy offers delivery and is wheelchair accessible."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "It is operational and accepts credit cards, debit cards, and NFC payments."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "Please note its pharmacy hours:\n*   Monday - Friday: 9:00 AM – 1:30 PM, then 2:00 PM – 7:00 PM"
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "*   Saturday: 10:00 AM – 1:30 PM, then 2:00 PM – 6:00 PM"
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "*   Sunday: 11:00 AM – 1:30 PM, then 2:00 PM – 5:00 PM"
+                  }
+                ],
+                "confidence": 0.9
+              }
+            },
+            {
+              "tool": "navigate_to",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "destination": "Walgreens at 158 W 45th St",
+                "total_distance": "58 m",
+                "total_duration": "1 min",
+                "destination_direction": "at 10 o'clock, 58 meters",
+                "steps": [
+                  {
+                    "step": 1,
+                    "instruction": "Head southeast on W 45th St\nDestination will be on the right",
+                    "distance": "58 m",
+                    "direction": "depart",
+                    "clock_direction": "at 10 o'clock, 58 meters"
+                  }
+                ],
+                "slope_warnings": [],
+                "accessibility_note": "Walking route. Watch for crosswalks and intersections. Listen for traffic signals at crossings."
+              }
+            },
+            {
+              "_type": "navigation_result",
+              "type": "navigation_result",
+              "summary": "at 10 o'clock, 58 meters",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "destination": "Walgreens at 158 W 45th St",
+                "total_distance": "58 m",
+                "total_duration": "1 min",
+                "destination_direction": "at 10 o'clock, 58 meters",
+                "steps": [
+                  {
+                    "step": 1,
+                    "instruction": "Head southeast on W 45th St\nDestination will be on the right",
+                    "distance": "58 m",
+                    "direction": "depart",
+                    "clock_direction": "at 10 o'clock, 58 meters"
+                  }
+                ],
+                "slope_warnings": [],
+                "accessibility_note": "Walking route. Watch for crosswalks and intersections. Listen for traffic signals at crossings."
+              }
+            },
+            {
+              "tool": "navigate_to",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "destination": "CVS Pharmacy at 1440 Broadway",
+                "total_distance": "434 m",
+                "total_duration": "6 min",
+                "destination_direction": "at 1 o'clock, 434 meters",
+                "steps": [
+                  {
+                    "step": 1,
+                    "instruction": "Head southwest on 7th Ave toward W 44th St",
+                    "distance": "0.2 km",
+                    "direction": "depart",
+                    "clock_direction": "at 1 o'clock, 244 meters"
+                  },
+                  {
+                    "step": 2,
+                    "instruction": "Turn left onto W 42nd St",
+                    "distance": "49 m",
+                    "direction": "turn to 9 o'clock",
+                    "clock_direction": "at 10 o'clock, 49 meters"
+                  },
+                  {
+                    "step": 3,
+                    "instruction": "Turn right onto Broadway\nDestination will be on the right",
+                    "distance": "0.1 km",
+                    "direction": "turn to 3 o'clock",
+                    "clock_direction": "straight ahead, 141 meters"
+                  }
+                ],
+                "slope_warnings": [],
+                "accessibility_note": "Walking route. Watch for crosswalks and intersections. Listen for traffic signals at crossings."
+              }
+            },
+            {
+              "_type": "navigation_result",
+              "type": "navigation_result",
+              "summary": "at 1 o'clock, 434 meters",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "destination": "CVS Pharmacy at 1440 Broadway",
+                "total_distance": "434 m",
+                "total_duration": "6 min",
+                "destination_direction": "at 1 o'clock, 434 meters",
+                "steps": [
+                  {
+                    "step": 1,
+                    "instruction": "Head southwest on 7th Ave toward W 44th St",
+                    "distance": "0.2 km",
+                    "direction": "depart",
+                    "clock_direction": "at 1 o'clock, 244 meters"
+                  },
+                  {
+                    "step": 2,
+                    "instruction": "Turn left onto W 42nd St",
+                    "distance": "49 m",
+                    "direction": "turn to 9 o'clock",
+                    "clock_direction": "at 10 o'clock, 49 meters"
+                  },
+                  {
+                    "step": 3,
+                    "instruction": "Turn right onto Broadway\nDestination will be on the right",
+                    "distance": "0.1 km",
+                    "direction": "turn to 3 o'clock",
+                    "clock_direction": "straight ahead, 141 meters"
+                  }
+                ],
+                "slope_warnings": [],
+                "accessibility_note": "Walking route. Watch for crosswalks and intersections. Listen for traffic signals at crossings."
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2,
+            "transcript": 21,
+            "tool_event": 5,
+            "tool_result": 5,
+            "navigation_result": 4
+          },
+          "audio_bytes_received": 158,
+          "first_user_transcript_latency": 3.523269666999113,
+          "first_agent_transcript_latency": 39.77276808299939,
+          "collect_duration_sec": 53.47185141700902,
+          "notes": "Navigation request — should trigger navigate_to tool"
+        },
+        {
+          "turn_id": "A05_search",
+          "text": "What's the weather like in New York today?",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "What's the weather like in New York today?",
+            "What's the weather like in New York today?"
+          ],
+          "agent_transcripts": [
+            "It's a cloudy day in New York City.",
+            "It's currently 35 degrees, though it feels a bit cooler, and the temperature will reach a high of 49.",
+            "No rain is expected today.",
+            "It's a cloudy day in New York City. It's currently 35 degrees, though it feels a bit cooler, and the temperature will reach a high of 49. No rain is expected today.",
+            "It's a cloudy day in New York City, currently around 35 degrees.",
+            "It should warm up slightly this afternoon, but rain isn't expected.",
+            "It's a cloudy day in New York City, currently around 35 degrees. It should warm up slightly this afternoon, but rain isn't expected."
+          ],
+          "tool_events": [
+            {
+              "tool": "google_search",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "tool": "google_search",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "answer": "Today in **New York City** (Wednesday, March 4, 2026), the weather is primarily **cloudy** with cool temperatures.\n\n### **Current Conditions (as of 6:35 AM)**\n*   **Temperature:** 35°F (2°C)\n*   **Feels Like:** 31°F (-1°C)\n*   **Conditions:** Cloudy\n*   **Humidity:** 93%\n\n### **Forecast for the Rest of Today**\n*   **High Temperature:** 49°F (9°C)\n*   **Low Temperature:** 35°F (2°C)\n*   **Daytime:** Mostly cloudy with a low chance of precipitation (about 10%).\n*   **Evening:** Remaining cloudy with the chance of rain increasing slightly to 20% overnight.\n*   **Wind:** Light, around 7 mph.\n*   **UV Index:** 2 (Low).\n\nIf you are heading out, you'll want a warm jacket, as temperatures will remain on the chillier side despite the afternoon high reaching nearly 50°F. Rain is unlikely for most of the day, but thicker clouds will persist into the night.",
+                "sources": [
+                  {
+                    "title": "weatherspark.com",
+                    "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGUKzHLFcos89j3gGp6d352f1tKpU1bOzx0qjjEjmLF_Ans1rl1J1TLiHbrzeRpxRelY_2lA2D0zYq_No8slSIX8NqtlVc1fkYmEMF1TuRsG_vsEcka_SN1kx7m5km6kwjlO-kBuipdd57m-bhkSn4iuiTF1Z-TEATMgOnRx4RJcMebP6KkclADdmgnJ0acLDA4nkqfMNFjuDbLhUv2xMacjWKLPSzNh51-tB4x1rIc2cHYbXnTWLgBkmYOspnwONeCJsIOReHvZL5RIImxoQ4mUlAGtI9XPoWEQ2UXKwAujbsl_wiIt81V640yWxwg1pmYUuJLYxRk47kiKovRINQMbSBNlE88z-ib59_7EixgHNrYoszyS2B799fJMnV7JgUUAtk4mYX7obtsOnTU4HPCpP9BVetuErtk5XIzOIE2AQj4hBCQGX8ktvHBi94r_dBb9mztXSnIJqRjnXR5Lww0x8Ni4RKjVjfo_AnQhBl6MSXrpP2IoUoiTSti38sdi0z5QbDH2QoEuo6c6msv_ptJOPtdLkKSoTkgKTs1xG9n12oCbtlV2PbSSba0dLhmsy0_UfhDjPSzhoNZo_8GaxOa1lwtGUIrpdoMtZdM9dSQHACvCzTFxpbU9pxvs4-rh4Sgg3awqgXhD0JxZc3LrT5570UFMNhKjEwQPVkec7EFbakYYg==",
+                    "snippet": ""
+                  },
+                  {
+                    "title": "google.com",
+                    "url": "https://www.google.com/search?q=weather+in+New York, NY,+US",
+                    "snippet": ""
+                  },
+                  {
+                    "title": "weathershogun.com",
+                    "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEX2lJJjU5AZqdKdTl2Ixqiskz9yAGKfas_0T8gsIolsjrIy80PAWZJkM9F8BmPMGr6oXHtRovmnkUBIiexqxeGkvHagSaqFWhfRVOvJcnAnL7eg0XU55rHrrHVZRCTnlYWxpHdtUYqNM3TuxuKLDmLrZWRXjjlMWTwrA4TqYIvR9bx",
+                    "snippet": ""
+                  }
+                ],
+                "confidence": 0.9
+              }
+            },
+            {
+              "_type": "search_result",
+              "type": "search_result",
+              "summary": "Today in **New York City** (Wednesday, March 4, 2026), the weather is primarily **cloudy** with cool temperatures.\n\n### **Current Conditions (as of 6:35 AM)**\n*   **Temperature:** 35°F (2°C)\n*   **Feels Like:** 31°F (-1°C)\n*   **Conditions:** Cloudy\n*   **Humidity:** 93%\n\n### **Forecast for the Rest of Today**\n*   **High Temperature:** 49°F (9°C)\n*   **Low Temperature:** 35°F (2°C)\n*   **Daytime:** Mostly cloudy with a low chance of precipitation (about 10%).\n*   **Evening:** Remaining cloudy with the chance of rain increasing slightly to 20% overnight.\n*   **Wind:** Light, around 7 mph.\n*   **UV Index:** 2 (Low).\n\nIf you are heading out, you'll want a warm jacket, as temperatures will remain on the chillier side despite the afternoon high reaching nearly 50°F. Rain is unlikely for most of the day, but thicker clouds will persist into the night.",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "answer": "Today in **New York City** (Wednesday, March 4, 2026), the weather is primarily **cloudy** with cool temperatures.\n\n### **Current Conditions (as of 6:35 AM)**\n*   **Temperature:** 35°F (2°C)\n*   **Feels Like:** 31°F (-1°C)\n*   **Conditions:** Cloudy\n*   **Humidity:** 93%\n\n### **Forecast for the Rest of Today**\n*   **High Temperature:** 49°F (9°C)\n*   **Low Temperature:** 35°F (2°C)\n*   **Daytime:** Mostly cloudy with a low chance of precipitation (about 10%).\n*   **Evening:** Remaining cloudy with the chance of rain increasing slightly to 20% overnight.\n*   **Wind:** Light, around 7 mph.\n*   **UV Index:** 2 (Low).\n\nIf you are heading out, you'll want a warm jacket, as temperatures will remain on the chillier side despite the afternoon high reaching nearly 50°F. Rain is unlikely for most of the day, but thicker clouds will persist into the night.",
+                "sources": [
+                  {
+                    "title": "weatherspark.com",
+                    "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGUKzHLFcos89j3gGp6d352f1tKpU1bOzx0qjjEjmLF_Ans1rl1J1TLiHbrzeRpxRelY_2lA2D0zYq_No8slSIX8NqtlVc1fkYmEMF1TuRsG_vsEcka_SN1kx7m5km6kwjlO-kBuipdd57m-bhkSn4iuiTF1Z-TEATMgOnRx4RJcMebP6KkclADdmgnJ0acLDA4nkqfMNFjuDbLhUv2xMacjWKLPSzNh51-tB4x1rIc2cHYbXnTWLgBkmYOspnwONeCJsIOReHvZL5RIImxoQ4mUlAGtI9XPoWEQ2UXKwAujbsl_wiIt81V640yWxwg1pmYUuJLYxRk47kiKovRINQMbSBNlE88z-ib59_7EixgHNrYoszyS2B799fJMnV7JgUUAtk4mYX7obtsOnTU4HPCpP9BVetuErtk5XIzOIE2AQj4hBCQGX8ktvHBi94r_dBb9mztXSnIJqRjnXR5Lww0x8Ni4RKjVjfo_AnQhBl6MSXrpP2IoUoiTSti38sdi0z5QbDH2QoEuo6c6msv_ptJOPtdLkKSoTkgKTs1xG9n12oCbtlV2PbSSba0dLhmsy0_UfhDjPSzhoNZo_8GaxOa1lwtGUIrpdoMtZdM9dSQHACvCzTFxpbU9pxvs4-rh4Sgg3awqgXhD0JxZc3LrT5570UFMNhKjEwQPVkec7EFbakYYg==",
+                    "snippet": ""
+                  },
+                  {
+                    "title": "google.com",
+                    "url": "https://www.google.com/search?q=weather+in+New York, NY,+US",
+                    "snippet": ""
+                  },
+                  {
+                    "title": "weathershogun.com",
+                    "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEX2lJJjU5AZqdKdTl2Ixqiskz9yAGKfas_0T8gsIolsjrIy80PAWZJkM9F8BmPMGr6oXHtRovmnkUBIiexqxeGkvHagSaqFWhfRVOvJcnAnL7eg0XU55rHrrHVZRCTnlYWxpHdtUYqNM3TuxuKLDmLrZWRXjjlMWTwrA4TqYIvR9bx",
+                    "snippet": ""
+                  }
+                ],
+                "confidence": 0.9
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2,
+            "transcript": 9,
+            "tool_event": 1,
+            "tool_result": 1,
+            "search_result": 1
+          },
+          "audio_bytes_received": 69,
+          "first_user_transcript_latency": 2.969121834001271,
+          "first_agent_transcript_latency": 21.25219220900908,
+          "collect_duration_sec": 29.291072374995565,
+          "notes": "Search request — should trigger google_search tool"
+        },
+        {
+          "turn_id": "A06_remember",
+          "text": "Please remember that the pharmacy is called Walgreens on 5th Avenue.",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "Please remember that the pharmacy is called Walgreens on 5th Avenue.",
+            "Please remember that the pharmacy is called Walgreens on 5th Avenue."
+          ],
+          "agent_transcripts": [
+            "I've noted that Walgreens is on Fifth Avenue.",
+            "I've made a note that the pharmacy is a Walgreens on 5th Avenue."
+          ],
+          "tool_events": [
+            {
+              "tool": "remember_entity",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "tool": "remember_entity",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "entity_id": "016889f423ca4eb9",
+                "name": "Walgreens",
+                "status": "created",
+                "message": "I'll remember Walgreens."
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2,
+            "transcript": 4,
+            "tool_event": 1,
+            "tool_result": 1
+          },
+          "audio_bytes_received": 23,
+          "first_user_transcript_latency": 4.51265424999292,
+          "first_agent_transcript_latency": 10.687901625002269,
+          "collect_duration_sec": 16.23297791701043,
+          "notes": "Memory store request"
+        },
+        {
+          "turn_id": "A07_whats_ahead",
+          "text": "What's ahead of me now?",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "What's ahead of me now?",
+            "What's ahead of me now?"
+          ],
+          "agent_transcripts": [
+            "I'm not seeing anything clearly right now; the view appears to be a solid blue."
+          ],
+          "tool_events": [
+            {
+              "tool": "analyze_scene",
+              "status": "queued",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "identify_person",
+              "status": "queued",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "identify_person",
+              "status": "completed",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "analyze_scene",
+              "status": "completed",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "_type": "vision_result",
+              "type": "vision_result",
+              "summary": "The image is a solid, uniform field of medium blue color. There are no objects, people, text, or discernible features present. It appears to be a blank canvas or a digital color swatch.",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "safety_warnings": [],
+                "navigation_info": {
+                  "entrances": [],
+                  "paths": [],
+                  "landmarks": []
+                },
+                "scene_description": "The image is a solid, uniform field of medium blue color. There are no objects, people, text, or discernible features present. It appears to be a blank canvas or a digital color swatch.",
+                "detected_text": null,
+                "people_count": 0,
+                "confidence": 1.0
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [
+            {
+              "queued_agents": [
+                "vision",
+                "face"
+              ]
+            }
+          ],
+          "message_counts": {
+            "tool_event": 4,
+            "identity_update": 1,
+            "frame_ack": 1,
+            "debug_activity": 2,
+            "face_debug": 1,
+            "transcript": 3,
+            "vision_result": 1,
+            "vision_debug": 1
+          },
+          "audio_bytes_received": 20,
+          "first_user_transcript_latency": 6.146363125008065,
+          "first_agent_transcript_latency": 17.685074750013882,
+          "collect_duration_sec": 21.869341540994355,
+          "notes": "Second vision query — different telemetry context, check context awareness"
+        },
+        {
+          "turn_id": "A08_danger_check",
+          "text": "Is there any danger ahead?",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "Is there any danger ahead?",
+            "Is there any danger ahead?"
+          ],
+          "agent_transcripts": [
+            "Let me look at that for you...",
+            "[CONTEXT UPDATE DO NOT SPEAK] [SILENT context only, do not speak aloud] [VISION ANALYSIS] Scene: The image is a solid, uniform",
+            "field of dark orange-red color.",
+            "There are no objects, people, text, or discernible features present.",
+            "Currently, I have no visual information to assess danger.",
+            "[CONTEXT UPDATE DO NOT SPEAK] [SILENT context only, do not speak aloud] [VISION ANALYSIS] Scene: The image is a solid, uniform field of dark orange-red color. There are no objects, people, text, or discernible features present.Currently, I have no visual information to assess danger."
+          ],
+          "tool_events": [
+            {
+              "tool": "analyze_scene",
+              "status": "queued",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "identify_person",
+              "status": "queued",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "analyze_scene",
+              "status": "completed",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "_type": "vision_result",
+              "type": "vision_result",
+              "summary": "The image is a solid, uniform field of a reddish-orange color. There are no objects, people, text, or discernible features present. It appears to be a blank canvas or a close-up of a uniformly colored surface.",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "safety_warnings": [],
+                "navigation_info": {
+                  "entrances": [],
+                  "paths": [],
+                  "landmarks": []
+                },
+                "scene_description": "The image is a solid, uniform field of a reddish-orange color. There are no objects, people, text, or discernible features present. It appears to be a blank canvas or a close-up of a uniformly colored surface.",
+                "detected_text": null,
+                "people_count": 0,
+                "confidence": 1.0
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [
+            {
+              "queued_agents": [
+                "vision",
+                "face"
+              ]
+            }
+          ],
+          "message_counts": {
+            "tool_event": 3,
+            "identity_update": 1,
+            "frame_ack": 1,
+            "debug_activity": 2,
+            "transcript": 8,
+            "vision_result": 1,
+            "vision_debug": 1
+          },
+          "audio_bytes_received": 69,
+          "first_user_transcript_latency": 2.4582105000154115,
+          "first_agent_transcript_latency": 1.9536655000119936,
+          "collect_duration_sec": 10.697726125014015,
+          "notes": "Safety-focused query with hazard image"
+        },
+        {
+          "turn_id": "A09_recall_memory",
+          "text": "What pharmacy did I mention earlier?",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "What pharmacy did I mention earlier?",
+            "What pharmacy did I mention earlier?"
+          ],
+          "agent_transcripts": [
+            "You mentioned Walgreens."
+          ],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2,
+            "transcript": 3
+          },
+          "audio_bytes_received": 6,
+          "first_user_transcript_latency": 2.7317274999804795,
+          "first_agent_transcript_latency": 3.3471224590030033,
+          "collect_duration_sec": 7.5320876670011785,
+          "notes": "Memory recall — should remember Walgreens on 5th Avenue"
+        },
+        {
+          "turn_id": "A10_describe_detail",
+          "text": "Describe everything you see in detail.",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "Describe everything you see in detail.",
+            "Describe everything you see in detail."
+          ],
+          "agent_transcripts": [
+            "Let me look at that for you...",
+            "I'm currently seeing a solid reddish-orange field; there are no objects or features in view."
+          ],
+          "tool_events": [
+            {
+              "tool": "analyze_scene",
+              "status": "queued",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "identify_person",
+              "status": "queued",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "analyze_scene",
+              "status": "completed",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "_type": "vision_result",
+              "type": "vision_result",
+              "summary": "The image is a solid, uniform shade of green. There are no objects, people, text, or discernible features present. It appears to be a blank green canvas or background.",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "safety_warnings": [],
+                "navigation_info": {
+                  "entrances": [],
+                  "paths": [],
+                  "landmarks": []
+                },
+                "scene_description": "The image is a solid, uniform shade of green. There are no objects, people, text, or discernible features present. It appears to be a blank green canvas or background.",
+                "detected_text": null,
+                "people_count": 0,
+                "confidence": 1.0
+              }
+            }
+          ],
+          "lod_updates": [
+            {
+              "lod": 3,
+              "reason": "force_lod_no_change"
+            }
+          ],
+          "frame_acks": [
+            {
+              "queued_agents": [
+                "vision",
+                "face"
+              ]
+            }
+          ],
+          "message_counts": {
+            "lod_update": 1,
+            "tool_event": 3,
+            "identity_update": 1,
+            "frame_ack": 1,
+            "transcript": 4,
+            "debug_activity": 2,
+            "vision_result": 1,
+            "vision_debug": 1
+          },
+          "audio_bytes_received": 22,
+          "first_user_transcript_latency": 3.7715997500054073,
+          "first_agent_transcript_latency": 3.3648702499922365,
+          "collect_duration_sec": 9.480375916988123,
+          "notes": "LOD3 detailed description request with gesture"
+        },
+        {
+          "turn_id": "A11_how_many_people",
+          "text": "How many people can you see?",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "How many people can you see?",
+            "How many people can you see?"
+          ],
+          "agent_transcripts": [
+            "I cannot see any people right now."
+          ],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2,
+            "transcript": 3
+          },
+          "audio_bytes_received": 9,
+          "first_user_transcript_latency": 2.40272066599573,
+          "first_agent_transcript_latency": 3.2061053329962306,
+          "collect_duration_sec": 7.3667679999780376,
+          "notes": "Follow-up question about previous image — tests context retention"
+        },
+        {
+          "turn_id": "A12_goodbye",
+          "text": "Thank you, that's all for now. Goodbye.",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "Thank you. That's all for now. Goodbye.",
+            "Thank you. That's all for now. Goodbye."
+          ],
+          "agent_transcripts": [
+            "I'm currently seeing a blank green view.",
+            "You're welcome.",
+            "Have a good day.",
+            "You're welcome. Have a good day."
+          ],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2,
+            "transcript": 6
+          },
+          "audio_bytes_received": 18,
+          "first_user_transcript_latency": 3.0627120420103893,
+          "first_agent_transcript_latency": 2.6160069170000497,
+          "collect_duration_sec": 7.94268408298376,
+          "notes": "Session closure — polite ending"
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "conv_rapid_context",
+      "description": "Rapid context switching: alternating vision/OCR/nav/search to test model coherence",
+      "total_turns": 5,
+      "passed": 3,
+      "failed": 2,
+      "duration_sec": 119.9,
+      "turns": [
+        {
+          "turn_id": "B01_greeting",
+          "text": "Hi, I need your help navigating the city.",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "Hi, I need your help navigating the city.",
+            "Hi, I need your help navigating the city."
+          ],
+          "agent_transcripts": [
+            "Hello. I'm",
+            "ready to help when you are.",
+            "Hello. I'm ready to help when you are.",
+            "I can certainly help with that.",
+            "Where are you trying to go?",
+            "I can certainly help with that. Where are you trying to go?"
+          ],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [
+            {
+              "lod": 3,
+              "reason": "Rule1:walking→LOD2 + Rule5b:unfamiliar(0.00)→+1 → LOD 3"
+            }
+          ],
+          "frame_acks": [],
+          "message_counts": {
+            "transcript": 8,
+            "lod_update": 1,
+            "debug_lod": 1,
+            "debug_activity": 2
+          },
+          "audio_bytes_received": 20,
+          "first_user_transcript_latency": 8.443356000003405,
+          "first_agent_transcript_latency": 4.774275250005303,
+          "collect_duration_sec": 13.472326999995857,
+          "notes": "Greeting with urban walking context"
+        },
+        {
+          "turn_id": "B02_read_menu",
+          "text": "Read the menu for me please.",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "Read the menu for me, please.",
+            "Read the menu for me, please."
+          ],
+          "agent_transcripts": [
+            "I'm still waiting for you to provide the destination.",
+            "Where would you like to navigate to?",
+            "I'm still waiting for you to provide the destination. Where would you like to navigate to?",
+            "I'm not seeing any text to read at the moment.",
+            "Could you pan the camera a little?",
+            "I'm not seeing any text to read at the moment. Could you pan the camera a little?",
+            "that for you."
+          ],
+          "tool_events": [
+            {
+              "tool": "analyze_scene",
+              "status": "queued",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "identify_person",
+              "status": "queued",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "identify_person",
+              "status": "completed",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "extract_text_from_camera",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "analyze_scene",
+              "status": "completed",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "_type": "vision_result",
+              "type": "vision_result",
+              "summary": "The image is a solid, uniform shade of green. There are no objects, people, text, or discernible features present. It appears to be a blank canvas or a digital color swatch.",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "safety_warnings": [],
+                "navigation_info": {
+                  "entrances": [],
+                  "paths": [],
+                  "landmarks": []
+                },
+                "scene_description": "The image is a solid, uniform shade of green. There are no objects, people, text, or discernible features present. It appears to be a blank canvas or a digital color swatch.",
+                "detected_text": null,
+                "people_count": 0,
+                "confidence": 1.0
+              }
+            },
+            {
+              "tool": "extract_text_from_camera",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "text": "",
+                "text_type": "unknown",
+                "items": [],
+                "confidence": 0.0
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [
+            {
+              "queued_agents": [
+                "vision",
+                "face"
+              ]
+            }
+          ],
+          "message_counts": {
+            "tool_event": 5,
+            "identity_update": 1,
+            "frame_ack": 1,
+            "debug_activity": 2,
+            "face_debug": 1,
+            "transcript": 9,
+            "vision_result": 1,
+            "vision_debug": 1,
+            "tool_result": 1
+          },
+          "audio_bytes_received": 40,
+          "first_user_transcript_latency": 2.0375967089785263,
+          "first_agent_transcript_latency": 1.8414964999828953,
+          "collect_duration_sec": 11.55605812498834,
+          "notes": "OCR request"
+        },
+        {
+          "turn_id": "B03_search_restaurant",
+          "text": "Search for the best Italian restaurant nearby.",
+          "passed": false,
+          "failures": [
+            "no_agent_transcript",
+            "no_agent_audio"
+          ],
+          "warnings": [],
+          "user_transcripts": [
+            "Search for the best Italian restaurant nearby.",
+            "Search for the best Italian restaurant nearby."
+          ],
+          "agent_transcripts": [],
+          "tool_events": [
+            {
+              "tool": "maps_query",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "google_search",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "tool": "maps_query",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "answer": "Here are some of the best Italian restaurants near your location in San Francisco:\n\n*   **Amarena** is a highly-rated option with a 4.8-star rating from 1547 reviews. This intimate spot serves traditional Italian fare, including homemade pasta and hearty veal dishes, and also features an extensive wine list. It offers takeout, delivery, and dine-in options.\n\n*   **Sforno Pizzeria Napoletana** boasts a 4.9-star rating based on 104 reviews and is located in Hayes Valley. They offer takeout, delivery, and dine-in services.\n\n*   **Seven Hills** is a lively Italian eatery with a 4.7-star rating from 891 reviews. They serve farm-to-table Roman fare with an inventive twist in a candlelit space and offer fresh pasta and a curated wine list. Seven Hills takes reservations and provides dine-in service.\n\n*   **Piccolo Forno** has a 4.7-star rating from over 2100 reviews. This casual neighborhood trattoria offers classic Italian dishes, including gluten-free options, and also serves beer and wine. They provide takeout, delivery, and dine-in.\n\n*   **The Italian Homemade Company** is another excellent choice, holding a 4.6-star rating with over 3200 reviews. This informal restaurant is known for its homemade pasta dishes like gnocchi and lasagna, as well as classic Italian mains and pizzas. They offer takeout, delivery, and dine-in services. There is also another location with a similar name and rating (4.6 stars from over 1700 reviews) that serves fresh and organic pasta, sauces, and other Italian dishes.\n\n*   **Trattoria Contadina** has a 4.6-star rating from 931 reviews and is a cozy, unpretentious fixture for classic Italian fare such as pasta, meatballs, and gnocchi. This family-owned eatery has been serving big bowls of pasta in a neighborly atmosphere for three decades. They offer reservations, takeout, delivery, and dine-in.\n\n*   **Sotto Mare** is a highly popular option with a 4.6-star rating from over 4900 reviews, specializing in Italian-style seafood, including pasta and cioppino. It's described as a lively, warm Italian eatery known for its seafood dishes. They accept reservations and offer takeout, delivery, and dine-in.\n\n*   **Cotogna**, rated 4.5 stars with over 2100 reviews, is a popular eatery serving spit-roasted and grilled meat and fish, wood-fired pizza, and house-made pasta. This neighborhood spot dishes up seasonal, regional Italian cooking alongside fine wines. Reservations are available, and they offer takeout and dine-in.\n\n*   **a Mano**, located at 450 Hayes St, has a 4.3-star rating from over 2200 reviews. This buzzy neighborhood spot offers housemade pasta, pizza, and Italian wine in a spacious environment. They also offer gluten-free pasta options.\n\n*   **Doppio Zero San Francisco**, with a 4.3-star rating from over 1000 reviews, specializes in Neapolitan pizza, alongside pasta and other classic Italian dishes, and has a bar. They offer takeout, delivery, and dine-in options.\n\n*   **Flour + Water** holds a 4.5-star rating from over 1800 reviews and is known for its handcrafted Italian food, including pasta and wood-fired pizza, served in a casual, rustic setting. They offer a pasta tasting menu and artisanal desserts.",
+                "sources": [
+                  {
+                    "title": "Google Maps",
+                    "snippet": "It offers takeout, delivery, and dine-in options."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "*   **Sforno Pizzeria Napoletana** boasts a 4.9-star rating based on 104 reviews and is located in Hayes Valley."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "They offer takeout, delivery, and dine-in services."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "*   **Seven Hills** is a lively Italian eatery with a 4.7-star rating from 891 reviews."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "They serve farm-to-table Roman fare with an inventive twist in a candlelit space and offer fresh pasta and a curated wine list."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "Seven Hills takes reservations and provides dine-in service."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "*   **Piccolo Forno** has a 4.7-star rating from over 2100 reviews."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "This casual neighborhood trattoria offers classic Italian dishes, including gluten-free options, and also serves beer and wine."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "They provide takeout, delivery, and dine-in."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "*   **The Italian Homemade Company** is another excellent choice, holding a 4.6-star rating with over 3200 reviews."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "This informal restaurant is known for its homemade pasta dishes like gnocchi and lasagna, as well as classic Italian mains and pizzas."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "They offer takeout, delivery, and dine-in services."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "There is also another location with a similar name and rating (4.6 stars from over 1700 reviews) that serves fresh and organic pasta, sauces, and other Italian dishes."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "*   **Trattoria Contadina** has a 4.6-star rating from 931 reviews and is a cozy, unpretentious fixture for classic Italian fare such as pasta, meatballs, and gnocchi."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "This family-owned eatery has been serving big bowls of pasta in a neighborly atmosphere for three decades."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "They offer reservations, takeout, delivery, and dine-in."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "*   **Sotto Mare** is a highly popular option with a 4.6-star rating from over 4900 reviews, specializing in Italian-style seafood, including pasta and cioppino."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "It's described as a lively, warm Italian eatery known for its seafood dishes."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "They accept reservations and offer takeout, delivery, and dine-in."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "*   **Cotogna**, rated 4.5 stars with over 2100 reviews, is a popular eatery serving spit-roasted and grilled meat and fish, wood-fired pizza, and house-made pasta."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "This neighborhood spot dishes up seasonal, regional Italian cooking alongside fine wines."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "Reservations are available, and they offer takeout and dine-in."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "*   **a Mano**, located at 450 Hayes St, has a 4.3-star rating from over 2200 reviews."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "This buzzy neighborhood spot offers housemade pasta, pizza, and Italian wine in a spacious environment."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "They also offer gluten-free pasta options."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "*   **Doppio Zero San Francisco**, with a 4.3-star rating from over 1000 reviews, specializes in Neapolitan pizza, alongside pasta and other classic Italian dishes, and has a bar."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "They offer takeout, delivery, and dine-in options."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "*   **Flour + Water** holds a 4.5-star rating from over 1800 reviews and is known for its handcrafted Italian food, including pasta and wood-fired pizza, served in a casual, rustic setting."
+                  },
+                  {
+                    "title": "Google Maps",
+                    "snippet": "They offer a pasta tasting menu and artisanal desserts."
+                  }
+                ],
+                "confidence": 0.9
+              }
+            },
+            {
+              "tool": "google_search",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "answer": "The coordinates **37.7749, -122.4194** place you in the heart of San Francisco’s Civic Center, directly adjacent to City Hall and the **Hayes Valley** neighborhood. This area is home to some of the city's best Italian dining, ranging from casual handmade pasta shops to upscale, buzzy trattorias.\n\nHere are the best Italian restaurants within a short walking distance:\n\n### 1. **a Mano** (0.4 miles / ~8 min walk)\n*450 Hayes St*\nKnown for its high-energy atmosphere and \"by hand\" (a mano) approach, this is arguably the most popular Italian spot in the area. \n*   **Why go:** They specialize in fresh, house-made pasta that changes seasonally. The outdoor seating is great for people-watching in Hayes Valley.\n*   **Top dishes:** Cacio e Pepe, Agnolotti, and their seasonal pizzas.\n\n### 2. **Doppio Zero** (0.3 miles / ~7 min walk)\n*495 Hayes St*\nA top-tier Southern Italian restaurant and pizzeria that holds a prestigious \"Top 50 Pizza in USA\" award.\n*   **Why go:** It offers a more extensive menu than a Mano, including fresh seafood and authentic Neapolitan wood-fired pizzas. It’s excellent for groups and has a great happy hour.\n*   **Top dishes:** Neapolitan Pizza (D.O.C. Margherita), Pistachio Pesto Pasta, and Grilled Octopus.\n\n### 3. **The Italian Homemade Company** (0.4 miles / ~8 min walk)\n*452 Hayes St*\nA more casual, counter-service gem that focuses on the Emilia-Romagna region.\n*   **Why go:** It is perfect for a high-quality, quick meal. You choose your pasta shape (all made fresh in-house) and pair it with your choice of sauce.\n*   **Top dishes:** Tortellini in Bolognese sauce, Cassoni (stuffed flatbread), and Lasagna.\n\n### 4. **Il Borgo** (0.4 miles / ~8 min walk)\n*434 Hayes St*\nA small, intimate \"hidden gem\" run by a chef from Milan. \n*   **Why go:** If you want a quieter, more authentic \"neighborhood\" feel away from the buzzy crowds, this is the place. The focus is on traditional, northern Italian flavors.\n*   **Top dishes:** Homemade Ravioli and Gnocchi.\n\n### 5. **Zuni Café** (0.3 miles / ~6 min walk)\n*1658 Market St*\nWhile not strictly \"Italian\" (it is classic San Francisco/French-Italian fusion), its wood-fired soul and rustic pasta dishes make it a staple for Italian food lovers.\n*   **Why go:** It’s a San Francisco legend with a Michelin-recommended menu and a stunning copper-topped bar.\n*   **Top dishes:** Ricotta Gnocchi and the iconic wood-fired Roasted Chicken (though it takes 60 minutes, it is world-famous).\n\n**Pro-Tip:** If you are attending a performance at the Symphony or Opera House, **a Mano** and **Doppio Zero** get very busy between 5:30 PM and 7:30 PM; reservations are highly recommended.",
+                "sources": [
+                  {
+                    "title": "michelin.com",
+                    "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEItlHcjqd8Yo9ipYkUpQyKKfOMK-HDIocOmlCjiFHL6t4EwJLYPGCMZOQzZFesGNYTsOnPrYN0sVp_hIldiCl6kMZVHBU1k382-sy6CHadShTRV1XD2k_RqxnttegOacf3_d8PjpRol0mspaRHbaPkXx1cDMDBIH_Q2TDBbu0K4QJHy_CbDpeq",
+                    "snippet": ""
+                  }
+                ],
+                "confidence": 0.9
+              }
+            },
+            {
+              "_type": "search_result",
+              "type": "search_result",
+              "summary": "The coordinates **37.7749, -122.4194** place you in the heart of San Francisco’s Civic Center, directly adjacent to City Hall and the **Hayes Valley** neighborhood. This area is home to some of the city's best Italian dining, ranging from casual handmade pasta shops to upscale, buzzy trattorias.\n\nHere are the best Italian restaurants within a short walking distance:\n\n### 1. **a Mano** (0.4 miles / ~8 min walk)\n*450 Hayes St*\nKnown for its high-energy atmosphere and \"by hand\" (a mano) approach, this is arguably the most popular Italian spot in the area. \n*   **Why go:** They specialize in fresh, house-made pasta that changes seasonally. The outdoor seating is great for people-watching in Hayes Valley.\n*   **Top dishes:** Cacio e Pepe, Agnolotti, and their seasonal pizzas.\n\n### 2. **Doppio Zero** (0.3 miles / ~7 min walk)\n*495 Hayes St*\nA top-tier Southern Italian restaurant and pizzeria that holds a prestigious \"Top 50 Pizza in USA\" award.\n*   **Why go:** It offers a more extensive menu than a Mano, including fresh seafood and authentic Neapolitan wood-fired pizzas. It’s excellent for groups and has a great happy hour.\n*   **Top dishes:** Neapolitan Pizza (D.O.C. Margherita), Pistachio Pesto Pasta, and Grilled Octopus.\n\n### 3. **The Italian Homemade Company** (0.4 miles / ~8 min walk)\n*452 Hayes St*\nA more casual, counter-service gem that focuses on the Emilia-Romagna region.\n*   **Why go:** It is perfect for a high-quality, quick meal. You choose your pasta shape (all made fresh in-house) and pair it with your choice of sauce.\n*   **Top dishes:** Tortellini in Bolognese sauce, Cassoni (stuffed flatbread), and Lasagna.\n\n### 4. **Il Borgo** (0.4 miles / ~8 min walk)\n*434 Hayes St*\nA small, intimate \"hidden gem\" run by a chef from Milan. \n*   **Why go:** If you want a quieter, more authentic \"neighborhood\" feel away from the buzzy crowds, this is the place. The focus is on traditional, northern Italian flavors.\n*   **Top dishes:** Homemade Ravioli and Gnocchi.\n\n### 5. **Zuni Café** (0.3 miles / ~6 min walk)\n*1658 Market St*\nWhile not strictly \"Italian\" (it is classic San Francisco/French-Italian fusion), its wood-fired soul and rustic pasta dishes make it a staple for Italian food lovers.\n*   **Why go:** It’s a San Francisco legend with a Michelin-recommended menu and a stunning copper-topped bar.\n*   **Top dishes:** Ricotta Gnocchi and the iconic wood-fired Roasted Chicken (though it takes 60 minutes, it is world-famous).\n\n**Pro-Tip:** If you are attending a performance at the Symphony or Opera House, **a Mano** and **Doppio Zero** get very busy between 5:30 PM and 7:30 PM; reservations are highly recommended.",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "answer": "The coordinates **37.7749, -122.4194** place you in the heart of San Francisco’s Civic Center, directly adjacent to City Hall and the **Hayes Valley** neighborhood. This area is home to some of the city's best Italian dining, ranging from casual handmade pasta shops to upscale, buzzy trattorias.\n\nHere are the best Italian restaurants within a short walking distance:\n\n### 1. **a Mano** (0.4 miles / ~8 min walk)\n*450 Hayes St*\nKnown for its high-energy atmosphere and \"by hand\" (a mano) approach, this is arguably the most popular Italian spot in the area. \n*   **Why go:** They specialize in fresh, house-made pasta that changes seasonally. The outdoor seating is great for people-watching in Hayes Valley.\n*   **Top dishes:** Cacio e Pepe, Agnolotti, and their seasonal pizzas.\n\n### 2. **Doppio Zero** (0.3 miles / ~7 min walk)\n*495 Hayes St*\nA top-tier Southern Italian restaurant and pizzeria that holds a prestigious \"Top 50 Pizza in USA\" award.\n*   **Why go:** It offers a more extensive menu than a Mano, including fresh seafood and authentic Neapolitan wood-fired pizzas. It’s excellent for groups and has a great happy hour.\n*   **Top dishes:** Neapolitan Pizza (D.O.C. Margherita), Pistachio Pesto Pasta, and Grilled Octopus.\n\n### 3. **The Italian Homemade Company** (0.4 miles / ~8 min walk)\n*452 Hayes St*\nA more casual, counter-service gem that focuses on the Emilia-Romagna region.\n*   **Why go:** It is perfect for a high-quality, quick meal. You choose your pasta shape (all made fresh in-house) and pair it with your choice of sauce.\n*   **Top dishes:** Tortellini in Bolognese sauce, Cassoni (stuffed flatbread), and Lasagna.\n\n### 4. **Il Borgo** (0.4 miles / ~8 min walk)\n*434 Hayes St*\nA small, intimate \"hidden gem\" run by a chef from Milan. \n*   **Why go:** If you want a quieter, more authentic \"neighborhood\" feel away from the buzzy crowds, this is the place. The focus is on traditional, northern Italian flavors.\n*   **Top dishes:** Homemade Ravioli and Gnocchi.\n\n### 5. **Zuni Café** (0.3 miles / ~6 min walk)\n*1658 Market St*\nWhile not strictly \"Italian\" (it is classic San Francisco/French-Italian fusion), its wood-fired soul and rustic pasta dishes make it a staple for Italian food lovers.\n*   **Why go:** It’s a San Francisco legend with a Michelin-recommended menu and a stunning copper-topped bar.\n*   **Top dishes:** Ricotta Gnocchi and the iconic wood-fired Roasted Chicken (though it takes 60 minutes, it is world-famous).\n\n**Pro-Tip:** If you are attending a performance at the Symphony or Opera House, **a Mano** and **Doppio Zero** get very busy between 5:30 PM and 7:30 PM; reservations are highly recommended.",
+                "sources": [
+                  {
+                    "title": "michelin.com",
+                    "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEItlHcjqd8Yo9ipYkUpQyKKfOMK-HDIocOmlCjiFHL6t4EwJLYPGCMZOQzZFesGNYTsOnPrYN0sVp_hIldiCl6kMZVHBU1k382-sy6CHadShTRV1XD2k_RqxnttegOacf3_d8PjpRol0mspaRHbaPkXx1cDMDBIH_Q2TDBbu0K4QJHy_CbDpeq",
+                    "snippet": ""
+                  }
+                ],
+                "confidence": 0.9
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2,
+            "transcript": 2,
+            "tool_event": 2,
+            "tool_result": 2,
+            "search_result": 1
+          },
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": 3.725644749996718,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 57.339992666995386,
+          "notes": "Immediate switch to search"
+        },
+        {
+          "turn_id": "B04_whats_this",
+          "text": "What is this building?",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "What is this building?",
+            "What is this building?"
+          ],
+          "agent_transcripts": [
+            "Let me look at that for you...",
+            "Based on your location, some highly-rated Italian restaurants nearby include Amarena, Sforno Pizzeria Napoletana, and Seven Hills.",
+            "Amarena has 4.8",
+            "stars with traditional Italian dishes, while Sforno is a Neapolitan pizzeria with a 4.9-star",
+            "rating.",
+            "Are any of those of interest?",
+            "Based on your location, some highly-rated Italian restaurants nearby include Amarena, Sforno Pizzeria Napoletana, and Seven Hills. Amarena has 4.8 stars with traditional Italian dishes, while Sforno is a Neapolitan pizzeria with a 4.9-star rating. Are any of those of interest?",
+            "Based on your location, Amarena is a highly-rated option with a 4.8-star",
+            "rating.",
+            "Piccolo Forno and Seven Hills also have excellent reviews.",
+            "Were you looking for something specific?",
+            "Based on your location, Amarena is a highly-rated option with a 4.8-star rating. Piccolo Forno and Seven Hills also have excellent reviews. Were you looking for something specific?",
+            "Based on your location in Civic Center, \"a Mano\" is a popular Italian spot nearby known for fresh pasta.",
+            "\"Doppio Zero\" is also well-regarded for Neapolitan pizza.",
+            "Are either of those appealing?",
+            "Based on your location in Civic Center, \"a Mano\" is a popular Italian spot nearby known for fresh pasta. \"Doppio Zero\" is also well-regarded for Neapolitan pizza. Are either of those appealing?",
+            "You are in the Civic Center area, near Hayes Valley.",
+            "For Italian food, you have a few great options nearby.",
+            "a Mano is a popular spot known for handmade pasta, The Italian Homemade Company is great for a quick, casual meal, and",
+            "Doppio Zero has highly-rated pizzas.",
+            "Are any of those appealing?",
+            "You are in the Civic Center area, near Hayes Valley. For Italian food, you have a few great options nearby. a Mano is a popular spot known for handmade pasta, The Italian Homemade Company is great for a quick, casual meal, and Doppio Zero has highly-rated pizzas. Are any of those appealing?",
+            "I can't see any building information at the moment.",
+            "Could you describe what's in front of you?",
+            "I can't see any building information at the moment. Could you describe what's in front of you?"
+          ],
+          "tool_events": [
+            {
+              "tool": "analyze_scene",
+              "status": "queued",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "identify_person",
+              "status": "queued",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "identify_person",
+              "status": "completed",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "analyze_scene",
+              "status": "completed",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "_type": "vision_result",
+              "type": "vision_result",
+              "summary": "The image is a solid, uniform field of a muted, medium-dark purple or lavender color. There are no objects, people, text, or discernible features present. It appears to be a digital color swatch or a completely blank background.",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "safety_warnings": [],
+                "navigation_info": {
+                  "entrances": [],
+                  "paths": [],
+                  "landmarks": []
+                },
+                "scene_description": "The image is a solid, uniform field of a muted, medium-dark purple or lavender color. There are no objects, people, text, or discernible features present. It appears to be a digital color swatch or a completely blank background.",
+                "detected_text": null,
+                "people_count": 0,
+                "confidence": 0.99
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [
+            {
+              "queued_agents": [
+                "vision",
+                "face"
+              ]
+            }
+          ],
+          "message_counts": {
+            "tool_event": 4,
+            "identity_update": 1,
+            "frame_ack": 1,
+            "debug_activity": 2,
+            "transcript": 27,
+            "face_debug": 1,
+            "vision_result": 1,
+            "vision_debug": 1
+          },
+          "audio_bytes_received": 263,
+          "first_user_transcript_latency": 2.9615758750005625,
+          "first_agent_transcript_latency": 1.7031046249903738,
+          "collect_duration_sec": 14.93956945897662,
+          "notes": "Vision query — context switch from search to vision"
+        },
+        {
+          "turn_id": "CONNECTION_ERROR",
+          "text": "received 1011 (internal error) downstream_error; then sent 1011 (internal error) downstream_error",
+          "passed": false,
+          "failures": [
+            "connection_error: received 1011 (internal error) downstream_error; then sent 1011 (internal error) downstream_error"
+          ],
+          "warnings": [],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {},
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 0.0,
+          "notes": ""
+        }
+      ],
+      "issues": [
+        {
+          "id": "MT-001",
+          "turn": "B03_search_restaurant",
+          "title": "no_agent_transcript",
+          "severity": "high",
+          "evidence": {
+            "user_transcripts": [
+              "Search for the best Italian restaurant nearby.",
+              "Search for the best Italian restaurant nearby."
+            ],
+            "agent_transcripts": [],
+            "tool_events": [
+              {
+                "tool": "maps_query",
+                "status": "invoked",
+                "behavior": "WHEN_IDLE"
+              },
+              {
+                "tool": "google_search",
+                "status": "invoked",
+                "behavior": "WHEN_IDLE"
+              }
+            ],
+            "message_counts": {
+              "debug_activity": 2,
+              "transcript": 2,
+              "tool_event": 2,
+              "tool_result": 2,
+              "search_result": 1
+            }
+          }
+        },
+        {
+          "id": "MT-002",
+          "turn": "B03_search_restaurant",
+          "title": "no_agent_audio",
+          "severity": "high",
+          "evidence": {
+            "user_transcripts": [
+              "Search for the best Italian restaurant nearby.",
+              "Search for the best Italian restaurant nearby."
+            ],
+            "agent_transcripts": [],
+            "tool_events": [
+              {
+                "tool": "maps_query",
+                "status": "invoked",
+                "behavior": "WHEN_IDLE"
+              },
+              {
+                "tool": "google_search",
+                "status": "invoked",
+                "behavior": "WHEN_IDLE"
+              }
+            ],
+            "message_counts": {
+              "debug_activity": 2,
+              "transcript": 2,
+              "tool_event": 2,
+              "tool_result": 2,
+              "search_result": 1
+            }
+          }
+        },
+        {
+          "id": "MT-003",
+          "turn": "CONNECTION_ERROR",
+          "title": "connection_error: received 1011 (internal error) downstream_error; then sent 1011 (internal error) downstream_error",
+          "severity": "medium",
+          "evidence": {
+            "user_transcripts": [],
+            "agent_transcripts": [],
+            "tool_events": [],
+            "message_counts": {}
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_turns": 17,
+    "passed": 15,
+    "failed": 2,
+    "pass_rate": "88.2%",
+    "total_issues": 3
+  },
+  "all_issues": [
+    {
+      "id": "MT-001",
+      "turn": "B03_search_restaurant",
+      "title": "no_agent_transcript",
+      "severity": "high",
+      "evidence": {
+        "user_transcripts": [
+          "Search for the best Italian restaurant nearby.",
+          "Search for the best Italian restaurant nearby."
+        ],
+        "agent_transcripts": [],
+        "tool_events": [
+          {
+            "tool": "maps_query",
+            "status": "invoked",
+            "behavior": "WHEN_IDLE"
+          },
+          {
+            "tool": "google_search",
+            "status": "invoked",
+            "behavior": "WHEN_IDLE"
+          }
+        ],
+        "message_counts": {
+          "debug_activity": 2,
+          "transcript": 2,
+          "tool_event": 2,
+          "tool_result": 2,
+          "search_result": 1
+        }
+      }
+    },
+    {
+      "id": "MT-002",
+      "turn": "B03_search_restaurant",
+      "title": "no_agent_audio",
+      "severity": "high",
+      "evidence": {
+        "user_transcripts": [
+          "Search for the best Italian restaurant nearby.",
+          "Search for the best Italian restaurant nearby."
+        ],
+        "agent_transcripts": [],
+        "tool_events": [
+          {
+            "tool": "maps_query",
+            "status": "invoked",
+            "behavior": "WHEN_IDLE"
+          },
+          {
+            "tool": "google_search",
+            "status": "invoked",
+            "behavior": "WHEN_IDLE"
+          }
+        ],
+        "message_counts": {
+          "debug_activity": 2,
+          "transcript": 2,
+          "tool_event": 2,
+          "tool_result": 2,
+          "search_result": 1
+        }
+      }
+    },
+    {
+      "id": "MT-003",
+      "turn": "CONNECTION_ERROR",
+      "title": "connection_error: received 1011 (internal error) downstream_error; then sent 1011 (internal error) downstream_error",
+      "severity": "medium",
+      "evidence": {
+        "user_transcripts": [],
+        "agent_transcripts": [],
+        "tool_events": [],
+        "message_counts": {}
+      }
+    }
+  ]
+}

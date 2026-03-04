@@ -24,12 +24,14 @@ logger = logging.getLogger("sightline.tools.accessibility")
 OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
 _REQUEST_TIMEOUT = 10.0  # seconds
 _CACHE_TTL = 300  # 5 minutes
+_UNAVAILABLE_COOLDOWN_SEC = 90.0
 
 # ---------------------------------------------------------------------------
 # Location cache (avoid repeated queries for the same area)
 # ---------------------------------------------------------------------------
 
 _cache: dict[str, tuple[float, dict]] = {}  # key → (timestamp, result)
+_overpass_unavailable_until: float = 0.0
 
 
 def _cache_key(lat: float, lng: float, radius: int) -> str:
@@ -207,6 +209,7 @@ def get_accessibility_info(
         Dict with ``features`` list, ``summary`` text, ``count``,
         and search ``area`` description.
     """
+    global _overpass_unavailable_until
     radius = max(50, min(500, radius))
 
     # Check cache
@@ -216,6 +219,22 @@ def get_accessibility_info(
         if time.time() - ts < _CACHE_TTL:
             logger.debug("Returning cached accessibility data for %s", key)
             return cached
+
+    now = time.time()
+    if now < _overpass_unavailable_until:
+        retry_after_sec = max(1, int(_overpass_unavailable_until - now))
+        return {
+            "success": False,
+            "error": (
+                "Accessibility data provider is temporarily unavailable. "
+                f"Retry in about {retry_after_sec}s."
+            ),
+            "retryable": True,
+            "retry_after_sec": retry_after_sec,
+            "features": [],
+            "summary": "Accessibility data temporarily unavailable.",
+            "count": 0,
+        }
 
     try:
         query = _OVERPASS_QUERY_TEMPLATE.format(
@@ -258,10 +277,53 @@ def get_accessibility_info(
         return result
 
     except httpx.TimeoutException:
+        _overpass_unavailable_until = time.time() + _UNAVAILABLE_COOLDOWN_SEC
         logger.warning("Overpass API timeout for (%s, %s)", lat, lng)
         return {
             "success": False,
             "error": "Accessibility data request timed out. Try again shortly.",
+            "retryable": True,
+            "features": [],
+            "summary": "Data temporarily unavailable.",
+            "count": 0,
+        }
+
+    except httpx.HTTPStatusError as e:
+        status = e.response.status_code if e.response else None
+        if status in {429, 502, 503, 504}:
+            _overpass_unavailable_until = time.time() + _UNAVAILABLE_COOLDOWN_SEC
+            logger.warning(
+                "Overpass API unavailable (status=%s) for (%s, %s); cooldown %.0fs",
+                status,
+                lat,
+                lng,
+                _UNAVAILABLE_COOLDOWN_SEC,
+            )
+            return {
+                "success": False,
+                "error": f"Accessibility data temporarily unavailable (status {status}).",
+                "retryable": True,
+                "status_code": status,
+                "features": [],
+                "summary": "Data temporarily unavailable.",
+                "count": 0,
+            }
+        logger.error("Overpass API HTTP error (status=%s): %s", status, e)
+        return {
+            "success": False,
+            "error": f"Accessibility API HTTP error (status {status}).",
+            "features": [],
+            "summary": "Data unavailable.",
+            "count": 0,
+        }
+
+    except httpx.RequestError as e:
+        _overpass_unavailable_until = time.time() + _UNAVAILABLE_COOLDOWN_SEC
+        logger.warning("Overpass API request error for (%s, %s): %s", lat, lng, e)
+        return {
+            "success": False,
+            "error": "Accessibility data request failed due to network issues.",
+            "retryable": True,
             "features": [],
             "summary": "Data temporarily unavailable.",
             "count": 0,
