@@ -964,6 +964,22 @@ async def api_list_users() -> JSONResponse:
 
 _DETAIL_PHRASES = {"tell me more", "more detail", "describe more", "what else", "elaborate"}
 _STOP_PHRASES = {"stop", "be quiet", "shut up", "enough", "stop talking", "quiet"}
+_NAVIGATION_INTENT_PHRASES = {
+    "navigate",
+    "navigation",
+    "direction",
+    "directions",
+    "route",
+    "way to",
+    "how do i get",
+    "take me to",
+    "go to",
+    "walk to",
+    "walking guidance",
+    "head to",
+    "guide me to",
+    "turn by turn",
+}
 
 
 def _detect_voice_intent(text: str) -> str | None:
@@ -976,6 +992,72 @@ def _detect_voice_intent(text: str) -> str | None:
         if phrase in lower:
             return "stop"
     return None
+
+
+def _has_navigation_intent(text: str) -> bool:
+    """Heuristic detector for explicit user navigation intent."""
+    lowered = _normalize_text_for_dedupe(text)
+    if not lowered:
+        return False
+    return any(phrase in lowered for phrase in _NAVIGATION_INTENT_PHRASES)
+
+
+def _recent_user_utterances(
+    transcript_history: deque,
+    *,
+    max_items: int = 3,
+) -> list[str]:
+    """Return latest non-empty user utterances from transcript history."""
+    user_texts: list[str] = []
+    for entry in reversed(transcript_history):
+        if entry.get("role") != "user":
+            continue
+        text = str(entry.get("text", "")).strip()
+        if not text:
+            continue
+        user_texts.append(text)
+        if len(user_texts) >= max_items:
+            break
+    return user_texts
+
+
+def _allow_navigation_tool_call(
+    *,
+    func_name: str,
+    func_args: dict,
+    transcript_history: deque,
+) -> tuple[bool, str]:
+    """Gate navigation calls to explicit user requests only."""
+    if func_name not in NAVIGATION_FUNCTIONS:
+        return True, "not_navigation_tool"
+
+    recent_user = _recent_user_utterances(transcript_history, max_items=3)
+    if not recent_user:
+        return False, "no_recent_user_transcript"
+
+    if any(_has_navigation_intent(text) for text in recent_user):
+        return True, "explicit_navigation_intent"
+
+    destination = str(func_args.get("destination", "")).strip().lower()
+    if destination:
+        for text in recent_user:
+            lowered = text.lower()
+            if destination in lowered and any(
+                hint in lowered for hint in ("how", "way", "get", "go", "route", "direction")
+            ):
+                return True, "destination_followup_navigation_intent"
+
+    return False, "navigation_tool_requires_explicit_user_request"
+
+
+def _sanitize_function_args_for_log(func_name: str, func_args: dict, user_id: str) -> dict:
+    """Sanitize function-call logging to avoid leaking/echoing forged user IDs."""
+    safe_args = dict(func_args)
+    if func_name in MEMORY_FUNCTIONS:
+        if "user_id" in safe_args:
+            safe_args["user_id"] = "<session_user>"
+        safe_args["_session_user"] = user_id
+    return safe_args
 
 
 # ---------------------------------------------------------------------------
@@ -1026,8 +1108,6 @@ async def _dispatch_function_call(
 
     Returns the tool result as a dict to be sent back as function response.
     """
-    logger.info("Function call: %s(%s)", func_name, func_args)
-
     if func_name not in ALL_FUNCTIONS:
         logger.warning("Unknown function call: %s (should have been caught upstream)", func_name)
         return {
@@ -1077,6 +1157,12 @@ async def _dispatch_function_call(
     # Memory tools: hard-set user_id from session (security: prevents cross-user access)
     if func_name in MEMORY_FUNCTIONS:
         func_args["user_id"] = user_id
+
+    logger.info(
+        "Function call: %s(%s)",
+        func_name,
+        _sanitize_function_args_for_log(func_name, func_args, user_id),
+    )
 
     # OCR tool: intercept and run async OCR pipeline with latest camera frame
     if func_name == "extract_text_from_camera":
@@ -1174,6 +1260,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     _vision_in_progress = False
     _face_lock = asyncio.Lock()
     _face_in_progress = False
+    _face_runtime_available = _face_available
+    _face_unavailable_notified = False
     _last_vision_time = 0.0
     _frame_seq = 0
     _last_vision_context_text = ""
@@ -1833,13 +1921,13 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     async def _run_face_recognition(image_base64: str) -> None:
         """Run face recognition and inject results as SILENT context."""
         nonlocal face_library, _face_library_loaded_at, _face_consecutive_misses, _face_skip_counter
-        nonlocal _face_in_progress
-        if not _face_available:
+        nonlocal _face_in_progress, _face_runtime_available, _face_unavailable_notified
+        if not _face_available or not _face_runtime_available:
             await _emit_tool_event(
                 "identify_person",
                 ToolBehavior.SILENT,
                 status="unavailable",
-                data={"reason": "face_agent_unavailable"},
+                data={"reason": "face_runtime_unavailable"},
             )
             return
 
@@ -1955,6 +2043,32 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     similarity=0.0,
                     source="face_detected_no_match",
                 )
+        except RuntimeError as exc:
+            err_text = str(exc)
+            if "InsightFace is unavailable" in err_text:
+                _face_runtime_available = False
+                if not _face_unavailable_notified:
+                    logger.warning(
+                        "Face runtime unavailable; disabling face recognition for session %s",
+                        session_id,
+                    )
+                    _face_unavailable_notified = True
+                await _emit_tool_event(
+                    "identify_person",
+                    ToolBehavior.SILENT,
+                    status="unavailable",
+                    data={"reason": "insightface_unavailable"},
+                )
+                await _emit_capability_degraded("face", "InsightFace runtime unavailable")
+            else:
+                logger.exception("Face recognition runtime error")
+                await _emit_tool_event(
+                    "identify_person",
+                    ToolBehavior.SILENT,
+                    status="error",
+                    data={"reason": "face_recognition_runtime_error"},
+                )
+                await _emit_capability_degraded("face", err_text[:200])
         except Exception as exc:
             logger.exception("Face recognition failed")
             await _emit_tool_event(
@@ -2156,7 +2270,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                             asyncio.create_task(_run_vision_analysis(image_b64))
 
                             # Face recognition: only at LOD 2/3 (match JSON path)
-                            if lod >= 2:
+                            if lod >= 2 and _face_runtime_available:
                                 await _emit_tool_event(
                                     "identify_person", ToolBehavior.SILENT, status="queued",
                                 )
@@ -2248,7 +2362,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         asyncio.create_task(_run_vision_analysis(image_b64))
 
                         # Face recognition: only at LOD 2/3
-                        if lod >= 2:
+                        if lod >= 2 and _face_runtime_available:
                             await _emit_tool_event(
                                 "identify_person",
                                 ToolBehavior.SILENT,
@@ -2878,6 +2992,54 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     if stop_downstream.is_set():
                         break
 
+                # --- Input transcription (user speech-to-text) ---
+                # Process before function calls so tool gating can use the latest
+                # transcribed user intent from this event.
+                if event.input_transcription and event.input_transcription.text:
+                    now_mono = time.monotonic()
+                    input_text = event.input_transcription.text
+                    if _is_likely_echo(input_text, now_mono):
+                        logger.debug("Echo detected, reclassifying: %s", input_text[:120])
+                        transcript_history.append({
+                            "role": "echo",
+                            "text": input_text,
+                        })
+                        await _safe_send_json({
+                            "type": MessageType.TRANSCRIPT,
+                            "text": input_text,
+                            "role": "echo",
+                        })
+                        # Tell Gemini to disregard the echo input (queued to avoid audio overlap)
+                        ctx_queue.enqueue(
+                            category="echo_cancel",
+                            text="[SYSTEM: The previous audio input was an echo of your own speech. Do not respond to it.]",
+                            priority=1,
+                            speak=False,
+                        )
+                        logger.info("Queued echo cancellation for Gemini")
+                    else:
+                        transcript_history.append({
+                            "role": "user",
+                            "text": input_text,
+                        })
+                        _last_user_activity_at = time.monotonic()
+                        session_meta.record_interaction()
+                        if not await _safe_send_json({
+                            "type": MessageType.TRANSCRIPT,
+                            "text": input_text,
+                            "role": "user",
+                        }):
+                            break
+
+                        # Voice intent → LOD session flags
+                        intent = _detect_voice_intent(input_text)
+                        if intent == "detail":
+                            session_ctx.user_requested_detail = True
+                            session_ctx.user_said_stop = False
+                        elif intent == "stop":
+                            session_ctx.user_said_stop = True
+                            session_ctx.user_requested_detail = False
+
                 # --- Function calls from Gemini (Phase 3) ---
                 function_calls = _extract_function_calls(event)
                 if function_calls:
@@ -2914,21 +3076,71 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                             ))
                             continue
 
+                        call_args = dict(fc.args) if fc.args else {}
                         user_speaking = session_ctx.current_activity_state == "user_speaking"
                         behavior = resolve_tool_behavior(
                             tool_name=fc.name,
                             lod=session_ctx.current_lod,
                             is_user_speaking=user_speaking,
                         )
+
+                        # Guard: navigation tools must be tied to explicit user request.
+                        allow_call, block_reason = _allow_navigation_tool_call(
+                            func_name=fc.name,
+                            func_args=call_args,
+                            transcript_history=transcript_history,
+                        )
+                        if not allow_call:
+                            blocked_result = {
+                                "status": "blocked",
+                                "reason": block_reason,
+                                "message": (
+                                    "Navigation tools require an explicit navigation request "
+                                    "from the user in this session."
+                                ),
+                            }
+                            await _emit_tool_event(
+                                fc.name,
+                                behavior,
+                                status="blocked",
+                                data={
+                                    "reason": block_reason,
+                                    "args": _json_safe(call_args),
+                                },
+                            )
+                            await _safe_send_json({
+                                "type": MessageType.TOOL_RESULT,
+                                "tool": fc.name,
+                                "behavior": behavior_to_text(behavior),
+                                "data": blocked_result,
+                            })
+                            if fc.name in NAVIGATION_FUNCTIONS:
+                                await _safe_send_json({
+                                    "type": MessageType.NAVIGATION_RESULT,
+                                    "summary": "",
+                                    "behavior": behavior_to_text(behavior),
+                                    "data": blocked_result,
+                                })
+                            from google.genai.types import FunctionResponse as _FR
+                            blocked_fr = _FR(name=fc.name, response=blocked_result)
+                            ctx_queue.inject_immediate(
+                                types.Content(
+                                    parts=[types.Part(function_response=blocked_fr)],
+                                    role="user",
+                                )
+                            )
+                            logger.warning("Blocked %s tool call: %s", fc.name, block_reason)
+                            continue
+
                         await _emit_tool_event(
                             fc.name,
                             behavior,
                             status="invoked",
-                            data={"args": _json_safe(dict(fc.args) if fc.args else {})},
+                            data={"args": _json_safe(call_args)},
                         )
                         result = await _dispatch_function_call(
                             fc.name,
-                            dict(fc.args) if fc.args else {},
+                            call_args,
                             session_id,
                             user_id,
                         )
@@ -3013,52 +3225,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         if not await _flush_transcript_buffer():
                             break
                         _output_transcription_forwarded = True
-
-                # --- Input transcription (user speech-to-text) with echo detection ---
-                if event.input_transcription and event.input_transcription.text:
-                    now_mono = time.monotonic()
-                    input_text = event.input_transcription.text
-                    if _is_likely_echo(input_text, now_mono):
-                        logger.debug("Echo detected, reclassifying: %s", input_text[:120])
-                        transcript_history.append({
-                            "role": "echo",
-                            "text": input_text,
-                        })
-                        await _safe_send_json({
-                            "type": MessageType.TRANSCRIPT,
-                            "text": input_text,
-                            "role": "echo",
-                        })
-                        # Tell Gemini to disregard the echo input (queued to avoid audio overlap)
-                        ctx_queue.enqueue(
-                            category="echo_cancel",
-                            text="[SYSTEM: The previous audio input was an echo of your own speech. Do not respond to it.]",
-                            priority=1,
-                            speak=False,
-                        )
-                        logger.info("Queued echo cancellation for Gemini")
-                    else:
-                        transcript_history.append({
-                            "role": "user",
-                            "text": input_text,
-                        })
-                        _last_user_activity_at = time.monotonic()
-                        session_meta.record_interaction()
-                        if not await _safe_send_json({
-                            "type": MessageType.TRANSCRIPT,
-                            "text": input_text,
-                            "role": "user",
-                        }):
-                            break
-
-                        # Voice intent → LOD session flags
-                        intent = _detect_voice_intent(input_text)
-                        if intent == "detail":
-                            session_ctx.user_requested_detail = True
-                            session_ctx.user_said_stop = False
-                        elif intent == "stop":
-                            session_ctx.user_said_stop = True
-                            session_ctx.user_requested_detail = False
 
                 # (Content parts already processed above, before function calls.)
 

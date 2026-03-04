@@ -12,6 +12,7 @@ LOD state initialisation, and protocol compliance.
 
 import json
 import os
+from collections import deque
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -324,3 +325,42 @@ class TestRepeatSuppressionGuards:
         )
         assert should_inject is True
         assert "periodic_refresh" in reasons
+
+    def test_navigation_guard_blocks_without_explicit_user_intent(self):
+        from server import _allow_navigation_tool_call
+
+        history = deque([
+            {"role": "user", "text": "Please summarize what you just perceived and what I should do next."},
+        ])
+        allow, reason = _allow_navigation_tool_call(
+            func_name="navigate_to",
+            func_args={"destination": "Central Park"},
+            transcript_history=history,
+        )
+        assert allow is False
+        assert reason == "navigation_tool_requires_explicit_user_request"
+
+    def test_navigation_guard_allows_explicit_navigation_request(self):
+        from server import _allow_navigation_tool_call
+
+        history = deque([
+            {"role": "user", "text": "Use walking directions from Times Square to Central Park."},
+        ])
+        allow, reason = _allow_navigation_tool_call(
+            func_name="get_walking_directions",
+            func_args={"origin": "Times Square", "destination": "Central Park"},
+            transcript_history=history,
+        )
+        assert allow is True
+        assert reason == "explicit_navigation_intent"
+
+    def test_memory_user_id_is_redacted_in_function_log_args(self):
+        from server import _sanitize_function_args_for_log
+
+        safe = _sanitize_function_args_for_log(
+            "remember_entity",
+            {"user_id": "default", "name": "Central Park"},
+            "test_user",
+        )
+        assert safe["user_id"] == "<session_user>"
+        assert safe["_session_user"] == "test_user"

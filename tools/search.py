@@ -16,6 +16,7 @@ import os
 from typing import Any
 
 from google import genai
+from google.genai import errors as genai_errors
 
 logger = logging.getLogger("sightline.tools.search")
 
@@ -93,6 +94,21 @@ def google_search(query: str) -> dict[str, Any]:
         }
 
     except Exception as e:
+        status_code = getattr(e, "status_code", None)
+        err_text = str(e)
+        is_unavailable = (
+            isinstance(e, genai_errors.ServerError) and status_code == 503
+        ) or ("UNAVAILABLE" in err_text.upper() and "503" in err_text)
+        if is_unavailable:
+            logger.warning("google_search unavailable (503/high demand): %s", err_text[:200])
+            return {
+                "success": False,
+                "answer": "Search backend is temporarily unavailable. Please try again shortly.",
+                "sources": [],
+                "confidence": 0.0,
+                "retryable": True,
+                "error_code": "upstream_unavailable",
+            }
         logger.exception("google_search failed: %s", e)
         return {
             "success": False,

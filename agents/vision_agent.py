@@ -17,9 +17,11 @@ import base64
 import json
 import logging
 import os
+import time
 from typing import Any
 
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
 logger = logging.getLogger("sightline.vision_agent")
@@ -29,6 +31,7 @@ logger = logging.getLogger("sightline.vision_agent")
 # ---------------------------------------------------------------------------
 
 VISION_MODEL = os.getenv("GEMINI_VISION_MODEL", "gemini-3.1-pro-preview")
+_VISION_UNAVAILABLE_COOLDOWN_SEC = float(os.getenv("VISION_UNAVAILABLE_COOLDOWN_SEC", "30"))
 
 _MEDIA_RESOLUTION_BY_LOD: dict[int, types.MediaResolution] = {
     1: types.MediaResolution.MEDIA_RESOLUTION_LOW,
@@ -200,6 +203,7 @@ def _build_context_user_message(lod: int, session_context: dict) -> str:
 # ---------------------------------------------------------------------------
 
 _client: genai.Client | None = None
+_vision_unavailable_until: float = 0.0
 
 
 def _get_client() -> genai.Client:
@@ -251,6 +255,11 @@ async def analyze_scene(
     user_message = _build_context_user_message(lod, session_context)
 
     response = None
+    global _vision_unavailable_until
+    now = time.monotonic()
+    if now < _vision_unavailable_until:
+        return dict(_EMPTY_RESULT)
+
     try:
         client = _get_client()
         response = await client.aio.models.generate_content(
@@ -293,6 +302,22 @@ async def analyze_scene(
         raw = response.text if response else "<no response>"
         logger.error("Failed to parse vision model JSON response: %s", raw)
         return dict(_EMPTY_RESULT)
-    except Exception:
+    except Exception as exc:
+        status_code = getattr(exc, "status_code", None)
+        err_text = str(exc)
+        is_unavailable = (
+            isinstance(exc, genai_errors.ServerError)
+            and status_code == 503
+        ) or ("UNAVAILABLE" in err_text.upper() and "503" in err_text)
+        if is_unavailable:
+            _vision_unavailable_until = max(
+                _vision_unavailable_until,
+                time.monotonic() + _VISION_UNAVAILABLE_COOLDOWN_SEC,
+            )
+            logger.warning(
+                "Vision backend unavailable (503). Cooling down for %.0fs.",
+                _VISION_UNAVAILABLE_COOLDOWN_SEC,
+            )
+            return dict(_EMPTY_RESULT)
         logger.exception("Vision analysis failed")
         return dict(_EMPTY_RESULT)
