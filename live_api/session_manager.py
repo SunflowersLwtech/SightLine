@@ -39,41 +39,65 @@ def _env_flag(name: str, default: bool = False) -> bool:
 
 
 def create_session_service():
-    """Create the session service, preferring VertexAiSessionService.
+    """Create a session service with graceful capability-based fallback.
 
-    Uses VertexAiSessionService whenever the SDK provides it. Falls back
-    gracefully for local development.
+    Selection order:
+    1) VertexAiSessionService when VERTEXAI=TRUE and class is available.
+    2) DatabaseSessionService when VERTEXAI=FALSE and class is available.
+    3) InMemorySessionService as universal fallback.
     """
+    import importlib
+
     # Read env at call time because server.py loads .env after imports.
     agent_engine_id = os.getenv("AGENT_ENGINE_ID", "").strip() or None
     project = os.getenv("GOOGLE_CLOUD_PROJECT", "sightline-hackathon")
     location = os.getenv("GOOGLE_CLOUD_REGION", "us-central1")
     use_vertex = _env_flag("GOOGLE_GENAI_USE_VERTEXAI", default=False)
+    db_url = os.getenv("SESSION_DB_URL", "sqlite:///sightline_sessions.db")
 
-    # VertexAiSessionService is intentionally NOT used.
-    # It cannot handle client-generated UUID session IDs (returns 400 instead
-    # of None for unknown sessions, preventing ADK create_session fallback).
-    # Session continuity is handled by Gemini's session_resumption_handle,
-    # not by the ADK session service.  All business data lives in Firestore.
-    # GOOGLE_GENAI_USE_VERTEXAI=TRUE still routes the Live API model connection
-    # through Vertex AI (fixing audio stuttering), which is separate from the
-    # session service.
-    if use_vertex:
-        logger.info(
-            "VERTEXAI=TRUE (Live API via Vertex AI); session service = InMemory"
-        )
-    else:
-        logger.info(
-            "VERTEXAI=FALSE (Live API via Google AI); session service = InMemory"
-        )
+    try:
+        sessions_mod = importlib.import_module("google.adk.sessions")
+    except Exception:
+        logger.exception("google.adk.sessions import failed; no session service available")
+        raise
 
-    # Both local and Cloud Run use in-memory session service.
-    # Session continuity is handled by Gemini's session_resumption_handle,
-    # not by the ADK session service. All business data lives in Firestore.
-    from google.adk.sessions import InMemorySessionService as _InMemory
+    if use_vertex and hasattr(sessions_mod, "VertexAiSessionService"):
+        Vertex = sessions_mod.VertexAiSessionService
+        try:
+            service = Vertex(
+                project=project,
+                location=location,
+                agent_engine_id=agent_engine_id,
+            )
+            logger.info("Using VertexAiSessionService (project=%s, location=%s)", project, location)
+            return service
+        except TypeError:
+            # Compatibility with older signatures that omit agent_engine_id.
+            service = Vertex(project=project, location=location)
+            logger.info(
+                "Using VertexAiSessionService (legacy signature; project=%s, location=%s)",
+                project,
+                location,
+            )
+            return service
+        except Exception:
+            logger.exception("VertexAiSessionService initialization failed; falling back")
 
-    logger.info("Using in-memory session service")
-    return _InMemory()
+    if (not use_vertex) and hasattr(sessions_mod, "DatabaseSessionService"):
+        Database = sessions_mod.DatabaseSessionService
+        try:
+            service = Database(db_url=db_url)
+        except TypeError:
+            service = Database(db_url)
+        logger.info("Using DatabaseSessionService (db_url=%s)", db_url)
+        return service
+
+    InMemory = getattr(sessions_mod, "InMemorySessionService", None)
+    if InMemory is None:
+        raise RuntimeError("google.adk.sessions.InMemorySessionService is unavailable")
+
+    logger.info("Using InMemorySessionService fallback")
+    return InMemory()
 
 # ---------------------------------------------------------------------------
 # LOD-driven VAD presets (SL-36)

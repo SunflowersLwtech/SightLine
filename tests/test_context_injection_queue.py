@@ -17,10 +17,16 @@ import pytest
 import sys
 import types as _pytypes
 
+_created_stub_modules: set[str] = set()
+
 
 def _make_stub(name):
+    existing = sys.modules.get(name)
+    if existing is not None:
+        return existing
     mod = _pytypes.ModuleType(name)
     sys.modules[name] = mod
+    _created_stub_modules.add(name)
     return mod
 
 
@@ -48,6 +54,16 @@ _stubs_needed = [
     "telemetry",
     "telemetry.telemetry_parser",
     "telemetry.session_meta_tracker",
+    "tools",
+    "tools.navigation",
+    "tools.search",
+    "tools.plus_codes",
+    "tools.accessibility",
+    "tools.maps_grounding",
+    "tools.ocr_tool",
+    "tools.tool_behavior",
+    "memory",
+    "memory.memory_tools",
 ]
 
 for mod_name in _stubs_needed:
@@ -154,6 +170,33 @@ _patch_attr("telemetry.telemetry_parser", "parse_telemetry", MagicMock())
 _patch_attr("telemetry.telemetry_parser", "parse_telemetry_to_ephemeral", MagicMock())
 _patch_attr("telemetry.session_meta_tracker", "SessionMetaTracker", MagicMock)
 
+# Stub tool registries/functions imported at server module scope
+_patch_attr("tools", "ALL_FUNCTIONS", {})
+_patch_attr("tools", "ALL_TOOL_DECLARATIONS", [])
+_patch_attr("tools.navigation", "NAVIGATION_FUNCTIONS", set())
+_patch_attr("tools.search", "SEARCH_FUNCTIONS", set())
+_patch_attr("tools.plus_codes", "PLUS_CODES_FUNCTIONS", set())
+_patch_attr("tools.accessibility", "ACCESSIBILITY_FUNCTIONS", set())
+_patch_attr("tools.maps_grounding", "MAPS_GROUNDING_FUNCTIONS", set())
+_patch_attr("tools.ocr_tool", "set_latest_frame", MagicMock())
+_patch_attr("tools.ocr_tool", "clear_session", MagicMock())
+_patch_attr("memory.memory_tools", "MEMORY_FUNCTIONS", set())
+
+
+class _ToolBehavior:
+    INTERRUPT = "INTERRUPT"
+    WHEN_IDLE = "WHEN_IDLE"
+    SILENT = "SILENT"
+
+
+_patch_attr("tools.tool_behavior", "ToolBehavior", _ToolBehavior)
+_patch_attr("tools.tool_behavior", "behavior_to_text", MagicMock(return_value=""))
+_patch_attr(
+    "tools.tool_behavior",
+    "resolve_tool_behavior",
+    MagicMock(return_value=_ToolBehavior.WHEN_IDLE),
+)
+
 # --- Finally, import the real class ----------------------------------------
 # We add the SightLine directory to sys.path so `import server` resolves.
 import os
@@ -177,30 +220,31 @@ Part = _FakePart
 
 def _restore_patched_attrs():
     """Restore attributes that were patched on REAL (pre-existing) modules.
-
-    Stub modules created by _make_stub are left in place — removing them
-    would break Python's import cache in unpredictable ways.  We only
-    restore attributes that were overwritten on modules that existed before
-    our stubs were set up (e.g. telemetry.session_meta_tracker).
     """
     for mod_name, attr_name, original in reversed(_saved_attrs):
         mod = sys.modules.get(mod_name)
         if mod is None:
             continue
         if original is _MISSING:
-            # Attribute didn't exist before — only delete if the module
-            # is a real package (not our stub), to avoid breaking stubs.
             continue
         else:
             setattr(mod, attr_name, original)
     _saved_attrs.clear()
 
 
-@pytest.fixture(autouse=True, scope="module")
-def _cleanup_module_patches():
-    """Restore patched sys.modules attributes after this module's tests complete."""
-    yield
-    _restore_patched_attrs()
+def _clear_created_stubs():
+    """Remove modules that were only created by this test module."""
+    # Remove deepest module paths first so parents can be re-imported cleanly.
+    for mod_name in sorted(_created_stub_modules, key=len, reverse=True):
+        sys.modules.pop(mod_name, None)
+    _created_stub_modules.clear()
+    # Ensure later tests import server with real dependencies.
+    sys.modules.pop("server", None)
+
+
+# Avoid polluting collection/import state for other test modules.
+_restore_patched_attrs()
+_clear_created_stubs()
 
 
 # ---------------------------------------------------------------------------

@@ -11,28 +11,34 @@ from __future__ import annotations
 import base64
 import logging
 import time
-from typing import Optional
+from typing import Any, Optional
 
 import cv2
 import numpy as np
-from insightface.app import FaceAnalysis
 import os
 from tools.tool_behavior import ToolBehavior, behavior_to_text
 
 logger = logging.getLogger(__name__)
 
+try:
+    from insightface.app import FaceAnalysis as _InsightFaceAnalysis
+except Exception:  # pragma: no cover - optional runtime dependency
+    _InsightFaceAnalysis = None
+
 # Cosine similarity threshold for positive match
 MATCH_THRESHOLD = float(os.getenv("FACE_MATCH_THRESHOLD", "0.4"))
 
 # Singleton FaceAnalysis instance (lazy-initialized)
-_face_app: Optional[FaceAnalysis] = None
+_face_app: Optional[Any] = None
 
 
-def _get_face_app() -> FaceAnalysis:
+def _get_face_app():
     """Return a lazily-initialized FaceAnalysis singleton."""
     global _face_app
+    if _InsightFaceAnalysis is None:
+        raise RuntimeError("InsightFace is unavailable in this environment")
     if _face_app is None:
-        _face_app = FaceAnalysis(
+        _face_app = _InsightFaceAnalysis(
             name="buffalo_l",
             root=os.path.expanduser("~/.insightface"),
             providers=["CPUExecutionProvider"],

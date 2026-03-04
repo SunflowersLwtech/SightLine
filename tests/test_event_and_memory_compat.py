@@ -2,8 +2,6 @@
 
 from types import SimpleNamespace
 
-from google.adk.events import EventActions
-
 
 def test_extract_function_calls_uses_event_getter():
     from server import _extract_function_calls
@@ -11,7 +9,7 @@ def test_extract_function_calls_uses_event_getter():
     call = SimpleNamespace(name="demo_tool", args={"x": 1})
     event = SimpleNamespace(
         get_function_calls=lambda: [call],
-        actions=EventActions(),
+        actions=SimpleNamespace(),
     )
 
     calls = _extract_function_calls(event)
@@ -25,7 +23,7 @@ def test_extract_function_calls_handles_missing_actions_field_safely():
 
     event = SimpleNamespace(
         get_function_calls=lambda: [],
-        actions=EventActions(),  # No `function_calls` attribute in adk 1.25.x
+        actions=SimpleNamespace(),  # No `function_calls` attribute in adk 1.25.x
     )
 
     assert _extract_function_calls(event) == []

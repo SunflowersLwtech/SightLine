@@ -2297,6 +2297,33 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     telemetry_data = message.get("data", {})
                     await _process_telemetry(telemetry_data)
 
+                elif message.get("type") in {"activity_start", "activity_end"}:
+                    event_name = str(message.get("type"))
+                    _last_user_activity_at = time.monotonic()
+                    session_meta.record_interaction()
+
+                    queue_status = "forwarded"
+                    queue_note = ""
+                    try:
+                        if event_name == "activity_start":
+                            live_request_queue.send_activity_start()
+                        else:
+                            live_request_queue.send_activity_end()
+                    except Exception as exc:
+                        queue_status = "failed"
+                        queue_note = str(exc)[:160]
+                        logger.warning(
+                            "Failed to forward %s to LiveRequestQueue: %s",
+                            event_name,
+                            queue_note,
+                        )
+
+                    await _emit_activity_debug_event(
+                        event_name=event_name,
+                        queue_status=queue_status,
+                        queue_note=queue_note,
+                    )
+
                 elif message.get("type") == "gesture":
                     gesture = message.get("gesture")
                     _last_user_activity_at = time.monotonic()

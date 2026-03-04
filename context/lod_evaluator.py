@@ -81,7 +81,11 @@ class LODEvaluator:
         """
         # LOD 1 is already the minimum — no further adjustment
         if baseline_lod == 1:
-            return LODAdjustment(delta=0, reason="LOD 1 — already minimum", confidence=1.0)
+            return LODAdjustment(
+                delta=0,
+                reason="Safety floor: LOD 1 already minimum",
+                confidence=1.0,
+            )
 
         # Debounce
         now = time.time()
