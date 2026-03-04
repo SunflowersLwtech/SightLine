@@ -241,6 +241,7 @@ class SessionManager:
         self._user_profiles: dict[str, UserProfile] = {}
         self._user_profile_access_times: dict[str, float] = {}
         self._ephemeral_contexts: dict[str, EphemeralContext] = {}
+        self._adk_session_ids: dict[str, str] = {}  # logical_id → ADK session ID
 
     # -- RunConfig ----------------------------------------------------------
 
@@ -414,6 +415,16 @@ class SessionManager:
         """Store the latest ephemeral context snapshot."""
         self._ephemeral_contexts[session_id] = ctx
 
+    # -- ADK session ID mapping (Vertex AI) -----------------------------------
+
+    def get_adk_session_id(self, logical_id: str) -> str | None:
+        """Get the ADK-generated session ID for a logical session."""
+        return self._adk_session_ids.get(logical_id)
+
+    def set_adk_session_id(self, logical_id: str, adk_id: str) -> None:
+        """Cache the ADK-generated session ID for a logical session."""
+        self._adk_session_ids[logical_id] = adk_id
+
     # -- Cleanup ------------------------------------------------------------
 
     def remove_session(self, session_id: str) -> None:
@@ -421,5 +432,6 @@ class SessionManager:
         self._session_handles.pop(session_id, None)
         self._session_contexts.pop(session_id, None)
         self._ephemeral_contexts.pop(session_id, None)
+        self._adk_session_ids.pop(session_id, None)
         self.evict_stale_profiles()
         logger.debug("Removed session state for %s", session_id)

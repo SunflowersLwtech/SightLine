@@ -139,6 +139,11 @@ runner = Runner(
     auto_create_session=True,
 )
 
+# Detect if session service needs ID mapping (Vertex AI generates its own IDs)
+_NEEDS_SESSION_ID_MAPPING = type(session_service).__name__ in (
+    "VertexAiSessionService", "VertexAISessionService"
+)
+
 
 def _coerce_bool(value: object, default: bool = False) -> bool:
     """Parse bool-like JSON values safely for request handling."""
@@ -3030,9 +3035,28 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         nonlocal _last_user_activity_at, _last_interrupt_at, _is_interrupted
         nonlocal _downstream_retry_count
 
+        # Resolve ADK session ID — Vertex AI generates its own IDs,
+        # so we pre-create the session and cache the mapping.
+        adk_session_id = session_id
+        if _NEEDS_SESSION_ID_MAPPING:
+            cached_adk_id = session_manager.get_adk_session_id(session_id)
+            if cached_adk_id:
+                adk_session_id = cached_adk_id
+            else:
+                adk_session = await runner.session_service.create_session(
+                    app_name="sightline",
+                    user_id=user_id,
+                )
+                adk_session_id = adk_session.id
+                session_manager.set_adk_session_id(session_id, adk_session_id)
+                logger.info(
+                    "Created ADK session %s for logical session %s",
+                    adk_session_id, session_id,
+                )
+
         def _start_live_events():
             return runner.run_live(
-                session_id=session_id,
+                session_id=adk_session_id,
                 user_id=user_id,
                 live_request_queue=live_request_queue,
                 run_config=run_config,
