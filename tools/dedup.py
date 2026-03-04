@@ -30,6 +30,7 @@ class ToolCallDeduplicator:
     def __init__(self, cooldown_sec: float = 8.0) -> None:
         self._cooldown_sec = cooldown_sec
         self._recent: dict[str, float] = {}  # fingerprint → timestamp
+        self._recent_by_tool: dict[str, float] = {}  # tool_name → timestamp
 
     def _fingerprint(self, func_name: str, args: dict) -> str:
         """Create a stable fingerprint for function + args."""
@@ -47,6 +48,15 @@ class ToolCallDeduplicator:
 
         fp = self._fingerprint(func_name, args)
         now = time.monotonic()
+        last_tool_time = self._recent_by_tool.get(func_name)
+        if last_tool_time is not None:
+            elapsed = now - last_tool_time
+            logger.info(
+                "Dedup: skipping %s (tool already called in current turn %.1fs ago)",
+                func_name, elapsed,
+            )
+            return False, "tool_repeat_within_turn"
+
         last_time = self._recent.get(fp)
 
         if last_time is not None and (now - last_time) < self._cooldown_sec:
@@ -58,14 +68,17 @@ class ToolCallDeduplicator:
             return False, f"duplicate_within_{self._cooldown_sec}s"
 
         self._recent[fp] = now
+        self._recent_by_tool[func_name] = now
         # Prune old entries
         cutoff = now - self._cooldown_sec * 2
         self._recent = {k: v for k, v in self._recent.items() if v > cutoff}
+        self._recent_by_tool = {k: v for k, v in self._recent_by_tool.items() if v > cutoff}
         return True, "ok"
 
     def reset(self) -> None:
         """Clear all tracked calls (e.g. on new session)."""
         self._recent.clear()
+        self._recent_by_tool.clear()
 
 
 _MUTEX_GROUPS = {
@@ -91,7 +104,7 @@ class MutualExclusionFilter:
             if func_name not in members:
                 continue
             first = self._fired.get(group_name)
-            if first is not None and first != func_name:
+            if first is not None:
                 logger.info(
                     "Mutex: skipping %s (group '%s' already used by %s)",
                     func_name, group_name, first,

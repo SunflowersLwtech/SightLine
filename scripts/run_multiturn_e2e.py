@@ -517,7 +517,99 @@ CONVERSATION_C = {
     ],
 }
 
-ALL_CONVERSATIONS = [CONVERSATION_A, CONVERSATION_B, CONVERSATION_C]
+# Conversation D: Real-time camera + audio multi-turn stress (mobile-like loop)
+CONVERSATION_D = {
+    "id": "conv_realtime_stream_stress",
+    "description": "Real-time stream stress: continuous camera frames + multi-turn audio with tool chain coverage",
+    "turns": [
+        {
+            "id": "D01_live_scene_boot",
+            "text": "I just raised my phone. Tell me what you can see right now.",
+            "send_image": "street_scene",
+            "send_telemetry": {
+                "motion_state": "walking",
+                "step_cadence": 96,
+                "ambient_noise_db": 68,
+                "heading": 120,
+                "gps": {"latitude": 37.7752, "longitude": -122.4186, "accuracy": 4.0},
+            },
+            "send_gesture": None,
+            "send_video_frames": 10,
+            "expect_agent_response": True,
+            "collect_sec": 35.0,
+            "notes": "Real-time style startup: camera frames + first spoken answer",
+        },
+        {
+            "id": "D02_live_ocr",
+            "text": "Please read that sign while I keep moving.",
+            "send_image": "text_sign",
+            "send_telemetry": {
+                "motion_state": "walking",
+                "step_cadence": 105,
+                "ambient_noise_db": 70,
+                "heading": 130,
+            },
+            "send_gesture": None,
+            "send_video_frames": 8,
+            "expect_agent_response": True,
+            "expect_tool": "extract_text_from_camera",
+            "collect_sec": 35.0,
+            "notes": "Live OCR under motion",
+        },
+        {
+            "id": "D03_live_search",
+            "text": "Find a nearby coffee shop with good reviews.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "google_search",
+            "collect_sec": 40.0,
+            "notes": "Search API chain validation in a live flow",
+        },
+        {
+            "id": "D04_live_nav",
+            "text": "Great, now navigate me there.",
+            "send_image": None,
+            "send_telemetry": {
+                "motion_state": "stationary",
+                "step_cadence": 0,
+                "ambient_noise_db": 58,
+                "heading": 110,
+                "gps": {"latitude": 37.7751, "longitude": -122.4183, "accuracy": 4.0},
+            },
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "navigate_to",
+            "collect_sec": 45.0,
+            "notes": "Navigation API chain validation",
+        },
+        {
+            "id": "D05_live_memory_store",
+            "text": "Remember this as my favorite route.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "remember_entity",
+            "collect_sec": 25.0,
+            "notes": "Memory write in a real-time navigation context",
+        },
+        {
+            "id": "D06_live_memory_recall",
+            "text": "What route did I ask you to remember?",
+            "send_image": "building_scene",
+            "send_telemetry": None,
+            "send_gesture": None,
+            "send_video_frames": 6,
+            "expect_agent_response": True,
+            "collect_sec": 30.0,
+            "notes": "Memory recall after live stream rounds",
+        },
+    ],
+}
+
+ALL_CONVERSATIONS = [CONVERSATION_A, CONVERSATION_B, CONVERSATION_C, CONVERSATION_D]
 
 
 # ---------------------------------------------------------------------------
@@ -773,6 +865,8 @@ async def run_conversation(
     pcm_cache: dict[str, bytes],
     image_dir: Path,
     timeout_mult: float = 1.0,
+    ws_ping_interval: float | None = None,
+    ws_ping_timeout: float | None = None,
 ) -> ConversationResult:
     """Run a full multi-turn conversation against the server."""
     conv_id = conversation["id"]
@@ -786,7 +880,13 @@ async def run_conversation(
     t0_total = time.monotonic()
 
     try:
-        async with websockets.connect(ws_url, max_size=None) as ws:
+        async with websockets.connect(
+            ws_url,
+            max_size=None,
+            ping_interval=ws_ping_interval,
+            ping_timeout=ws_ping_timeout,
+            close_timeout=10.0,
+        ) as ws:
             # Wait for session_ready
             deadline = time.monotonic() + 20.0
             while True:
@@ -1231,6 +1331,8 @@ async def async_main(args: argparse.Namespace) -> int:
     # Step 3: Run conversations
     log.info("--- Running multi-turn conversations ---")
     results: list[ConversationResult] = []
+    ws_ping_interval = args.ws_ping_interval if args.ws_ping_interval and args.ws_ping_interval > 0 else None
+    ws_ping_timeout = args.ws_ping_timeout if args.ws_ping_timeout and args.ws_ping_timeout > 0 else None
 
     for conv in ALL_CONVERSATIONS:
         result = await run_conversation(
@@ -1239,6 +1341,8 @@ async def async_main(args: argparse.Namespace) -> int:
             pcm_cache=pcm_cache,
             image_dir=image_dir,
             timeout_mult=args.timeout,
+            ws_ping_interval=ws_ping_interval,
+            ws_ping_timeout=ws_ping_timeout,
         )
         results.append(result)
         log.info(
@@ -1265,12 +1369,26 @@ async def async_main(args: argparse.Namespace) -> int:
     total_passed = 0
     total_failed = 0
     all_issues: list[dict[str, Any]] = []
+    observed_tools: set[str] = set()
+    required_chain_tools = {
+        "analyze_scene",
+        "extract_text_from_camera",
+        "google_search",
+        "navigate_to",
+        "remember_entity",
+        "nearby_search",
+    }
 
     for r in results:
         total_turns += r.total_turns
         total_passed += r.passed_turns
         total_failed += r.failed_turns
         all_issues.extend(r.issues)
+        for t in r.turns:
+            for ev in t.tool_events:
+                name = ev.get("tool")
+                if name:
+                    observed_tools.add(str(name))
 
         conv_data = {
             "id": r.conversation_id,
@@ -1284,12 +1402,30 @@ async def async_main(args: argparse.Namespace) -> int:
         }
         report["conversations"].append(conv_data)
 
+    missing_chain_tools = sorted(required_chain_tools - observed_tools)
+    if missing_chain_tools:
+        all_issues.append({
+            "id": "MT-CHAIN-001",
+            "turn": "SUITE",
+            "title": f"api_chain_missing_tools: {missing_chain_tools}",
+            "severity": "high",
+            "evidence": {
+                "required_tools": sorted(required_chain_tools),
+                "observed_tools": sorted(observed_tools),
+            },
+        })
+
     report["summary"] = {
         "total_turns": total_turns,
         "passed": total_passed,
         "failed": total_failed,
         "pass_rate": f"{total_passed / total_turns * 100:.1f}%" if total_turns > 0 else "N/A",
         "total_issues": len(all_issues),
+        "tool_chain_coverage": {
+            "required": sorted(required_chain_tools),
+            "observed": sorted(observed_tools),
+            "missing": missing_chain_tools,
+        },
     }
     report["all_issues"] = all_issues
 
@@ -1337,6 +1473,8 @@ def main() -> int:
     p.add_argument("--output-dir", default="artifacts/e2e_multiturn", help="Output directory")
     p.add_argument("--voice", default="Aoede", help="TTS voice")
     p.add_argument("--timeout", type=float, default=1.0, help="Timeout multiplier")
+    p.add_argument("--ws-ping-interval", type=float, default=0.0, help="WebSocket ping interval seconds (<=0 disables)")
+    p.add_argument("--ws-ping-timeout", type=float, default=0.0, help="WebSocket ping timeout seconds (<=0 disables)")
     args = p.parse_args()
     try:
         return asyncio.run(async_main(args))

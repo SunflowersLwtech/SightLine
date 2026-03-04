@@ -364,3 +364,27 @@ class TestRepeatSuppressionGuards:
         )
         assert safe["user_id"] == "<session_user>"
         assert safe["_session_user"] == "test_user"
+
+    def test_activity_start_resets_stale_interrupted_state(self):
+        from server import _should_reset_interrupted_on_activity_start
+
+        assert _should_reset_interrupted_on_activity_start(
+            event_name="activity_start",
+            interrupted=True,
+        ) is True
+
+    def test_activity_end_does_not_reset_interrupted_state(self):
+        from server import _should_reset_interrupted_on_activity_start
+
+        assert _should_reset_interrupted_on_activity_start(
+            event_name="activity_end",
+            interrupted=True,
+        ) is False
+
+    def test_activity_start_noop_when_not_interrupted(self):
+        from server import _should_reset_interrupted_on_activity_start
+
+        assert _should_reset_interrupted_on_activity_start(
+            event_name="activity_start",
+            interrupted=False,
+        ) is False

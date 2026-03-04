@@ -206,6 +206,15 @@ def _is_repeated_text(
     return (now_ts - previous_ts) < cooldown_sec
 
 
+def _should_reset_interrupted_on_activity_start(
+    *,
+    event_name: str,
+    interrupted: bool,
+) -> bool:
+    """Return True when a fresh user turn should clear stale interrupted state."""
+    return event_name == "activity_start" and interrupted
+
+
 # ---------------------------------------------------------------------------
 # Token Budget Monitor (E2E-006) — logs context window utilization
 # ---------------------------------------------------------------------------
@@ -1407,6 +1416,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     _is_interrupted: bool = False
     _last_interrupt_at: float = 0.0
     _INTERRUPT_DEBOUNCE_SEC = 1.0
+    _downstream_retry_count: int = 0
+    _DOWNSTREAM_MAX_RETRIES = 2
 
     # Adaptive face detection: skip cycles when no faces are consistently detected
     _face_consecutive_misses: int = 0
@@ -2545,6 +2556,20 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     _last_user_activity_at = time.monotonic()
                     session_meta.record_interaction()
 
+                    if _should_reset_interrupted_on_activity_start(
+                        event_name=event_name,
+                        interrupted=_is_interrupted,
+                    ):
+                        _is_interrupted = False
+                        logger.info(
+                            "Reset stale interrupted state on activity_start: user=%s session=%s",
+                            user_id,
+                            session_id,
+                        )
+
+                    if event_name == "activity_start":
+                        tool_dedup.reset()
+
                     queue_status = "forwarded"
                     queue_note = ""
                     try:
@@ -2993,6 +3018,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         """
         nonlocal _transcript_buffer, _transcript_buffer_started_at, _turn_had_vision_content, _model_audio_last_seen_at
         nonlocal _last_user_activity_at, _last_interrupt_at, _is_interrupted
+        nonlocal _downstream_retry_count
 
         def _start_live_events():
             return runner.run_live(
@@ -3416,6 +3442,30 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             stop_downstream.set()
             logger.info("Client disconnected (downstream): user=%s session=%s", user_id, session_id)
         except Exception as exc:
+            exc_text = str(exc).lower()
+            if (
+                "keepalive ping timeout" in exc_text
+                and _downstream_retry_count < _DOWNSTREAM_MAX_RETRIES
+                and websocket.client_state == WebSocketState.CONNECTED
+            ):
+                _downstream_retry_count += 1
+                backoff_sec = 0.8 * _downstream_retry_count
+                logger.warning(
+                    "Transient Live API keepalive timeout; retrying downstream (%d/%d) after %.1fs: user=%s session=%s",
+                    _downstream_retry_count,
+                    _DOWNSTREAM_MAX_RETRIES,
+                    backoff_sec,
+                    user_id,
+                    session_id,
+                )
+                await _safe_send_json({
+                    "type": MessageType.GO_AWAY,
+                    "retry_ms": int(backoff_sec * 1000),
+                    "message": "Live stream transient timeout, retrying.",
+                })
+                await asyncio.sleep(backoff_sec)
+                return await _downstream()
+
             stop_downstream.set()
             logger.exception("Error in downstream handler: user=%s session=%s", user_id, session_id)
 

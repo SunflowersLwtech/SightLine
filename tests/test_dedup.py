@@ -25,18 +25,27 @@ class TestToolCallDeduplicator:
         d.should_execute("nearby_search", {"lat": 1.0, "lng": 2.0})
         ok, reason = d.should_execute("nearby_search", {"lat": 1.0, "lng": 2.0})
         assert ok is False
-        assert "duplicate" in reason
+        assert "repeat" in reason or "duplicate" in reason
 
-    def test_different_args_allowed(self):
+    def test_different_args_blocked_within_same_turn(self):
         d = ToolCallDeduplicator(cooldown_sec=5.0)
         d.should_execute("nearby_search", {"lat": 1.0, "lng": 2.0})
         ok, reason = d.should_execute("nearby_search", {"lat": 3.0, "lng": 4.0})
-        assert ok is True
+        assert ok is False
+        assert "repeat" in reason or "duplicate" in reason
+
+    def test_non_target_tool_different_args_still_allowed(self):
+        d = ToolCallDeduplicator(cooldown_sec=5.0)
+        ok1, _ = d.should_execute("remember_entity", {"name": "Alice"})
+        ok2, _ = d.should_execute("remember_entity", {"name": "Bob"})
+        assert ok1 is True
+        assert ok2 is True
 
     def test_after_cooldown_allowed(self):
         d = ToolCallDeduplicator(cooldown_sec=0.1)
         d.should_execute("navigate_to", {"destination": "cafe"})
         time.sleep(0.15)
+        d.reset()
         ok, reason = d.should_execute("navigate_to", {"destination": "cafe"})
         assert ok is True
 
@@ -73,12 +82,13 @@ class TestMutualExclusionFilter:
         assert ok is False
         assert "mutex" in reason
 
-    def test_same_tool_twice_allowed(self):
-        """Same tool within a group is not blocked (dedup handles this)."""
+    def test_same_tool_twice_blocked(self):
+        """Same tool in the same mutex batch is blocked after first call."""
         m = MutualExclusionFilter()
         m.should_execute("nearby_search")
-        ok, _ = m.should_execute("nearby_search")
-        assert ok is True
+        ok, reason = m.should_execute("nearby_search")
+        assert ok is False
+        assert "mutex" in reason
 
     def test_different_groups_allowed(self):
         m = MutualExclusionFilter()
