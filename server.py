@@ -14,6 +14,7 @@ Phase 3 additions:
 
 import asyncio
 import base64
+from collections import deque
 import json
 import logging
 import os
@@ -1159,7 +1160,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     _face_library_loaded_at: float = 0.0
     if _face_available:
         try:
-            face_library = load_face_library(user_id)
+            face_library = await asyncio.to_thread(load_face_library, user_id)
             _face_library_loaded_at = time.monotonic()
             logger.info("Loaded %d face(s) for user %s", len(face_library), user_id)
         except Exception:
@@ -1171,6 +1172,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     # -- Vision analysis state -----------------------------------------------
     _vision_lock = asyncio.Lock()
     _vision_in_progress = False
+    _face_lock = asyncio.Lock()
+    _face_in_progress = False
     _last_vision_time = 0.0
     _frame_seq = 0
     _last_vision_context_text = ""
@@ -1492,10 +1495,11 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     # Inject the full dynamic system prompt so the model has LOD context
     # immediately, rather than waiting for the first telemetry tick.
     _initial_ephemeral = session_manager.get_ephemeral_context(session_id)
-    _initial_memories = load_relevant_memories(
+    _initial_memories = await asyncio.to_thread(
+        load_relevant_memories,
         user_id,
         session_ctx.active_task or session_ctx.trip_purpose or "",
-        top_k=3,
+        3,
     )
     _initial_prompt = build_full_dynamic_prompt(
         lod=session_ctx.current_lod,
@@ -1579,6 +1583,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         logger.info("Injected [LOD UPDATE] -> LOD %d (%s)", new_lod, reason)
 
     # -- Per-session memory state (Phase 4) -----------------------------------
+    _TRANSCRIPT_HISTORY_MAX_ENTRIES = 1500
     memory_top3: list[str] = []
     memory_top3_detailed: list[dict] = []
     # Per-session budget tracker — intentionally not persisted to Firestore.
@@ -1586,15 +1591,18 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     # accumulating across reconnections.  Persistence would require atomic
     # read-modify-write on Firestore and adds complexity without clear benefit.
     memory_budget = MemoryBudgetTracker() if _memory_available else None
-    transcript_history: list[dict] = []
+    transcript_history = deque(maxlen=_TRANSCRIPT_HISTORY_MAX_ENTRIES)
 
     async def _load_session_memories(context_hint: str = "") -> list[str]:
         """Load relevant memories for this user session."""
         nonlocal memory_top3, memory_top3_detailed
         try:
             if _memory_available:
-                bank = MemoryBankService(user_id)
-                raw_results = bank.retrieve_memories(context_hint, top_k=3)
+                def _retrieve_memories_sync(hint: str) -> list[dict]:
+                    bank = MemoryBankService(user_id)
+                    return bank.retrieve_memories(hint, top_k=3)
+
+                raw_results = await asyncio.to_thread(_retrieve_memories_sync, context_hint)
                 memory_top3 = [m["content"] for m in raw_results][:3]
                 memory_top3_detailed = [{
                     "content": m.get("content", "")[:120],
@@ -1823,6 +1831,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     async def _run_face_recognition(image_base64: str) -> None:
         """Run face recognition and inject results as SILENT context."""
         nonlocal face_library, _face_library_loaded_at, _face_consecutive_misses, _face_skip_counter
+        nonlocal _face_in_progress
         if not _face_available:
             await _emit_tool_event(
                 "identify_person",
@@ -1832,11 +1841,18 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             )
             return
 
+        async with _face_lock:
+            if _face_in_progress:
+                return
+            _face_in_progress = True
+
         # Adaptive backoff: skip cycles when no faces are consistently detected
         if _face_consecutive_misses >= _FACE_BACKOFF_THRESHOLD:
             _face_skip_counter += 1
             if _face_skip_counter <= _FACE_BACKOFF_SKIP_CYCLES:
                 logger.debug("Face detection skipped (backoff: %d misses)", _face_consecutive_misses)
+                async with _face_lock:
+                    _face_in_progress = False
                 return
             _face_skip_counter = 0  # run this cycle, then skip again
 
@@ -1844,7 +1860,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         now_mono = time.monotonic()
         if now_mono - _face_library_loaded_at >= FACE_LIBRARY_REFRESH_SEC:
             try:
-                face_library = load_face_library(user_id)
+                face_library = await asyncio.to_thread(load_face_library, user_id)
                 _face_library_loaded_at = now_mono
                 logger.info("Refreshed face library (%d faces) for user %s", len(face_library), user_id)
             except Exception:
@@ -1901,7 +1917,12 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         pname = person.get("person_name", "")
                         if pname and pname != "unknown":
                             try:
-                                person_memories = load_relevant_memories(user_id, f"person {pname}", top_k=2)
+                                person_memories = await asyncio.to_thread(
+                                    load_relevant_memories,
+                                    user_id,
+                                    f"person {pname}",
+                                    2,
+                                )
                                 if person_memories:
                                     face_text += f"\nMemories about {pname}:"
                                     for mem in person_memories:
@@ -1941,6 +1962,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 data={"reason": "face_recognition_failed"},
             )
             await _emit_capability_degraded("face", str(exc)[:200])
+        finally:
+            async with _face_lock:
+                _face_in_progress = False
 
     async def _run_ocr_analysis(image_base64: str, safety_only: bool = False) -> None:
         """Run OCR and inject results into Live session context."""
@@ -2712,6 +2736,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             async for event in live_events:
                 if stop_downstream.is_set():
                     break
+                _output_transcription_forwarded = False
 
                 # --- Session resumption update ---
                 if event.live_session_resumption_update:
@@ -2928,7 +2953,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         logger.info("Sent function response for %s (behavior=%s)", fc.name, behavior_to_text(behavior))
 
                 # --- Output transcription (agent speech-to-text) — buffered ---
-                _output_transcription_forwarded = False
                 if event.output_transcription and event.output_transcription.text:
                     now_mono = time.monotonic()
                     transcript_history.append({
@@ -3051,7 +3075,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     extractor.extract_and_store,
                     user_id=user_id,
                     session_id=session_id,
-                    transcript_history=transcript_history,
+                    transcript_history=list(transcript_history),
                     memory_bank=bank,
                     budget=budget,
                 )

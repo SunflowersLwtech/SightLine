@@ -592,6 +592,14 @@ struct MainView: View {
         }
     }
 
+    private var shouldCaptureDevEvents: Bool {
+        #if DEBUG
+        return showDevConsole
+        #else
+        return false
+        #endif
+    }
+
     private func openAppSettings() {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
@@ -687,7 +695,9 @@ struct MainView: View {
 
         webSocketManager.onTextSent = { text in
             DispatchQueue.main.async {
-                devConsoleModel.captureNetworkMessage(direction: "UP", payload: text)
+                if shouldCaptureDevEvents {
+                    devConsoleModel.captureNetworkMessage(direction: "UP", payload: text)
+                }
             }
         }
 
@@ -720,7 +730,9 @@ struct MainView: View {
 
         webSocketManager.onTextReceived = { text in
             DispatchQueue.main.async {
-                devConsoleModel.captureNetworkMessage(direction: "DOWN", payload: text)
+                if shouldCaptureDevEvents {
+                    devConsoleModel.captureNetworkMessage(direction: "DOWN", payload: text)
+                }
             }
             if let msg = DownstreamMessage.parse(text: text) {
                 handleDownstreamMessage(msg)
@@ -941,21 +953,27 @@ struct MainView: View {
             DispatchQueue.main.async {
                 let message = "Face library reloaded (\(count) faces)."
                 transcript = message
-                devConsoleModel.captureTranscript(text: message, role: "system")
+                if shouldCaptureDevEvents {
+                    devConsoleModel.captureTranscript(text: message, role: "system")
+                }
             }
             logger.info("Face library reloaded: \(count)")
         case .faceLibraryCleared(let deletedCount):
             DispatchQueue.main.async {
                 let message = "Face library cleared (\(deletedCount) deleted)."
                 transcript = message
-                devConsoleModel.captureTranscript(text: message, role: "system")
+                if shouldCaptureDevEvents {
+                    devConsoleModel.captureTranscript(text: message, role: "system")
+                }
             }
             logger.info("Face library cleared: \(deletedCount)")
         case .error(let message):
             DispatchQueue.main.async {
                 connectionStatus = "Server error — retrying..."
                 transcript = "Server error: \(message)"
-                devConsoleModel.captureTranscript(text: "Server error: \(message)", role: "system")
+                if shouldCaptureDevEvents {
+                    devConsoleModel.captureTranscript(text: "Server error: \(message)", role: "system")
+                }
                 audioCapture.stopCapture()
                 cameraManager.stopCapture()
             }
@@ -967,11 +985,15 @@ struct MainView: View {
                     // Agent transcripts → visible as subtitles + dev console
                     transcript = text
                     lastAgentTranscript = text
-                    devConsoleModel.captureTranscript(text: text, role: role)
+                    if shouldCaptureDevEvents {
+                        devConsoleModel.captureTranscript(text: text, role: role)
+                    }
                     drainWhenIdleToolQueueIfPossible()
                 } else {
                     // User / echo transcripts → dev console only (no main UI)
-                    devConsoleModel.captureTranscript(text: text, role: role == "user" && audioPlayback.isPlaying ? "echo" : role)
+                    if shouldCaptureDevEvents {
+                        devConsoleModel.captureTranscript(text: text, role: role == "user" && audioPlayback.isPlaying ? "echo" : role)
+                    }
                 }
             }
         case .lodUpdate(let lod):
@@ -989,10 +1011,12 @@ struct MainView: View {
             let status = (payload["status"] as? String)?.lowercased() ?? ""
             if !status.isEmpty {
                 DispatchQueue.main.async {
-                    devConsoleModel.captureTranscript(text: "Tool \(tool): \(status)", role: "system")
-                    devConsoleModel.captureToolActivity(
-                        tool: tool, behavior: behavior.rawValue, status: status
-                    )
+                    if shouldCaptureDevEvents {
+                        devConsoleModel.captureTranscript(text: "Tool \(tool): \(status)", role: "system")
+                        devConsoleModel.captureToolActivity(
+                            tool: tool, behavior: behavior.rawValue, status: status
+                        )
+                    }
                 }
             }
             switch status {
@@ -1025,19 +1049,27 @@ struct MainView: View {
             )
         case .visionDebug(let data):
             DispatchQueue.main.async {
-                devConsoleModel.captureVisionDebug(data)
+                if shouldCaptureDevEvents {
+                    devConsoleModel.captureVisionDebug(data)
+                }
             }
         case .ocrDebug(let data):
             DispatchQueue.main.async {
-                devConsoleModel.captureOCRDebug(data)
+                if shouldCaptureDevEvents {
+                    devConsoleModel.captureOCRDebug(data)
+                }
             }
         case .faceDebug(let data):
             DispatchQueue.main.async {
-                devConsoleModel.captureFaceDebug(data)
+                if shouldCaptureDevEvents {
+                    devConsoleModel.captureFaceDebug(data)
+                }
             }
         case .frameAck(let frameId, let queuedAgents):
             DispatchQueue.main.async {
-                devConsoleModel.captureFrameAck(frameId: frameId, queuedAgents: queuedAgents)
+                if shouldCaptureDevEvents {
+                    devConsoleModel.captureFrameAck(frameId: frameId, queuedAgents: queuedAgents)
+                }
             }
         case .navigationResult(let summary, let behavior):
             // Haptic feedback for urgent navigation (LOD 1 safety mode)
@@ -1083,8 +1115,10 @@ struct MainView: View {
                 audioPlayback.stopImmediately()
                 audioPlayback.suppressIncomingAudio(for: 0.8)
                 HapticManager.shared.doubleTap()
-                devConsoleModel.captureTranscript(
-                    text: "Model interrupted by user", role: "system")
+                if shouldCaptureDevEvents {
+                    devConsoleModel.captureTranscript(
+                        text: "Model interrupted by user", role: "system")
+                }
             }
         case .goAway(let retryMs):
             logger.info("GoAway received, reconnecting in \(retryMs)ms")
@@ -1108,10 +1142,12 @@ struct MainView: View {
         case .unknown(let raw):
             logger.debug("Unknown downstream message: \(String(raw.prefix(200)), privacy: .public)")
             DispatchQueue.main.async {
-                devConsoleModel.captureTranscript(
-                    text: "Unknown downstream: \(String(raw.prefix(160)))",
-                    role: "system"
-                )
+                if shouldCaptureDevEvents {
+                    devConsoleModel.captureTranscript(
+                        text: "Unknown downstream: \(String(raw.prefix(160)))",
+                        role: "system"
+                    )
+                }
             }
         default:
             break
