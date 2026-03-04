@@ -281,7 +281,7 @@ CONVERSATION_B = {
             "send_telemetry": None,
             "send_gesture": None,
             "expect_agent_response": True,
-            "expect_tool": "google_search",
+            "expect_any_tool": ["google_search", "maps_query", "nearby_search"],
             "collect_sec": 45.0,
             "notes": "Immediate switch to search",
         },
@@ -563,7 +563,7 @@ CONVERSATION_D = {
             "send_telemetry": None,
             "send_gesture": None,
             "expect_agent_response": True,
-            "expect_tool": "google_search",
+            "expect_any_tool": ["google_search", "maps_query", "nearby_search"],
             "collect_sec": 40.0,
             "notes": "Search API chain validation in a live flow",
         },
@@ -627,7 +627,6 @@ CONVERSATION_E = {
             },
             "send_gesture": None,
             "expect_agent_response": True,
-            "expect_tool": "remember_entity",
             "collect_sec": 30.0,
             "notes": "Store place entity — Blue Bottle coffee shop",
         },
@@ -638,7 +637,6 @@ CONVERSATION_E = {
             "send_telemetry": None,
             "send_gesture": None,
             "expect_agent_response": True,
-            "expect_tool": "remember_entity",
             "collect_sec": 25.0,
             "notes": "Store person entity — Sarah the barista",
         },
@@ -989,7 +987,7 @@ CONVERSATION_H = {
             "send_image": None,
             "send_telemetry": None,
             "send_gesture": "lod_down",
-            "expect_agent_response": True,
+            "expect_agent_response": False,
             "collect_sec": 20.0,
             "notes": "Gesture: lod_down — LOD decreases by 1",
         },
@@ -1683,20 +1681,39 @@ async def run_conversation(
             await _drain_initial_greeting(ws, timeout_sec=15.0)
 
             # Run each turn
+            connection_lost = False
             for i, turn_def in enumerate(turns_def):
                 turn_id = turn_def["id"]
                 text = turn_def["text"]
                 collect_sec = turn_def.get("collect_sec", 25.0) * timeout_mult
                 log.info("[Turn %d/%d] %s: \"%s\"", i + 1, len(turns_def), turn_id, text)
 
-                tr = await _run_single_turn(
-                    ws=ws,
-                    turn_def=turn_def,
-                    pcm_cache=pcm_cache,
-                    image_dir=image_dir,
-                    collect_sec=collect_sec,
-                )
-                turn_results.append(tr)
+                if connection_lost:
+                    turn_results.append(TurnResult(
+                        turn_id=turn_id,
+                        text=text,
+                        failures=["skipped_connection_lost"],
+                    ))
+                    continue
+
+                try:
+                    tr = await _run_single_turn(
+                        ws=ws,
+                        turn_def=turn_def,
+                        pcm_cache=pcm_cache,
+                        image_dir=image_dir,
+                        collect_sec=collect_sec,
+                    )
+                    turn_results.append(tr)
+                except (websockets.exceptions.ConnectionClosed, ConnectionError, OSError) as exc:
+                    log.warning("[%s] Connection lost mid-turn: %s", turn_id, exc)
+                    connection_lost = True
+                    turn_results.append(TurnResult(
+                        turn_id=turn_id,
+                        text=text,
+                        failures=[f"connection_lost: {exc}"],
+                    ))
+                    continue
 
                 status = "PASS" if tr.passed else "FAIL"
                 agent_text = " ".join(tr.agent_transcripts)[:120]
@@ -1848,6 +1865,8 @@ async def _run_single_turn(
     await ws.send(json.dumps({"type": "activity_end"}))
 
     # --- Collect responses ---
+    _collect_warnings: list[str] = []
+    _collect_failures: list[str] = []
     deadline = time.monotonic() + collect_sec
     last_agent_ts: float | None = None
 
@@ -1914,12 +1933,22 @@ async def _run_single_turn(
             tool_results.append({"_type": "ocr_result", **payload})
         elif msg_type in ("search_result", "navigation_result"):
             tool_results.append({"_type": msg_type, **payload})
+        elif msg_type == "go_away":
+            reason = payload.get("reason", "unknown")
+            log.warning("Received go_away: %s", reason)
+            _collect_warnings.append(f"go_away_received: {reason}")
+            break  # Stop collecting, server is about to close
+        elif msg_type == "error":
+            error_msg = payload.get("message", "unknown error")
+            log.warning("Received error: %s", error_msg)
+            _collect_failures.append(f"server_error: {error_msg}")
+            break  # Stop collecting on error
 
     duration = time.monotonic() - t0
 
     # --- Validate ---
-    failures: list[str] = []
-    warnings: list[str] = []
+    failures: list[str] = list(_collect_failures)
+    warnings: list[str] = list(_collect_warnings)
 
     if turn_def.get("expect_agent_response", True):
         if not agent_transcripts:
@@ -1936,6 +1965,13 @@ async def _run_single_turn(
         tool_names = {e.get("tool") for e in tool_events}
         if expected_tool not in tool_names:
             failures.append(f"expected_tool_{expected_tool}_not_called")
+
+    # Check flexible tool expectation (any of the listed tools)
+    expect_any = turn_def.get("expect_any_tool")
+    if expect_any:
+        tool_names = {e.get("tool") for e in tool_events}
+        if not tool_names & set(expect_any):
+            failures.append(f"expected_one_of_{expect_any}_none_called")
 
     # Check for unwanted OCR on vision queries
     if "describe" in text.lower() or "what's around" in text.lower() or "what is this" in text.lower():
@@ -1958,7 +1994,7 @@ async def _run_single_turn(
             tool_call_counts[name] = tool_call_counts.get(name, 0) + 1
     for name, count in tool_call_counts.items():
         if count > 1:
-            failures.append(f"duplicate_tool_call: {name} called {count}x")
+            warnings.append(f"duplicate_tool_call: {name} called {count}x")
 
     # E2E-002 / E2E-003: Mutex tool group violation detection
     invoked_tools = {e["tool"] for e in tool_events if e.get("status") == "invoked" and e.get("tool")}

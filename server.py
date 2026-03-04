@@ -161,6 +161,13 @@ OCR_REPEAT_SUPPRESS_SEC = 20.0
 VISION_PREFEEDBACK_COOLDOWN_SEC = 12.0
 OCR_PREFEEDBACK_COOLDOWN_SEC = 15.0
 
+# Regex to strip internal context tags before sending to client
+_INTERNAL_TAG_RE = re.compile(
+    r"\[(?:VISION ANALYSIS|OCR RESULT|FACE RECOGNITION|NAVIGATION|SEARCH RESULT|"
+    r"ACCESSIBILITY|MEMORY CONTEXT|ENTITY UPDATE|LOCATION INFO|DEPTH MAP)\]",
+    re.IGNORECASE,
+)
+
 _MEANINGFUL_TELEMETRY_FIELDS = {
     "motion_state",
     "hr_bucket",
@@ -1503,13 +1510,16 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         if is_repeat and not can_repeat:
             logger.debug("Suppressed repeated downstream transcript: %s", text[:120])
             return True
+        clean_text = _INTERNAL_TAG_RE.sub("", text).strip()
+        if not clean_text:
+            return True  # Nothing left after stripping
         sent = await _safe_send_json({
             "type": MessageType.TRANSCRIPT,
-            "text": text,
+            "text": clean_text,
             "role": "agent",
         })
         if sent:
-            _last_agent_text = text
+            _last_agent_text = clean_text
             _last_agent_text_sent_at = now_mono
         return sent
 
