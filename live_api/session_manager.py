@@ -88,9 +88,24 @@ def create_session_service():
         try:
             service = Database(db_url=db_url)
         except TypeError:
-            service = Database(db_url)
-        logger.info("Using DatabaseSessionService (db_url=%s)", db_url)
-        return service
+            try:
+                service = Database(db_url)
+            except Exception:
+                logger.exception(
+                    "DatabaseSessionService init failed for %s; falling back to InMemory",
+                    db_url,
+                )
+            else:
+                logger.info("Using DatabaseSessionService (db_url=%s)", db_url)
+                return service
+        except Exception:
+            logger.exception(
+                "DatabaseSessionService init failed for %s; falling back to InMemory",
+                db_url,
+            )
+        else:
+            logger.info("Using DatabaseSessionService (db_url=%s)", db_url)
+            return service
 
     InMemory = getattr(sessions_mod, "InMemorySessionService", None)
     if InMemory is None:

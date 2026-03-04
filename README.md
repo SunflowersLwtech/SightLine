@@ -465,8 +465,13 @@ gcloud run deploy sightline-backend \
 ```bash
 conda activate sightline
 cd SightLine
+python -m pip install -U pytest pytest-asyncio
 python -m pytest tests/ -v
 ```
+
+Notes:
+- Async test suites (`test_vision_agent.py`, `test_ocr_agent.py`, websocket contract tests) require `pytest-asyncio`.
+- Session service falls back to in-memory mode when `DatabaseSessionService` cannot initialize (for example, non-async SQLite driver in local/dev environments).
 
 Test coverage includes:
 - `test_vision_agent.py` — LOD-adaptive prompting
