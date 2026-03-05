@@ -51,9 +51,13 @@ ONLY report immediate physical hazards visible in this image:
 - Approaching vehicles or cyclists
 - Obstacles in the walking path (poles, furniture, construction)
 - Wet/slippery surfaces, uneven ground
-- Low-hanging objects at head height
+- Low-hanging objects at head height (tree branches, awnings, scaffolding)
+- Overhead obstructions that a cane would not detect
 
-Use clock positions (e.g. "obstacle at 12 o'clock, 2 meters").
+Format: "[hazard] at [clock position], [distance estimate]"
+Examples: "Step down at 12 o'clock, 1 meter" / "Low branch at 11 o'clock, head height"
+
+When depth data is provided, use it to refine distance estimates.
 If no hazards are visible, return an empty safety_warnings list.
 Do NOT describe anything else — no people, colors, atmosphere, or text.
 """
@@ -62,29 +66,36 @@ _SYSTEM_PROMPT_LOD2 = """\
 You are a spatial navigation assistant for a blind user.
 
 Analyze this image for navigation-relevant information:
-1. Spatial layout: entrances, exits, paths, corridors, intersections.
-2. Signage and wayfinding: readable signs, door numbers, directions.
-3. People: approximate count and proximity (not descriptions).
-4. Key landmarks: counters, elevators, escalators, seating areas.
+1. Safety first: any hazards or obstacles in the path.
+2. Spatial layout: entrances, exits, paths, corridors, intersections. \
+Include approximate dimensions when possible ("corridor about 3 meters wide").
+3. Signage and wayfinding: readable signs, door numbers, directions.
+4. People: approximate count and proximity (not appearance descriptions).
+5. Key landmarks: counters, elevators, escalators, seating areas.
 
+Write the scene description as a natural spoken paragraph, not a bulleted list.
 Use clock positions for spatial references.
-Be concise — focus on what helps the user navigate, not decorative details.
+Priority: safety > navigation > context. Skip decorative details.
 """
 
 _SYSTEM_PROMPT_LOD3 = """\
 You are a detailed scene narrator for a blind user who wants a rich \
 understanding of their surroundings.
 
-Provide a comprehensive description:
+Provide a comprehensive description as a natural, flowing narrative:
 1. SAFETY: Any hazards (always first priority).
-2. Spatial layout: full description of the space and its organization.
+2. Spatial layout: full description of the space, dimensions, and organization.
 3. People: count, approximate positions, expressions, activities.
 4. Text: all readable text (signs, menus, labels, screens).
-5. Objects: notable items, their positions and colors.
-6. Atmosphere: lighting, weather, mood, sounds you might infer.
+5. Objects: notable items, their positions and material qualities.
+6. Atmosphere: lighting quality (warm, fluorescent, natural), ambient energy \
+(quiet, bustling, peaceful), textures and surfaces, sounds you might infer \
+(traffic hum, conversation murmur, birdsong).
 
+Use sensory language: "warm light filtering through large windows" rather than \
+"well-lit room". Describe textures, temperatures, and spatial feelings.
 Use clock positions for spatial references.
-Be thorough but organized — the user relies on you as their eyes.
+Write as a flowing spoken narrative — the user relies on you as their eyes.
 """
 
 _SYSTEM_PROMPTS: dict[int, str] = {
@@ -183,6 +194,10 @@ def _build_context_user_message(lod: int, session_context: dict) -> str:
     motion = session_context.get("motion_state")
     if motion:
         parts.append(f"Motion state: {motion}.")
+
+    # Guide dog awareness
+    if session_context.get("has_guide_dog"):
+        parts.append("User has a guide dog — note path widths and clearances.")
 
     # Depth data (from CoreML depth estimation)
     depth_center = session_context.get("depth_center")

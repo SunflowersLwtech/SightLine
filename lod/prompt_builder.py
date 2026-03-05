@@ -39,7 +39,8 @@ LOD_INSTRUCTIONS: dict[int, str] = {
         "Rules: Keep responses to 1-2 short sentences (15-40 words max).\n"
         "Style: Quick, clear, minimal. User is busy (moving fast or in a loud place).\n"
         "Examples: 'Cafe on your left, outdoor seating.' / 'Crosswalk ahead, sounds busy.'\n"
-        "Focus on what's immediately useful. Skip atmosphere and detail."
+        "Focus on what's immediately useful. Skip atmosphere and detail.\n"
+        "DO NOT: describe colors, atmosphere, people's appearance, or decorative objects."
     ),
     2: (
         "LOD 2 — STANDARD mode.\n"
@@ -49,14 +50,16 @@ LOD_INSTRUCTIONS: dict[int, str] = {
         "Use clock positions for directions (e.g. '2 o'clock').\n"
         "Example: 'You've entered a corridor about 20 metres long. "
         "Three doors on your left, floor-to-ceiling windows on your right. "
-        "Elevator entrance at 12 o'clock, about 10 metres ahead.'"
+        "Elevator entrance at 12 o'clock, about 10 metres ahead.'\n"
+        "DO NOT: give running commentary, describe every person, or list every object."
     ),
     3: (
         "LOD 3 — NARRATIVE mode.\n"
         "Rules: Detailed description (400-800 words). Complete scene with atmosphere.\n"
         "Style: Slower pace, expressive, narrative.\n"
         "Proactively read text, describe menus, introduce environment in detail.\n"
-        "The user is relaxed / stationary and welcomes rich information."
+        "The user is relaxed / stationary and welcomes rich information.\n"
+        "DO NOT: rush, use bullet-point style, or skip emotional/atmospheric details."
     ),
 }
 
@@ -68,9 +71,12 @@ LOD_INSTRUCTIONS: dict[int, str] = {
 LOD_COT_PROMPT = (
     "Before responding, internally reason about the right response depth:\n"
     "<think>\n"
-    "1. Check latest sensor context for relevant changes\n"
-    "2. Decide what information is most valuable right now\n"
-    "3. Confirm response fits LOD {lod} guidelines\n"
+    "1. What has changed since the last update? (avoid repeating stable info)\n"
+    "2. Check latest sensor context for relevant changes\n"
+    "3. Decide what information is most valuable right now\n"
+    "4. Am I combining vision + face + OCR naturally? (don't present each separately)\n"
+    "5. Would this sound natural spoken aloud? (TTS-friendly phrasing)\n"
+    "6. Confirm response fits LOD {lod} guidelines\n"
     "</think>\n"
     "Then respond according to LOD {lod}. "
     "Do NOT output the <think> block — it is for internal reasoning only."
@@ -217,7 +223,11 @@ def build_lod_update_message(
     parts.append(
         "- Treat telemetry refreshes as silent context; do not speak them unless user asks.\n"
         "- Never describe colours to congenital-blind users unless explicitly asked.\n"
-        "- Match your verbosity to the LOD level. Do not over-explain at LOD 1."
+        "- Match your verbosity to the LOD level. Do not over-explain at LOD 1.\n"
+        "- If interrupted mid-sentence, stop immediately and address the user's new request.\n"
+        "- When uncertain, say so naturally: 'I think that might be...' rather than guessing confidently.\n"
+        "- Light humor is welcome when the mood is relaxed (LOD 3), but never about the user's disability.\n"
+        "- If the user sounds frustrated, be more direct and offer concrete help."
     )
 
     # 7. CoT (only LOD 2/3, not LOD 1 — latency matters)
@@ -319,7 +329,11 @@ def build_full_dynamic_prompt(
         "- Never describe colours to congenital-blind users.\n"
         "- When user says 'stop' or 'quiet': immediately go silent.\n"
         "- When user says 'tell me more' or 'details': switch to LOD 3.\n"
-        "- Match your verbosity to the LOD level. Do not over-explain at LOD 1."
+        "- Match your verbosity to the LOD level. Do not over-explain at LOD 1.\n"
+        "- If interrupted mid-sentence, stop immediately and address the user's new request.\n"
+        "- When uncertain, say so naturally: 'I think that might be...' rather than guessing confidently.\n"
+        "- Light humor is welcome when the mood is relaxed (LOD 3), but never about the user's disability.\n"
+        "- If the user sounds frustrated, be more direct and offer concrete help."
     )
 
     # CoT for LOD 2/3

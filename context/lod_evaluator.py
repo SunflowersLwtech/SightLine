@@ -35,16 +35,25 @@ Current state:
 - Recent memories: {memories}
 - User profile: vision={vision_status}, O&M={om_level}, verbosity={verbosity}
 
-Based on this context, should the LOD be adjusted?
+Decision framework — consider each:
+- UP (+1 detail): Unfamiliar location (familiarity < 0.3)? New entities the user hasn't \
+encountered before? User's verbosity preference is "detailed"? Complex or crowded environment?
+- DOWN (-1 detail): Very familiar location (familiarity > 0.8)? No new entities? \
+User prefers "concise"? Simple, empty, or routine environment?
+- KEEP (no change): Context roughly matches current LOD? Mixed signals? Uncertain?
+
+Examples:
+1. LOD 2, familiarity=0.1, entities="unknown cafe" → UP (new place, user needs orientation)
+2. LOD 3, familiarity=0.9, entities="home" → DOWN (familiar, no need for full narrative)
+3. LOD 2, familiarity=0.5, entities="regular bus stop" → KEEP (moderate, no strong signal)
+4. LOD 2, familiarity=0.2, entities="David, Sarah" → UP (known people in unfamiliar place, describe context)
 
 Rules:
-- You can only suggest KEEP, UP (+1), or DOWN (-1)
-- UP means more detail (higher LOD number)
-- DOWN means less detail (lower LOD number)
+- You can only suggest KEEP, UP, or DOWN
 - Only suggest change if the context clearly warrants it
 - Err on the side of KEEP
 
-Respond with EXACTLY one line in this format:
+Respond with EXACTLY two lines:
 DECISION: KEEP|UP|DOWN
 REASON: <one sentence explanation>
 """

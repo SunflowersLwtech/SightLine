@@ -518,7 +518,17 @@ class ContextInjectionQueue:
         for it in items:
             merged_parts.append(it.text)
 
-        merged_text = "\n\n".join(merged_parts)
+        # Multi-source fusion hint: when vision+face+OCR arrive together,
+        # instruct the model to combine them into one coherent response.
+        categories = {it.category for it in items}
+        if len(categories) > 1 and not all_silent:
+            fusion_hint = (
+                "[MULTI-SOURCE UPDATE: Combine the following naturally into "
+                "one coherent response. Do not present each source separately.]\n"
+            )
+            merged_text = fusion_hint + "\n\n".join(merged_parts)
+        else:
+            merged_text = "\n\n".join(merged_parts)
         if all_silent:
             merged_text = "<<<INTERNAL_CONTEXT>>>\n" + merged_text + "\n<<<END_INTERNAL_CONTEXT>>>"
 
@@ -1985,6 +1995,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 "trip_purpose": session_ctx.trip_purpose,
                 "active_task": session_ctx.active_task,
                 "motion_state": session_manager.get_ephemeral_context(session_id).motion_state,
+                "has_guide_dog": user_profile.has_guide_dog,
             }
             result = await analyze_scene(image_base64, session_ctx.current_lod, ctx_dict)
             vision_text = _format_vision_result(result, session_ctx.current_lod)
@@ -3679,17 +3690,21 @@ def _format_vision_result(result: dict, lod: int) -> str:
     """Format vision analysis result for Gemini context injection."""
     parts = ["[VISION ANALYSIS]"]
 
+    # Safety warnings always first
+    warnings = result.get("safety_warnings", [])
+    for w in warnings:
+        parts.append(f"SAFETY: {w}")
+
+    # Navigation info as compact spatial summary
     nav = result.get("navigation_info", {})
     if lod >= 2:
-        entrances = nav.get("entrances", [])
-        if entrances:
-            parts.append("Entrances: " + ", ".join(entrances))
-        paths = nav.get("paths", [])
-        if paths:
-            parts.append("Paths: " + ", ".join(paths))
-        landmarks = nav.get("landmarks", [])
-        if landmarks:
-            parts.append("Landmarks: " + ", ".join(landmarks))
+        nav_items = []
+        for key in ("entrances", "paths", "landmarks"):
+            items = nav.get(key, [])
+            if items:
+                nav_items.extend(items)
+        if nav_items:
+            parts.append("Spatial: " + " | ".join(nav_items))
 
     desc = result.get("scene_description", "")
     if desc:
@@ -3697,11 +3712,14 @@ def _format_vision_result(result: dict, lod: int) -> str:
 
     text = result.get("detected_text")
     if text and lod >= 2:
-        parts.append(f"Visible text: {text}")
+        parts.append(f"Text spotted: {text}")
 
     count = result.get("people_count", 0)
     if count > 0 and lod >= 2:
-        parts.append(f"People visible: {count}")
+        if count == 1:
+            parts.append("1 person nearby")
+        else:
+            parts.append(f"{count} people nearby")
 
     return "\n".join(parts)
 
@@ -3713,11 +3731,15 @@ def _format_face_results(known_faces: list[dict]) -> str:
         name = face["person_name"]
         rel = face.get("relationship", "")
         sim = face.get("similarity", 0)
-        position = face.get("bbox", [])
         desc = f"{name}"
         if rel:
             desc += f" ({rel})"
-        desc += f" (confidence: {sim:.0%})"
+        if sim >= 0.85:
+            desc += " — high confidence"
+        elif sim >= 0.70:
+            desc += " — moderate confidence, verify if possible"
+        else:
+            desc += " — low confidence, do not announce unless user asks"
         parts.append(desc)
     return "\n".join(parts)
 
@@ -3727,17 +3749,28 @@ def _format_ocr_result(result: dict) -> str:
     parts = ["[OCR RESULT]"]
 
     text_type = result.get("text_type", "unknown")
-    parts.append(f"Type: {text_type}")
+    confidence = result.get("confidence", 1.0)
+
+    # Context-aware type labels
+    type_hints = {
+        "menu": "Menu text detected — read items with prices:",
+        "sign": "Sign text detected:",
+        "document": "Document text detected:",
+        "label": "Label text detected:",
+    }
+    parts.append(type_hints.get(text_type, f"Text detected ({text_type}):"))
+
+    if confidence < 0.5:
+        parts.append("(Note: text quality is poor, some characters may be inaccurate)")
 
     items = result.get("items", [])
     if items:
-        parts.append("Items:")
         for item in items:
             parts.append(f"  - {item}")
     else:
         text = result.get("text", "")
         if text:
-            parts.append(f"Text: {text}")
+            parts.append(text)
 
     return "\n".join(parts)
 

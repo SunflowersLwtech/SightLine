@@ -41,6 +41,25 @@ semantic for facts about people/places/things, procedural for habits/preferences
 - "entity_names": Array of entity names (people, places, organizations) referenced in this memory. \
 Empty array if none.
 
+Importance scoring guide:
+- 1.0: Safety-critical (e.g., "user is allergic to peanuts", "user's guide dog is named Max")
+- 0.8: Navigation routines and key people (e.g., "takes the 8am bus", "David is the user's partner")
+- 0.6: Preferences and frequented locations (e.g., "prefers detailed descriptions", "regular at Joe's Cafe")
+- 0.4: One-time experiences worth recalling (e.g., "enjoyed the jazz festival last Saturday")
+- 0.2: Trivial or transient details (e.g., "mentioned the weather was nice today")
+
+Emotional context: When the user expresses feelings about a place, person, or experience, \
+capture the emotional dimension (e.g., "user finds Riverside Park relaxing", \
+"user felt frustrated navigating the new subway station").
+
+Privacy rules:
+- Do NOT extract specific financial details (account numbers, balances, transaction amounts).
+- Do NOT extract medical details (diagnoses, medications, dosages) UNLESS safety-relevant \
+  (e.g., allergies, mobility conditions affecting navigation).
+- Do NOT extract passwords, PINs, or authentication details.
+- Summarize sensitive topics at a general level: "user has a medical appointment on Thursdays" \
+  rather than specific medical conditions.
+
 Return a JSON array of objects. If no meaningful memories can be extracted, return an empty array [].
 
 Only extract facts that are clearly stated or strongly implied. Do NOT speculate.

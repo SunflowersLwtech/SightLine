@@ -36,11 +36,28 @@ Rules:
    screens, handwriting.
 2. Classify the text type: "menu", "sign", "document", "label", or "unknown".
 3. For menus: parse into individual items with prices when visible. Format \
-   each item as "Item Name - $Price" or just "Item Name" if no price.
+   each item as "Item Name - $Price" or just "Item Name" if no price. \
+   Group items by category when clear (e.g. appetizers, mains, drinks, desserts).
 4. For signs: preserve the exact wording.
 5. For documents: maintain reading order (top to bottom, left to right).
 6. Report confidence based on text clarity (0.0 = unreadable, 1.0 = crystal clear).
 7. If no text is visible, return empty results with confidence 0.0.
+
+Text priority (extract all, but rank by importance):
+1. Safety-critical: warnings, caution signs, traffic signals, hazard labels.
+2. Actionable: prices, opening hours, directions, instructions, dosage info.
+3. Informational: names, titles, descriptions, news headlines.
+4. Decorative: brand slogans, decorative quotes, background text.
+
+Multi-language handling:
+- Always extract text in its original language first.
+- If the text is not in the user's language, add a brief translation \
+  in parentheses: "注意安全 (Caution: be safe)".
+- For mixed-language text, preserve both languages.
+
+Unclear text:
+- Mark partially obscured or blurry characters with [?]: "Pha[?]macy".
+- If a word is completely unreadable, note "[unreadable]" in its position.
 
 Priority: accuracy over speed. A blind user depends on correct text reading.
 """
@@ -153,7 +170,7 @@ async def extract_text(
         system_prompt = _SYSTEM_PROMPT
         user_message = "Extract all visible text from this image."
         if context_hint:
-            user_message += f" Context: {context_hint}"
+            user_message += f" Context: {context_hint}. Prioritize text most relevant to this context."
         media_res = types.MediaResolution.MEDIA_RESOLUTION_MEDIUM
 
     response = None
