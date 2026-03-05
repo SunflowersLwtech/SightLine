@@ -87,11 +87,39 @@ _LEAKED_MARKERS = [
     "<<<SILENT_SENSOR_DATA>>>", "<<<END_",
 ]
 
+# Extra leak patterns from gap analysis (JSON/function/system prompt fragments)
+_LEAKED_REGEX_FAILURES = [
+    re.compile(r"\{\s*\"type\"\s*:", re.IGNORECASE),
+    re.compile(r"\"tool\"\s*:", re.IGNORECASE),
+    re.compile(r"\"status\"\s*:", re.IGNORECASE),
+    re.compile(
+        r"\b(?:navigate_to|get_location_info|nearby_search|reverse_geocode|"
+        r"get_walking_directions|preview_destination|validate_address|"
+        r"google_search|identify_person|resolve_plus_code|convert_to_plus_code|"
+        r"get_accessibility_info|maps_query|preload_memory|remember_entity|"
+        r"what_do_you_remember|forget_entity|forget_recent_memory|extract_text_from_camera)\s*\(",
+        re.IGNORECASE,
+    ),
+]
+_LEAKED_REGEX_WARNINGS = [
+    re.compile(r"you are a vision-first", re.IGNORECASE),
+    re.compile(r"\blod\s*level\b", re.IGNORECASE),
+    re.compile(r"-?\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}"),
+]
+
+# Equivalent tool aliases observed in tool_event payloads
+_TOOL_ALIASES: dict[str, set[str]] = {
+    "extract_text_from_camera": {"extract_text_from_camera", "extract_text"},
+}
+
 # Mutex tool groups — at most one tool from each group per turn
 _MUTEX_TOOL_GROUPS = [
     {"nearby_search", "maps_query"},
     {"navigate_to", "get_walking_directions"},
 ]
+
+# Runtime toggle: require strict real-service behavior (no synthetic fallbacks).
+_STRICT_REAL_ENV = False
 
 # ---------------------------------------------------------------------------
 # Multi-turn conversation definitions
@@ -1377,11 +1405,404 @@ CONVERSATION_K = {
     ],
 }
 
+# Conversation L: Face + memory edge flow (identify -> remember -> recall -> forget_recent)
+CONVERSATION_L = {
+    "id": "conv_face_social_memory",
+    "description": "Face signal + memory lifecycle edge cases with SILENT/WHEN_IDLE behaviors",
+    "expect_bootstrap_messages": ["tools_manifest"],
+    "turns": [
+        {
+            "id": "L01_face_context",
+            "text": "I'm meeting someone now. Do you recognize anyone nearby?",
+            "send_image": "street_scene",
+            "send_telemetry": {
+                "motion_state": "stationary",
+                "step_cadence": 0,
+                "ambient_noise_db": 58,
+                "heading": 45,
+                "gps": {"latitude": 40.7581, "longitude": -73.9854, "accuracy": 6.0},
+            },
+            "send_video_frames": 4,
+            "expect_agent_response": True,
+            "expect_any_message_types": ["identity_update", "face_debug", "capability_degraded"],
+            "collect_sec": 35.0,
+            "notes": "Face pipeline should emit identity/debug or explicit capability degradation",
+        },
+        {
+            "id": "L02_store_person",
+            "text": "Remember that Alex is my project manager and prefers morning meetings.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "remember_entity",
+            "expect_tool_behavior": {"remember_entity": "SILENT"},
+            "expect_silent_tools": ["remember_entity"],
+            "collect_sec": 28.0,
+            "notes": "Explicit memory write should stay SILENT from tool-call internals",
+        },
+        {
+            "id": "L03_recall_person",
+            "text": "What do you remember about Alex?",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "what_do_you_remember",
+            "expect_tool_behavior": {"what_do_you_remember": "WHEN_IDLE"},
+            "collect_sec": 30.0,
+            "notes": "Memory recall path coverage",
+        },
+        {
+            "id": "L04_forget_recent",
+            "text": "Forget what I told you in the last 15 minutes.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "forget_recent_memory",
+            "expect_tool_behavior": {"forget_recent_memory": "SILENT"},
+            "collect_sec": 28.0,
+            "notes": "Time-window memory deletion path",
+        },
+        {
+            "id": "L05_verify_forget_recent",
+            "text": "Now what do you remember about Alex?",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "what_do_you_remember",
+            "collect_sec": 28.0,
+            "notes": "Verify recall path after forget_recent",
+        },
+        {
+            "id": "L06_goodbye",
+            "text": "Thanks, that's all for this social check.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "collect_sec": 15.0,
+            "notes": "Conversation close",
+        },
+    ],
+}
+
+# Conversation M: Intersection crossing + accessibility + location edge flow
+CONVERSATION_M = {
+    "id": "conv_intersection_crossing",
+    "description": "Crosswalk safety and accessibility routing under realistic telemetry/depth context",
+    "turns": [
+        {
+            "id": "M01_intersection_scan",
+            "text": "I'm approaching an intersection. Is anything dangerous right ahead?",
+            "send_image": "hazard_scene",
+            "send_telemetry": {
+                "motion_state": "walking",
+                "step_cadence": 92,
+                "ambient_noise_db": 72,
+                "heading": 90,
+                "depth_center": 3.8,
+                "depth_min": 1.6,
+                "depth_min_region": "front_left",
+                "gps": {"latitude": 40.7580, "longitude": -73.9853, "accuracy": 5.0},
+            },
+            "send_video_frames": 4,
+            "expect_agent_response": True,
+            "expect_any_tool": ["get_accessibility_info", "analyze_scene", "nearby_search"],
+            "collect_sec": 32.0,
+            "notes": "Safety scan at an intersection with dense context",
+        },
+        {
+            "id": "M02_accessible_crossing",
+            "text": "Find the safest wheelchair-accessible crossing route here.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "get_accessibility_info",
+            "expect_tool_behavior": {"get_accessibility_info": "WHEN_IDLE"},
+            "collect_sec": 35.0,
+            "notes": "Accessibility-first crossing guidance",
+        },
+        {
+            "id": "M03_where_exactly",
+            "text": "Where exactly am I at this corner?",
+            "send_image": None,
+            "send_telemetry": {
+                "motion_state": "stationary",
+                "step_cadence": 0,
+                "ambient_noise_db": 60,
+                "heading": 100,
+                "gps": {"latitude": 40.7580, "longitude": -73.9853, "accuracy": 4.0},
+            },
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_any_tool": ["get_location_info", "reverse_geocode"],
+            "collect_sec": 30.0,
+            "notes": "Location grounding for crossing context",
+        },
+        {
+            "id": "M04_validate_address",
+            "text": "I need to cross toward one two three west forty second street.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "validate_address",
+            "collect_sec": 30.0,
+            "notes": "Address validation speech-normalization path",
+        },
+        {
+            "id": "M05_navigate_safe",
+            "text": "Navigate me to the nearest pharmacy entrance with curb ramps.",
+            "send_image": None,
+            "send_telemetry": {
+                "motion_state": "walking",
+                "step_cadence": 84,
+                "ambient_noise_db": 68,
+                "heading": 110,
+                "gps": {"latitude": 40.7581, "longitude": -73.9852, "accuracy": 5.0},
+            },
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "navigate_to",
+            "expect_tool_behavior": {"navigate_to": "INTERRUPT"},
+            "collect_sec": 45.0,
+            "notes": "INTERRUPT behavior verification for navigation tool",
+        },
+        {
+            "id": "M06_thanks",
+            "text": "Great, keep me safe and let's continue.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "collect_sec": 15.0,
+            "notes": "Conversation close",
+        },
+    ],
+}
+
+# Conversation N: Error resilience + protocol fuzzing (edge sniffing)
+CONVERSATION_N = {
+    "id": "conv_error_resilience_fuzz",
+    "description": "Inject malformed/edge upstream events and verify graceful degradation paths",
+    "turns": [
+        {
+            "id": "N01_camera_failure_probe",
+            "text": "My camera just failed briefly. Can you keep helping me?",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "send_upstream_before": [
+                {"type": "camera_failure", "error": "lens_blocked", "recoverable": True},
+            ],
+            "expect_agent_response": True,
+            "expect_message_types": ["capability_degraded"],
+            "expect_message_fields": [
+                {"type": "capability_degraded", "field": "capability", "equals": "camera"},
+            ],
+            "collect_sec": 28.0,
+            "notes": "camera_failure upstream should emit capability_degraded(camera)",
+        },
+        {
+            "id": "N02_unknown_gesture_probe",
+            "text": "I just made a weird gesture. Did you still hear me?",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "send_upstream_before": [
+                {"type": "gesture", "gesture": "unknown_wave_777"},
+            ],
+            "expect_agent_response": True,
+            "collect_sec": 25.0,
+            "notes": "Unknown gesture should be ignored without crashing session",
+        },
+        {
+            "id": "N03_malformed_telemetry_probe",
+            "text": "Sensors might be noisy. Are you still stable?",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "send_upstream_before": [
+                {
+                    "type": "telemetry",
+                    "data": {
+                        "motion_state": 123,
+                        "step_cadence": "fast",
+                        "ambient_noise_db": -999,
+                        "gps": {"latitude": "oops", "longitude": None, "accuracy": "bad"},
+                    },
+                },
+            ],
+            "expect_agent_response": True,
+            "collect_sec": 25.0,
+            "notes": "Malformed telemetry payload should degrade gracefully",
+        },
+        {
+            "id": "N04_profile_update_ack",
+            "text": "I just updated my preferences. Confirm that you got it.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "send_upstream_before": [
+                {"type": "profile_updated"},
+            ],
+            "expect_agent_response": True,
+            "expect_any_message_types": ["profile_updated_ack", "error"],
+            "collect_sec": 28.0,
+            "notes": "profile_updated path should ack or explicit error",
+        },
+        {
+            "id": "N05_reload_face_library",
+            "text": "Please refresh your face library now.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "send_upstream_before": [
+                {"type": "reload_face_library"},
+            ],
+            "expect_agent_response": True,
+            "expect_any_message_types": ["face_library_reloaded", "error"],
+            "collect_sec": 28.0,
+            "notes": "Face library reload command path",
+        },
+        {
+            "id": "N06_clear_face_library",
+            "text": "Now clear the face library please.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "send_upstream_before": [
+                {"type": "clear_face_library"},
+            ],
+            "expect_agent_response": True,
+            "expect_any_message_types": ["face_library_cleared", "error"],
+            "collect_sec": 28.0,
+            "notes": "Face library clear command path",
+        },
+        {
+            "id": "N07_activity_protocol_violation",
+            "text": "I accidentally tapped stop early. Continue normally.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "send_upstream_before": [
+                {"type": "activity_end"},
+            ],
+            "expect_agent_response": True,
+            "expect_message_types": ["debug_activity"],
+            "collect_sec": 26.0,
+            "notes": "activity_end before turn audio should not break turn state machine",
+        },
+        {
+            "id": "N08_binary_magic_fuzz",
+            "text": "Final check: are you still responsive after that protocol noise?",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "send_binary_before": [
+                {"magic": 255, "size": 4, "fill": 170},
+            ],
+            "expect_agent_response": True,
+            "collect_sec": 25.0,
+            "notes": "Unknown binary magic byte should be ignored safely",
+        },
+    ],
+}
+
+# Conversation O: Proactive safety + behavior-mode verification
+CONVERSATION_O = {
+    "id": "conv_proactive_safety_interrupt",
+    "description": "Proactive hazard guidance + explicit INTERRUPT/WHEN_IDLE/SILENT behavior checks",
+    "expect_bootstrap_messages": ["tools_manifest"],
+    "expect_message_types": ["debug_lod"],
+    "turns": [
+        {
+            "id": "O01_proactive_hazard",
+            "text": "I'm walking forward now.",
+            "send_image": "hazard_scene",
+            "send_telemetry": {
+                "motion_state": "walking",
+                "step_cadence": 95,
+                "ambient_noise_db": 70,
+                "heading": 90,
+                "gps": {"latitude": 40.7580, "longitude": -73.9855, "accuracy": 5.0},
+            },
+            "send_video_frames": 5,
+            "expect_agent_response": True,
+            "collect_sec": 32.0,
+            "notes": "Safety guidance should trigger even without an explicit hazard question",
+        },
+        {
+            "id": "O02_interrupt_nav",
+            "text": "Stop and navigate me to the nearest pharmacy right now.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "navigate_to",
+            "expect_tool_behavior": {"navigate_to": "INTERRUPT"},
+            "collect_sec": 42.0,
+            "notes": "INTERRUPT behavior mode check",
+        },
+        {
+            "id": "O03_idle_recall",
+            "text": "When you're done speaking, what do you remember about where I am?",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "what_do_you_remember",
+            "expect_tool_behavior": {"what_do_you_remember": "WHEN_IDLE"},
+            "collect_sec": 30.0,
+            "notes": "WHEN_IDLE behavior mode check",
+        },
+        {
+            "id": "O04_silent_memory_store",
+            "text": "Remember that this crosswalk has a slippery patch today.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "expect_tool": "remember_entity",
+            "expect_tool_behavior": {"remember_entity": "SILENT"},
+            "expect_silent_tools": ["remember_entity"],
+            "collect_sec": 28.0,
+            "notes": "SILENT behavior mode check",
+        },
+        {
+            "id": "O05_lod_debug_probe",
+            "text": "Give me less detail for now.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": "lod_down",
+            "expect_agent_response": False,
+            "expect_message_types": ["debug_lod"],
+            "collect_sec": 20.0,
+            "notes": "LOD debug message validation",
+        },
+        {
+            "id": "O06_goodbye",
+            "text": "Thanks. End of proactive safety check.",
+            "send_image": None,
+            "send_telemetry": None,
+            "send_gesture": None,
+            "expect_agent_response": True,
+            "collect_sec": 15.0,
+            "notes": "Conversation close",
+        },
+    ],
+}
+
 # Session 1 conversations (single WebSocket, stores memories)
 SESSION_1_CONVERSATIONS = [
     CONVERSATION_A, CONVERSATION_B, CONVERSATION_C, CONVERSATION_D,
     CONVERSATION_E, CONVERSATION_G, CONVERSATION_H, CONVERSATION_I,
-    CONVERSATION_J, CONVERSATION_K,
+    CONVERSATION_J, CONVERSATION_K, CONVERSATION_L, CONVERSATION_M,
+    CONVERSATION_N, CONVERSATION_O,
 ]
 
 # Session 2 conversations (NEW WebSocket, recalls Session 1 memories)
@@ -1408,6 +1829,7 @@ class TurnResult:
     lod_updates: list[dict[str, Any]] = field(default_factory=list)
     frame_acks: list[dict[str, Any]] = field(default_factory=list)
     message_counts: dict[str, int] = field(default_factory=dict)
+    raw_messages: list[dict[str, Any]] = field(default_factory=list)
     audio_bytes_received: int = 0
     first_user_transcript_latency: float | None = None
     first_agent_transcript_latency: float | None = None
@@ -1425,6 +1847,7 @@ class ConversationResult:
     failed_turns: int = 0
     turns: list[TurnResult] = field(default_factory=list)
     issues: list[dict[str, Any]] = field(default_factory=list)
+    bootstrap_message_counts: dict[str, int] = field(default_factory=dict)
     total_duration_sec: float = 0.0
 
 
@@ -1568,6 +1991,10 @@ def synthesize_pcm(client: genai.Client, text: str, voice: str = "Aoede") -> byt
     except Exception as exc:
         exc_text = str(exc)
         if "429" in exc_text or "RESOURCE_EXHAUSTED" in exc_text:
+            if _STRICT_REAL_ENV:
+                raise RuntimeError(
+                    "Gemini TTS quota exhausted in strict real-env mode (fallback disabled)."
+                ) from exc
             log.warning("Gemini TTS quota exhausted; using local fallback for this turn.")
             return _synthesize_pcm_local_fallback(text)
         raise
@@ -1624,7 +2051,7 @@ def _generate_synthetic_image(
     *,
     client: genai.Client | None = None,
 ) -> Path:
-    """Generate a test image: try Imagen first, fall back to ffmpeg.
+    """Generate a test image: try Imagen first, optionally fall back to ffmpeg.
 
     Images are cached — if the file already exists it is returned immediately.
     """
@@ -1650,9 +2077,20 @@ def _generate_synthetic_image(
                     _compress_image(out_path)
                     log.info("[imagen] saved %s (%d bytes)", out_path.name, out_path.stat().st_size)
                     return out_path
+            if _STRICT_REAL_ENV:
+                raise RuntimeError(f"Imagen empty response for {scene_id} in strict real-env mode")
             log.warning("[imagen] empty response for %s, falling back to ffmpeg", scene_id)
         except Exception as exc:
+            if _STRICT_REAL_ENV:
+                raise RuntimeError(
+                    f"Imagen failed for {scene_id} in strict real-env mode: {exc}"
+                ) from exc
             log.warning("[imagen] failed for %s (%s), falling back to ffmpeg", scene_id, exc)
+
+    if _STRICT_REAL_ENV:
+        raise RuntimeError(
+            f"No Imagen client/prompt for {scene_id} in strict real-env mode; ffmpeg fallback disabled"
+        )
 
     # --- Fallback: ffmpeg synthetic image ---
     colors = {
@@ -1693,6 +2131,44 @@ def _generate_synthetic_image(
 # WebSocket multi-turn runner
 # ---------------------------------------------------------------------------
 
+def _tool_aliases(name: str) -> set[str]:
+    name_norm = str(name or "").strip()
+    aliases = set(_TOOL_ALIASES.get(name_norm, set()))
+    aliases.add(name_norm)
+    return aliases
+
+
+def _tool_called(tool_events: list[dict[str, Any]], expected_tool: str) -> bool:
+    if not expected_tool:
+        return False
+    aliases = _tool_aliases(expected_tool)
+    for event in tool_events:
+        tool_name = str(event.get("tool", "")).strip()
+        if tool_name in aliases:
+            return True
+    return False
+
+
+def _build_binary_frame(spec: dict[str, Any]) -> bytes:
+    magic = int(spec.get("magic", 0)) & 0xFF
+    if spec.get("payload_hex"):
+        payload = bytes.fromhex(str(spec["payload_hex"]))
+    else:
+        size = max(0, int(spec.get("size", 1)))
+        fill = int(spec.get("fill", 0)) & 0xFF
+        payload = bytes([fill]) * size
+    return bytes([magic]) + payload
+
+
+def _extract_field(payload: dict[str, Any], field_path: str) -> Any:
+    cur: Any = payload
+    for part in str(field_path or "").split("."):
+        if isinstance(cur, dict) and part in cur:
+            cur = cur[part]
+        else:
+            return None
+    return cur
+
 async def run_conversation(
     *,
     ws_base_url: str,
@@ -1707,6 +2183,7 @@ async def run_conversation(
     session_ready_timeout_sec: float = 35.0,
     turn_retry_on_reconnect: int = 1,
     inter_turn_delay_sec: float = 1.5,
+    strict_expectations: bool = False,
 ) -> ConversationResult:
     """Run a full multi-turn conversation against the server."""
     conv_id = conversation["id"]
@@ -1719,11 +2196,12 @@ async def run_conversation(
     turn_results: list[TurnResult] = []
     t0_total = time.monotonic()
 
-    async def _open_ws(*, drain_initial_greeting: bool) -> websockets.ClientConnection:
+    async def _open_ws(*, drain_initial_greeting: bool) -> tuple[websockets.ClientConnection, dict[str, int]]:
         last_exc: Exception | None = None
         attempts = max(1, int(connect_retries))
         for attempt in range(1, attempts + 1):
             ws: websockets.ClientConnection | None = None
+            bootstrap_counts: dict[str, int] = {}
             try:
                 ws = await websockets.connect(
                     ws_url,
@@ -1741,15 +2219,20 @@ async def run_conversation(
                         raise TimeoutError("session_ready timeout")
                     raw = await asyncio.wait_for(ws.recv(), timeout=remain)
                     if isinstance(raw, bytes):
+                        bootstrap_counts["audio_bytes"] = bootstrap_counts.get("audio_bytes", 0) + 1
                         continue
                     msg = json.loads(raw)
+                    msg_type = str(msg.get("type", "unknown"))
+                    bootstrap_counts[msg_type] = bootstrap_counts.get(msg_type, 0) + 1
                     if msg.get("type") == "session_ready":
                         log.info("[%s] session_ready received (attempt %d/%d)", conv_id, attempt, attempts)
                         break
 
                 if drain_initial_greeting:
-                    await _drain_initial_greeting(ws, timeout_sec=15.0)
-                return ws
+                    drained = await _drain_initial_greeting(ws, timeout_sec=15.0)
+                    for k, v in drained.items():
+                        bootstrap_counts[k] = bootstrap_counts.get(k, 0) + v
+                return ws, bootstrap_counts
             except Exception as exc:
                 last_exc = exc
                 if ws is not None:
@@ -1773,8 +2256,28 @@ async def run_conversation(
         raise RuntimeError(f"failed to connect conversation websocket: {last_exc}")
 
     ws: websockets.ClientConnection | None = None
+    bootstrap_message_counts: dict[str, int] = {}
+    conv_message_counts: dict[str, int] = {}
+
+    def _mark_conversation_expectation(issue: str) -> None:
+        if turn_results:
+            if strict_expectations:
+                turn_results[0].failures.append(issue)
+                turn_results[0].passed = False
+            else:
+                turn_results[0].warnings.append(issue)
+        else:
+            turn_results.append(TurnResult(
+                turn_id="CONVERSATION_EXPECTATION",
+                text=issue,
+                passed=not strict_expectations,
+                failures=[issue] if strict_expectations else [],
+                warnings=[] if strict_expectations else [issue],
+            ))
+
     try:
-        ws = await _open_ws(drain_initial_greeting=True)
+        ws, bootstrap_message_counts = await _open_ws(drain_initial_greeting=True)
+        conv_message_counts.update(bootstrap_message_counts)
 
         # Run each turn with optional reconnect+retry
         for i, turn_def in enumerate(turns_def):
@@ -1793,6 +2296,7 @@ async def run_conversation(
                         pcm_cache=pcm_cache,
                         image_dir=image_dir,
                         collect_sec=collect_sec,
+                        strict_expectations=strict_expectations,
                     )
                 except (websockets.exceptions.ConnectionClosed, ConnectionError, OSError) as exc:
                     if retry_budget > 0:
@@ -1808,7 +2312,9 @@ async def run_conversation(
                                 await ws.close()
                             except Exception:
                                 pass
-                        ws = await _open_ws(drain_initial_greeting=False)
+                        ws, reconnect_counts = await _open_ws(drain_initial_greeting=False)
+                        for k, v in reconnect_counts.items():
+                            conv_message_counts[k] = conv_message_counts.get(k, 0) + v
                         continue
                     tr = TurnResult(
                         turn_id=turn_id,
@@ -1829,7 +2335,9 @@ async def run_conversation(
                             await ws.close()
                         except Exception:
                             pass
-                    ws = await _open_ws(drain_initial_greeting=False)
+                    ws, reconnect_counts = await _open_ws(drain_initial_greeting=False)
+                    for k, v in reconnect_counts.items():
+                        conv_message_counts[k] = conv_message_counts.get(k, 0) + v
                     continue
                 break
 
@@ -1840,6 +2348,8 @@ async def run_conversation(
                     failures=["turn_result_missing"],
                 )
             turn_results.append(tr)
+            for k, v in tr.message_counts.items():
+                conv_message_counts[k] = conv_message_counts.get(k, 0) + v
 
             status = "PASS" if tr.passed else "FAIL"
             agent_text = " ".join(tr.agent_transcripts)[:120]
@@ -1862,6 +2372,15 @@ async def run_conversation(
             # Brief pause between turns to let model settle
             if inter_turn_delay_sec > 0:
                 await asyncio.sleep(inter_turn_delay_sec)
+
+        # Conversation-level expectations (bootstrap + aggregate message types)
+        for msg_type in conversation.get("expect_bootstrap_messages", []):
+            if bootstrap_message_counts.get(msg_type, 0) == 0:
+                _mark_conversation_expectation(f"missing_bootstrap_message_type:{msg_type}")
+
+        for msg_type in conversation.get("expect_message_types", []):
+            if conv_message_counts.get(msg_type, 0) == 0:
+                _mark_conversation_expectation(f"missing_conversation_message_type:{msg_type}")
 
     except Exception as exc:
         log.error("Conversation %s failed: %s", conv_id, exc)
@@ -1889,6 +2408,7 @@ async def run_conversation(
         passed_turns=passed,
         failed_turns=failed,
         turns=turn_results,
+        bootstrap_message_counts=bootstrap_message_counts,
         total_duration_sec=total_duration,
     )
 
@@ -1900,8 +2420,9 @@ async def run_conversation(
 async def _drain_initial_greeting(
     ws: websockets.ClientConnection,
     timeout_sec: float = 15.0,
-) -> None:
+) -> dict[str, int]:
     """Drain any initial greeting audio/transcripts from the model."""
+    counts: dict[str, int] = {}
     deadline = time.monotonic() + timeout_sec
     last_event = time.monotonic()
     while True:
@@ -1914,8 +2435,17 @@ async def _drain_initial_greeting(
         try:
             raw = await asyncio.wait_for(ws.recv(), timeout=1.0)
             last_event = time.monotonic()
+            if isinstance(raw, bytes):
+                counts["audio_bytes"] = counts.get("audio_bytes", 0) + 1
+                continue
+            payload = json.loads(raw)
+            msg_type = str(payload.get("type", "unknown"))
+            counts[msg_type] = counts.get(msg_type, 0) + 1
         except asyncio.TimeoutError:
             continue
+        except json.JSONDecodeError:
+            continue
+    return counts
 
 
 async def _run_single_turn(
@@ -1925,6 +2455,7 @@ async def _run_single_turn(
     pcm_cache: dict[str, bytes],
     image_dir: Path,
     collect_sec: float,
+    strict_expectations: bool,
 ) -> TurnResult:
     """Execute a single conversation turn and collect the response."""
     turn_id = turn_def["id"]
@@ -1948,6 +2479,7 @@ async def _run_single_turn(
     user_transcripts: list[str] = []
     agent_transcripts: list[str] = []
     frame_acks: list[dict[str, Any]] = []
+    raw_messages: list[dict[str, Any]] = []
     audio_bytes_count = 0
 
     t0 = time.monotonic()
@@ -1964,6 +2496,12 @@ async def _run_single_turn(
     if turn_def.get("send_gesture"):
         await ws.send(json.dumps({"type": "gesture", "gesture": turn_def["send_gesture"]}))
 
+    # 2.5 Extra upstream JSON/binary events (edge/fuzz scenarios)
+    for payload in turn_def.get("send_upstream_before", []):
+        await ws.send(json.dumps(payload))
+    for spec in turn_def.get("send_binary_before", []):
+        await ws.send(_build_binary_frame(spec))
+
     # 3. Image (before audio so vision pipeline starts)
     img_bytes_for_frames: bytes | None = None
     if turn_def.get("send_image"):
@@ -1977,7 +2515,9 @@ async def _run_single_turn(
 
     # 4. Audio + optional video frame streaming
     send_video_frames = turn_def.get("send_video_frames", 0)
-    await ws.send(json.dumps({"type": "activity_start"}))
+    send_activity_markers = bool(turn_def.get("send_activity_markers", True))
+    if send_activity_markers:
+        await ws.send(json.dumps({"type": "activity_start"}))
 
     audio_start = time.monotonic()
     audio_duration = len(pcm) / 2.0 / 16000.0
@@ -1999,7 +2539,13 @@ async def _run_single_turn(
                 await ws.send(bytes([MAGIC_IMAGE]) + img_bytes_for_frames)
                 frames_sent += 1
 
-    await ws.send(json.dumps({"type": "activity_end"}))
+    if send_activity_markers:
+        await ws.send(json.dumps({"type": "activity_end"}))
+
+    for payload in turn_def.get("send_upstream_after", []):
+        await ws.send(json.dumps(payload))
+    for spec in turn_def.get("send_binary_after", []):
+        await ws.send(_build_binary_frame(spec))
 
     # --- Collect responses ---
     _collect_warnings: list[str] = []
@@ -2025,7 +2571,14 @@ async def _run_single_turn(
             last_agent_ts = now
             continue
 
-        payload = json.loads(raw)
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            _collect_warnings.append("non_json_downstream_payload")
+            continue
+
+        if len(raw_messages) < 200:
+            raw_messages.append(payload)
         msg_type = str(payload.get("type", "unknown"))
         counts[msg_type] = counts.get(msg_type, 0) + 1
 
@@ -2099,19 +2652,90 @@ async def _run_single_turn(
     if not user_transcripts:
         warnings.append("no_user_transcript_echoed")
 
+    turn_strict = bool(turn_def.get("strict_expectations", strict_expectations))
+
+    def _expectation_miss(issue: str) -> None:
+        if turn_strict:
+            failures.append(issue)
+        else:
+            warnings.append(issue)
+
     # Check expected tool
     expected_tool = turn_def.get("expect_tool")
     if expected_tool:
-        tool_names = {e.get("tool") for e in tool_events}
-        if expected_tool not in tool_names:
-            failures.append(f"expected_tool_{expected_tool}_not_called")
+        if not _tool_called(tool_events, expected_tool):
+            _expectation_miss(f"expected_tool_{expected_tool}_not_called")
 
     # Check flexible tool expectation (any of the listed tools)
     expect_any = turn_def.get("expect_any_tool")
     if expect_any:
-        tool_names = {e.get("tool") for e in tool_events}
-        if not tool_names & set(expect_any):
-            failures.append(f"expected_one_of_{expect_any}_none_called")
+        if not any(_tool_called(tool_events, str(tool)) for tool in expect_any):
+            _expectation_miss(f"expected_one_of_{expect_any}_none_called")
+
+    # Downstream message type expectations
+    for msg_type in turn_def.get("expect_message_types", []):
+        if counts.get(str(msg_type), 0) == 0:
+            _expectation_miss(f"expected_message_type_missing:{msg_type}")
+
+    expect_any_msg = turn_def.get("expect_any_message_types")
+    if expect_any_msg:
+        if not any(counts.get(str(msg), 0) > 0 for msg in expect_any_msg):
+            _expectation_miss(f"expected_any_message_type_missing:{expect_any_msg}")
+
+    for msg_type in turn_def.get("expect_no_message_types", []):
+        if counts.get(str(msg_type), 0) > 0:
+            _expectation_miss(f"unexpected_message_type_present:{msg_type}")
+
+    # Structured payload expectation checks
+    for expected in turn_def.get("expect_message_fields", []):
+        msg_type = str(expected.get("type", ""))
+        field_path = str(expected.get("field", ""))
+        want_equals = expected.get("equals")
+        want_contains = expected.get("contains")
+        matched = False
+        for payload in raw_messages:
+            if str(payload.get("type", "")) != msg_type:
+                continue
+            value = _extract_field(payload, field_path)
+            if "equals" in expected and value == want_equals:
+                matched = True
+                break
+            if "contains" in expected and want_contains is not None and str(want_contains) in str(value):
+                matched = True
+                break
+            if "equals" not in expected and "contains" not in expected and value is not None:
+                matched = True
+                break
+        if not matched:
+            _expectation_miss(f"expected_message_field_missing:{msg_type}.{field_path}")
+
+    # Tool behavior mode checks
+    expect_tool_behavior = turn_def.get("expect_tool_behavior") or {}
+    for tool_name, expected_behavior in expect_tool_behavior.items():
+        aliases = _tool_aliases(str(tool_name))
+        matching_events = [
+            event for event in tool_events
+            if str(event.get("tool", "")).strip() in aliases
+        ]
+        if not matching_events:
+            _expectation_miss(
+                f"expected_tool_behavior_missing_event:{tool_name}:{expected_behavior}"
+            )
+            continue
+        if not any(
+            str(event.get("behavior", "")).strip().upper()
+            == str(expected_behavior).strip().upper()
+            for event in matching_events
+        ):
+            _expectation_miss(
+                f"expected_tool_behavior_mismatch:{tool_name}:{expected_behavior}"
+            )
+
+    # SILENT behavior should not leak as tool-call text in spoken transcript
+    for tool_name in turn_def.get("expect_silent_tools", []):
+        pattern = re.compile(rf"\b{re.escape(str(tool_name))}\b|\b{re.escape(str(tool_name))}\s*\(", re.IGNORECASE)
+        if any(pattern.search(t or "") for t in agent_transcripts):
+            _expectation_miss(f"silent_tool_mentioned_in_speech:{tool_name}")
 
     # Check for unwanted OCR on vision queries
     if "describe" in text.lower() or "what's around" in text.lower() or "what is this" in text.lower():
@@ -2125,6 +2749,13 @@ async def _run_single_turn(
     for marker in _LEAKED_MARKERS:
         if any(marker.lower() in t.lower() for t in agent_transcripts):
             failures.append(f"context_tag_leaked: {marker}")
+
+    for pattern in _LEAKED_REGEX_FAILURES:
+        if any(pattern.search(t or "") for t in agent_transcripts):
+            failures.append(f"context_regex_leaked: {pattern.pattern}")
+    for pattern in _LEAKED_REGEX_WARNINGS:
+        if any(pattern.search(t or "") for t in agent_transcripts):
+            warnings.append(f"context_regex_suspect: {pattern.pattern}")
 
     # E2E-002 / E2E-003: Duplicate tool call detection
     tool_call_counts: dict[str, int] = {}
@@ -2146,7 +2777,7 @@ async def _run_single_turn(
     # E2E-005: Tool result delivery — if tool expected and result returned, agent must speak
     if expected_tool and tool_results:
         if not agent_transcripts:
-            failures.append("tool_result_not_spoken")
+            _expectation_miss("tool_result_not_spoken")
 
     # E2E-007: Navigation over-blocking detection
     expect_not_blocked = turn_def.get("expect_not_blocked")
@@ -2156,7 +2787,7 @@ async def _run_single_turn(
             if e.get("status") == "blocked" and e.get("tool") in expect_not_blocked
         ]
         if blocked_tools:
-            failures.append(f"over_blocked: {[e['tool'] for e in blocked_tools]}")
+            _expectation_miss(f"over_blocked: {[e['tool'] for e in blocked_tools]}")
 
     return TurnResult(
         turn_id=turn_id,
@@ -2171,6 +2802,7 @@ async def _run_single_turn(
         lod_updates=lod_updates,
         frame_acks=frame_acks,
         message_counts=counts,
+        raw_messages=raw_messages,
         audio_bytes_received=audio_bytes_count,
         first_user_transcript_latency=first_user_lat,
         first_agent_transcript_latency=first_agent_lat,
@@ -2224,6 +2856,11 @@ def _build_issues(turns: list[TurnResult]) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 async def async_main(args: argparse.Namespace) -> int:
+    global _STRICT_REAL_ENV
+    _STRICT_REAL_ENV = bool(args.strict_real_env)
+    if _STRICT_REAL_ENV:
+        log.info("Strict real-env mode enabled: synthetic asset/TTS fallbacks are disabled.")
+
     def _filter_conversations(
         conversations: list[dict[str, Any]],
         patterns_csv: str,
@@ -2334,6 +2971,7 @@ async def async_main(args: argparse.Namespace) -> int:
             session_ready_timeout_sec=args.session_ready_timeout_sec,
             turn_retry_on_reconnect=args.turn_retry_on_reconnect,
             inter_turn_delay_sec=args.inter_turn_delay_sec,
+            strict_expectations=args.strict_expectations,
         )
         results.append(result)
         log.info(
@@ -2366,6 +3004,7 @@ async def async_main(args: argparse.Namespace) -> int:
                 session_ready_timeout_sec=args.session_ready_timeout_sec,
                 turn_retry_on_reconnect=args.turn_retry_on_reconnect,
                 inter_turn_delay_sec=args.inter_turn_delay_sec,
+                strict_expectations=args.strict_expectations,
             )
             results.append(result)
             log.info(
@@ -2399,7 +3038,15 @@ async def async_main(args: argparse.Namespace) -> int:
         "google_search",
         "navigate_to",
         "remember_entity",
+        "what_do_you_remember",
+        "forget_recent_memory",
+        "forget_entity",
         "nearby_search",
+        "maps_query",
+        "get_location_info",
+        "validate_address",
+        "identify_person",
+        "preload_memory",
         "get_accessibility_info",
         "reverse_geocode",
         "convert_to_plus_code",
@@ -2426,12 +3073,13 @@ async def async_main(args: argparse.Namespace) -> int:
             "passed": r.passed_turns,
             "failed": r.failed_turns,
             "duration_sec": round(r.total_duration_sec, 1),
+            "bootstrap_message_counts": r.bootstrap_message_counts,
             "turns": [asdict(t) for t in r.turns],
             "issues": r.issues,
         }
         report["conversations"].append(conv_data)
 
-    enforce_chain_coverage = not bool(args.conversations)
+    enforce_chain_coverage = bool(args.enforce_tool_coverage)
     missing_chain_tools = sorted(required_chain_tools - observed_tools)
     if enforce_chain_coverage and missing_chain_tools:
         all_issues.append({
@@ -2512,6 +3160,9 @@ def main() -> int:
     p.add_argument("--turn-retry-on-reconnect", type=int, default=1, help="How many times to retry a turn after reconnect/go_away.")
     p.add_argument("--inter-turn-delay-sec", type=float, default=1.5, help="Delay between turns.")
     p.add_argument("--conversation-cooldown-sec", type=float, default=8.0, help="Delay between conversations to avoid local capacity overlap.")
+    p.add_argument("--strict-real-env", action="store_true", help="Disable local synthetic fallbacks (require real Imagen/TTS services).")
+    p.add_argument("--strict-expectations", action="store_true", help="Treat expectation misses as failures instead of warnings.")
+    p.add_argument("--enforce-tool-coverage", action="store_true", help="Fail suite when required tool chain coverage is incomplete.")
     args = p.parse_args()
     try:
         return asyncio.run(async_main(args))

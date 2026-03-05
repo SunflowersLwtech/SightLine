@@ -44,19 +44,34 @@ class TelemetryAggregator: ObservableObject {
         return (window.0 + window.1) / 2.0
     }
 
+    /// Timer tick interval — LOD-aware to reduce CPU wake-ups.
+    /// LOD 1/2: 1s tick (responsive). LOD 3: half the send interval.
+    private var tickInterval: TimeInterval {
+        if currentLOD == 3 { return 3.0 }
+        return 1.0
+    }
+
+    /// Force-refresh interval: even if nothing changed, send at least once per period.
+    private let forceRefreshInterval: TimeInterval = 60.0
+
     /// Start the telemetry aggregation loop.
     func start(sensorManager: SensorManager, webSocket: WebSocketManager) {
         self.sensorManager = sensorManager
         self.webSocketManager = webSocket
         isPaused = false
 
-        // Schedule repeating timer on main run loop
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.tick()
-        }
+        rescheduleTimer()
 
         Self.logger.info("TelemetryAggregator started (LOD \(self.currentLOD), interval \(self.sendInterval)s)")
+    }
+
+    /// Reschedule the timer with the current LOD-appropriate tick interval.
+    private func rescheduleTimer() {
+        let interval = tickInterval
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            self?.tick()
+        }
     }
 
     /// Stop the telemetry aggregation loop.
@@ -84,6 +99,10 @@ class TelemetryAggregator: ObservableObject {
         currentLOD = lod
         if oldLOD != lod {
             Self.logger.info("LOD updated: \(oldLOD) → \(lod)")
+            // Reschedule timer if tick interval changed (LOD 3 uses slower tick)
+            if timer != nil {
+                rescheduleTimer()
+            }
         }
     }
 
@@ -110,9 +129,50 @@ class TelemetryAggregator: ObservableObject {
         }
 
         // Scheduled send based on LOD interval
-        if Date().timeIntervalSince(lastSendTime) >= sendInterval {
-            sendTelemetry(newData, via: ws, trigger: nil)
+        let elapsed = Date().timeIntervalSince(lastSendTime)
+        guard elapsed >= sendInterval else { return }
+
+        // Delta detection: skip if data hasn't meaningfully changed
+        // (still send at least once per forceRefreshInterval as heartbeat)
+        if let last = lastSentTelemetry, elapsed < forceRefreshInterval {
+            if !hasSignificantChange(old: last, new: newData) {
+                return
+            }
         }
+
+        sendTelemetry(newData, via: ws, trigger: nil)
+    }
+
+    /// Check if telemetry data has changed enough to warrant sending.
+    private func hasSignificantChange(old: TelemetryData, new: TelemetryData) -> Bool {
+        // Motion state
+        if old.motionState != new.motionState { return true }
+        // Heart rate (any change > 5 BPM)
+        if let newHR = new.heartRate, let oldHR = old.heartRate {
+            if abs(newHR - oldHR) > 5.0 { return true }
+        } else if (new.heartRate == nil) != (old.heartRate == nil) {
+            return true
+        }
+        // Noise level (> 3 dB change)
+        if abs(old.ambientNoiseDb - new.ambientNoiseDb) > 3.0 { return true }
+        // Step cadence
+        if old.stepCadence != new.stepCadence { return true }
+        // GPS (moved > ~10m at equator: ~0.0001 degree)
+        if let newGPS = new.gps, let oldGPS = old.gps {
+            let dLat = abs(newGPS.lat - oldGPS.lat)
+            let dLng = abs(newGPS.lng - oldGPS.lng)
+            if dLat > 0.0001 || dLng > 0.0001 { return true }
+        } else if (new.gps == nil) != (old.gps == nil) {
+            return true
+        }
+        // Heading (> 15 degrees)
+        if let newH = new.heading, let oldH = old.heading {
+            if abs(newH - oldH) > 15.0 { return true }
+        }
+        // Device type changed
+        if old.deviceType != new.deviceType { return true }
+
+        return false
     }
 
     private func sendTelemetry(_ data: TelemetryData, via ws: WebSocketManager, trigger: ImmediateTrigger?) {
@@ -147,12 +207,16 @@ class TelemetryAggregator: ObservableObject {
         }
 
         // Noise threshold crossed (40dB or 80dB boundaries)
-        let oldNoise = old.ambientNoiseDb
-        let newNoise = new.ambientNoiseDb
-        let crossedLow = (oldNoise >= 40 && newNoise < 40) || (oldNoise < 40 && newNoise >= 40)
-        let crossedHigh = (oldNoise >= 80 && newNoise < 80) || (oldNoise < 80 && newNoise >= 80)
-        if crossedLow || crossedHigh {
-            return .noiseThresholdCrossed
+        // Skip if NoiseMeter hasn't received real data yet (default 50.0 → first reading)
+        let noiseReady = sensorManager?.noiseMeter.hasReceivedData ?? true
+        if noiseReady {
+            let oldNoise = old.ambientNoiseDb
+            let newNoise = new.ambientNoiseDb
+            let crossedLow = (oldNoise >= 40 && newNoise < 40) || (oldNoise < 40 && newNoise >= 40)
+            let crossedHigh = (oldNoise >= 80 && newNoise < 80) || (oldNoise < 80 && newNoise >= 80)
+            if crossedLow || crossedHigh {
+                return .noiseThresholdCrossed
+            }
         }
 
         // User gesture

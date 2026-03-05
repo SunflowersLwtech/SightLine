@@ -135,6 +135,7 @@ class SensorManager: ObservableObject {
             noiseMeter.$ambientNoiseDb,
             healthKitManager.$heartRate
         )
+        .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
         .receive(on: DispatchQueue.main)
         .sink { [weak self] _, _, _, _ in
             self?.currentTelemetry = self?.snapshot() ?? TelemetryData()
@@ -143,13 +144,14 @@ class SensorManager: ObservableObject {
 
         // Group 2: Real-time watch heart rate (primary channel)
         watchReceiver.$heartRate
+            .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.currentTelemetry = self?.snapshot() ?? TelemetryData()
             }
             .store(in: &cancellables)
 
-        // Group 3: Weather updates (every ~10 min)
+        // Group 3: Weather updates (every ~10 min, no need for debounce)
         weatherManager.$currentWeather
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in

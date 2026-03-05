@@ -39,6 +39,7 @@ struct MainView: View {
     @State private var isMuted = false
     @State private var isCameraActive = false
     @State private var isPaused = false
+    @State private var userAudioEnergy: CGFloat = 0
     @State private var lastAgentTranscript = ""
     @State private var toastMessage: String?
     @State private var isVoiceOverActive = UIAccessibility.isVoiceOverRunning
@@ -173,9 +174,13 @@ struct MainView: View {
 
             Spacer()
 
-            // Breathing indicator
-            breathingIndicator
-                .padding(.bottom, 20)
+            // Aurora visualizer (Gemini Live-style audio energy feedback)
+            AuroraVisualizer(
+                userEnergy: userAudioEnergy,
+                modelSpeaking: audioPlayback.isPlaying
+            )
+            .frame(height: 220)
+            .padding(.bottom, -40)
 
             // Bottom info cluster
             bottomInfoCluster
@@ -270,32 +275,6 @@ struct MainView: View {
             }
         }
         .padding(.bottom, 16)
-    }
-
-    // MARK: - Breathing Indicator
-
-    private var breathingIndicator: some View {
-        ZStack {
-            Circle()
-                .fill(isActive ? Color.green.opacity(0.6) : Color.gray.opacity(0.3))
-                .frame(
-                    width: isCameraActive ? 48 : 80,
-                    height: isCameraActive ? 48 : 80
-                )
-                .scaleEffect(isActive ? 1.1 : 0.9)
-                .animation(
-                    .easeInOut(duration: 2).repeatForever(autoreverses: true),
-                    value: isActive
-                )
-
-            if isCameraActive {
-                Image(systemName: "camera.fill")
-                    .font(.system(size: isCameraActive ? 14 : 18))
-                    .foregroundColor(.white.opacity(0.85))
-            }
-        }
-        .accessibilityHidden(true)
-        .animation(.easeInOut(duration: 0.3), value: isCameraActive)
     }
 
     // MARK: - Toast Overlay
@@ -845,6 +824,11 @@ struct MainView: View {
         }
         audioCapture.onAudioLevelUpdate = { rms in
             sensorManager.processAudioRMS(rms)
+            // Normalize RMS (typical range 0~0.3) to 0~1 for aurora visualizer
+            let normalized = CGFloat(min(rms / 0.25, 1.0))
+            DispatchQueue.main.async {
+                userAudioEnergy = normalized
+            }
         }
 
         // Wire pipeline error callbacks to developer console

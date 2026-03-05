@@ -2960,6 +2960,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
         # Semantic text injection (LOD-aware throttle)
         now = time.monotonic()
+        _signature_changed = False
         if telemetry_agg.should_send(now):
             signature = _build_telemetry_signature(ephemeral_ctx)
             should_inject, reasons = _should_inject_telemetry_context(
@@ -2967,6 +2968,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 current_signature=signature,
                 last_injected_ts=_last_telemetry_context_sent_at,
                 now_ts=now,
+            )
+            _signature_changed = bool(
+                _last_telemetry_signature is None
+                or _changed_signature_fields(_last_telemetry_signature, signature)
             )
             if should_inject:
                 semantic_text = parse_telemetry(telemetry_data)
@@ -3001,7 +3006,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             except Exception:
                 logger.debug("Location context evaluation failed", exc_info=True)
 
-        await _process_lod_decision(ephemeral_ctx)
+        # Only run LOD decision when signature changed or periodic refresh
+        # (avoids expensive rule engine + LLM evaluator on every tick)
+        if _signature_changed or (now - _last_telemetry_context_sent_at) >= TELEMETRY_FORCE_REFRESH_SEC:
+            await _process_lod_decision(ephemeral_ctx)
 
     async def _process_lod_decision(ephemeral_ctx) -> None:
         """Run the LOD decision engine and handle transitions."""
@@ -3485,13 +3493,17 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
                 # --- Output transcription (agent speech-to-text) — buffered ---
                 if event.output_transcription and event.output_transcription.text:
+                    # Skip pure silence markers from Gemini Live API
+                    _ot_text = event.output_transcription.text
+                    if _ot_text.replace("[Silence]", "").strip() == "":
+                        continue
                     now_mono = time.monotonic()
                     transcript_history.append({
                         "role": "agent",
-                        "text": event.output_transcription.text,
+                        "text": _ot_text,
                     })
                     # Detect if model is speaking about vision/scene
-                    _out_lower = event.output_transcription.text.lower()
+                    _out_lower = _ot_text.lower()
                     if any(kw in _out_lower for kw in (
                         "i see", "i can see", "looking at", "in front of",
                         "ahead of", "around you", "your surroundings",
@@ -3499,10 +3511,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     )):
                         _turn_had_vision_content = True
                     # Buffer fragments instead of forwarding immediately
-                    _transcript_buffer += event.output_transcription.text
+                    _transcript_buffer += _ot_text
                     if _transcript_buffer_started_at == 0.0:
                         _transcript_buffer_started_at = now_mono
-                    logger.debug("Buffered transcript fragment: %s", event.output_transcription.text[:80])
+                    logger.debug("Buffered transcript fragment: %s", _ot_text[:80])
                     # Flush on sentence boundary
                     if _has_sentence_boundary(_transcript_buffer):
                         if not await _flush_transcript_buffer():

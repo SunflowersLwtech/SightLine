@@ -268,7 +268,10 @@ class SessionManager:
             logger.info("Starting fresh session %s (no cached handle)", session_id)
 
         vad_preset = get_lod_vad_preset(lod)
-        aad_disabled = _env_flag("LIVE_AAD_DISABLED", default=True)
+        # iOS client no longer sends manual activity_start/activity_end markers.
+        # Keep server-side automatic activity detection enabled by default so
+        # spoken input can be segmented into turns without explicit markers.
+        aad_disabled = _env_flag("LIVE_AAD_DISABLED", default=False)
 
         # Only pass language_code if it's supported by the native audio model.
         # Unsupported languages (e.g. zh-CN) are handled via system instructions
@@ -305,9 +308,8 @@ class SessionManager:
             ),
             realtime_input_config=types.RealtimeInputConfig(
                 automatic_activity_detection=types.AutomaticActivityDetection(
-                    # We use explicit activity_start/activity_end from client.
-                    # Keeping server-side AAD disabled avoids turn-stall behavior
-                    # observed with native-audio model under TURN_INCLUDES_ONLY_ACTIVITY.
+                    # Default: enabled (disabled=False). If needed for legacy
+                    # clients/tests, set LIVE_AAD_DISABLED=true in env.
                     disabled=aad_disabled,
                     start_of_speech_sensitivity=vad_preset["start_sensitivity"],
                     end_of_speech_sensitivity=vad_preset["end_sensitivity"],
@@ -321,7 +323,9 @@ class SessionManager:
                 # iOS stops playback locally and the server suppresses forwarding
                 # until turn_complete.
                 activity_handling=types.ActivityHandling.NO_INTERRUPTION,
-                turn_coverage=types.TurnCoverage.TURN_INCLUDES_ONLY_ACTIVITY,
+                # iOS relies on automatic activity detection; include all incoming
+                # audio in turn coverage so manual activity markers are optional.
+                turn_coverage=types.TurnCoverage.TURN_INCLUDES_ALL_INPUT,
             ),
         )
 

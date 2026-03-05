@@ -8,9 +8,31 @@
 import Foundation
 
 enum SightLineConfig {
-    // Server URL — Debug builds connect to local Mac, Release to Cloud Run
+    private static let debugServerBaseURLDefaultsKey = "sightline.debug_server_base_url"
+
+    // Server URL — Debug builds support runtime override for real-device local testing.
     #if DEBUG
-    static let serverBaseURL = "ws://Lius-MacBook-Air.local:8100"
+    static let serverBaseURL: String = {
+        // Highest priority: launch-time environment variable from `devicectl`.
+        if let runtime = ProcessInfo.processInfo.environment["SIGHTLINE_WS_BASE_URL"],
+           !runtime.isEmpty {
+            // Persist once so manual relaunches keep using the same LAN endpoint.
+            UserDefaults.standard.set(runtime, forKey: debugServerBaseURLDefaultsKey)
+            return runtime
+        }
+        // Next priority: previously persisted LAN endpoint.
+        if let persisted = UserDefaults.standard.string(forKey: debugServerBaseURLDefaultsKey),
+           !persisted.isEmpty {
+            return persisted
+        }
+        // Allows CLI deploy scripts to inject current LAN IP at build time:
+        // `INFOPLIST_KEY_SIGHTLINE_WS_BASE_URL=ws://<ip>:8100`.
+        if let injected = Bundle.main.object(forInfoDictionaryKey: "SIGHTLINE_WS_BASE_URL") as? String,
+           !injected.isEmpty {
+            return injected
+        }
+        return "ws://Lius-MacBook-Air.local:8100"
+    }()
     #else
     static let serverBaseURL = "wss://sightline-backend-kp47ssyf4q-uc.a.run.app"
     #endif

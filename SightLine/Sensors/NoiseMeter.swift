@@ -13,6 +13,8 @@ import os
 
 class NoiseMeter: ObservableObject {
     @Published var ambientNoiseDb: Double = 50.0
+    /// True once at least one real RMS sample has been processed.
+    private(set) var hasReceivedData: Bool = false
 
     private static let logger = Logger(subsystem: "com.sightline.app", category: "NoiseMeter")
 
@@ -24,6 +26,7 @@ class NoiseMeter: ObservableObject {
     /// Called by AudioCaptureManager's onAudioLevelUpdate callback.
     /// Uses 25th-percentile over a 20-sample window to filter speech spikes.
     func processRMS(_ rms: Float) {
+        hasReceivedData = true
         rmsHistory.append(rms)
         if rmsHistory.count > historySize {
             rmsHistory.removeFirst()
@@ -42,6 +45,7 @@ class NoiseMeter: ObservableObject {
     /// Reset noise meter state.
     func reset() {
         rmsHistory.removeAll()
+        hasReceivedData = false
         DispatchQueue.main.async {
             self.ambientNoiseDb = 50.0
         }
