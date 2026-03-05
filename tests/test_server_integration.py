@@ -140,14 +140,14 @@ class TestSessionManager:
         assert "[VAD UPDATE]" in message
         assert "silence_duration_ms" in message
 
-    def test_run_config_disables_aad_by_default(self):
-        """Live AAD should default to disabled when client sends activity markers."""
+    def test_run_config_enables_aad_by_default(self):
+        """Live AAD defaults to enabled unless LIVE_AAD_DISABLED is set."""
         from live_api.session_manager import SessionManager
         mgr = SessionManager()
         config = mgr.get_run_config("test_aad_default", lod=2)
         aad = config.realtime_input_config.automatic_activity_detection
         assert aad is not None
-        assert aad.disabled is True
+        assert aad.disabled is False
 
     def test_run_config_aad_override_via_env(self):
         """LIVE_AAD_DISABLED=false should re-enable server-side AAD explicitly."""

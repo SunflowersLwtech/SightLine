@@ -1,0 +1,1593 @@
+{
+  "suite_id": "multiturn_e2e_20260305_172221",
+  "created_at": "2026-03-05T09:22:21.950251+00:00",
+  "server_url": "ws://127.0.0.1:8100",
+  "conversations": [
+    {
+      "id": "conv_error_resilience_fuzz",
+      "description": "Inject malformed/edge upstream events and verify graceful degradation paths",
+      "total_turns": 8,
+      "passed": 8,
+      "failed": 0,
+      "duration_sec": 142.0,
+      "bootstrap_message_counts": {
+        "session_ready": 1,
+        "tools_manifest": 1
+      },
+      "turns": [
+        {
+          "turn_id": "N01_camera_failure_probe",
+          "text": "My camera just failed briefly. Can you keep helping me?",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [
+            "Hello TestUser, I'm here and ready to help with whatever you need."
+          ],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "capability_degraded": 1,
+            "debug_activity": 2,
+            "transcript": 1
+          },
+          "raw_messages": [
+            {
+              "type": "capability_degraded",
+              "capability": "camera",
+              "reason": "lens_blocked",
+              "recoverable": true
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:18:13.799494+00:00",
+                "event_count": 1
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:18:17.748440+00:00",
+                "event_count": 2
+              }
+            },
+            {
+              "type": "transcript",
+              "text": "Hello TestUser, I'm here and ready to help with whatever you need.",
+              "role": "agent"
+            }
+          ],
+          "audio_bytes_received": 14,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": 10.647007290972397,
+          "collect_duration_sec": 16.72248545801267,
+          "notes": "camera_failure upstream should emit capability_degraded(camera)",
+          "request_reconnect": false
+        },
+        {
+          "turn_id": "N02_unknown_gesture_probe",
+          "text": "I just made a weird gesture. Did you still hear me?",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:18:30.723715+00:00",
+                "event_count": 3
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:18:34.665439+00:00",
+                "event_count": 4
+              }
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 16.96783612499712,
+          "notes": "Unknown gesture should be ignored without crashing session",
+          "request_reconnect": false
+        },
+        {
+          "turn_id": "N03_malformed_telemetry_probe",
+          "text": "Sensors might be noisy. Are you still stable?",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [
+            {
+              "lod": 3,
+              "reason": "Rule1:stationary→LOD3 → LOD 3"
+            }
+          ],
+          "frame_acks": [],
+          "message_counts": {
+            "lod_update": 1,
+            "debug_lod": 1,
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "lod_update",
+              "lod": 3,
+              "reason": "Rule1:stationary→LOD3 → LOD 3"
+            },
+            {
+              "type": "debug_lod",
+              "data": {
+                "lod": 3,
+                "prev": 2,
+                "reason": "Rule1:stationary→LOD3 → LOD 3",
+                "rules": [
+                  "Rule1:stationary→LOD3"
+                ],
+                "hr": null,
+                "motion": "stationary",
+                "cadence": 0.0,
+                "noise_db": -999.0,
+                "watch_heading": null,
+                "stability": null,
+                "memory_top3": [
+                  "The user receives spatial directions using the clock-position method.",
+                  "The user's name is TestUser.",
+                  "The user was located on a sidewalk in an urban area just north of Times Square."
+                ],
+                "memory_top3_detailed": [
+                  {
+                    "content": "The user receives spatial directions using the clock-position method.",
+                    "category": "preference",
+                    "importance": 0.9,
+                    "score": 0.54
+                  },
+                  {
+                    "content": "The user's name is TestUser.",
+                    "category": "person",
+                    "importance": 0.8,
+                    "score": 0.525
+                  },
+                  {
+                    "content": "The user was located on a sidewalk in an urban area just north of Times Square.",
+                    "category": "location",
+                    "importance": 0.7,
+                    "score": 0.509
+                  }
+                ],
+                "vad_update": {
+                  "lod": 3,
+                  "start_of_speech_sensitivity": "START_SENSITIVITY_LOW",
+                  "end_of_speech_sensitivity": "END_SENSITIVITY_LOW",
+                  "prefix_padding_ms": 300,
+                  "silence_duration_ms": 1500,
+                  "runtime_hot_reconfig_supported": false,
+                  "runtime_note": "LiveRequestQueue does not expose realtime_input_config updates mid-session."
+                }
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:18:51.929725+00:00",
+                "event_count": 5
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:18:51.936019+00:00",
+                "event_count": 6
+              }
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 16.065344957984053,
+          "notes": "Malformed telemetry payload should degrade gracefully",
+          "request_reconnect": false
+        },
+        {
+          "turn_id": "N04_profile_update_ack",
+          "text": "I just updated my preferences. Confirm that you got it.",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "profile_updated_ack": 1,
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "profile_updated_ack"
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:19:05.611755+00:00",
+                "event_count": 7
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:19:07.958108+00:00",
+                "event_count": 8
+              }
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 17.81867950002197,
+          "notes": "profile_updated path should ack or explicit error",
+          "request_reconnect": false
+        },
+        {
+          "turn_id": "N05_reload_face_library",
+          "text": "Please refresh your face library now.",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "face_library_reloaded": 1,
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "face_library_reloaded",
+              "count": 0
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:19:23.566811+00:00",
+                "event_count": 9
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:19:25.162232+00:00",
+                "event_count": 10
+              }
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 17.002874583005905,
+          "notes": "Face library reload command path",
+          "request_reconnect": false
+        },
+        {
+          "turn_id": "N06_clear_face_library",
+          "text": "Now clear the face library please.",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "face_library_cleared": 1,
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "face_library_cleared",
+              "deleted_count": 0
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:19:39.657030+00:00",
+                "event_count": 11
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:19:41.736066+00:00",
+                "event_count": 12
+              }
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 16.372086499992292,
+          "notes": "Face library clear command path",
+          "request_reconnect": false
+        },
+        {
+          "turn_id": "N07_activity_protocol_violation",
+          "text": "I accidentally tapped stop early. Continue normally.",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 3
+          },
+          "raw_messages": [
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:19:55.962001+00:00",
+                "event_count": 13
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:19:55.962406+00:00",
+                "event_count": 14
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:20:00.133018+00:00",
+                "event_count": 15
+              }
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 17.19331416703062,
+          "notes": "activity_end before turn audio should not break turn state machine",
+          "request_reconnect": false
+        },
+        {
+          "turn_id": "N08_binary_magic_fuzz",
+          "text": "Final check: are you still responsive after that protocol noise?",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:20:13.357022+00:00",
+                "event_count": 16
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:20:17.521808+00:00",
+                "event_count": 17
+              }
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 17.187047042010818,
+          "notes": "Unknown binary magic byte should be ignored safely",
+          "request_reconnect": false
+        }
+      ],
+      "issues": [
+        {
+          "id": "MT-001",
+          "turn": "N01_camera_failure_probe",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": [
+              "Hello TestUser, I'm here and ready to help with whatever you need."
+            ]
+          }
+        },
+        {
+          "id": "MT-002",
+          "turn": "N02_unknown_gesture_probe",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-003",
+          "turn": "N03_malformed_telemetry_probe",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-004",
+          "turn": "N04_profile_update_ack",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-005",
+          "turn": "N05_reload_face_library",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-006",
+          "turn": "N06_clear_face_library",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-007",
+          "turn": "N07_activity_protocol_violation",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-008",
+          "turn": "N08_binary_magic_fuzz",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "conv_proactive_safety_interrupt",
+      "description": "Proactive hazard guidance + explicit INTERRUPT/WHEN_IDLE/SILENT behavior checks",
+      "total_turns": 6,
+      "passed": 6,
+      "failed": 0,
+      "duration_sec": 111.2,
+      "bootstrap_message_counts": {
+        "session_ready": 1,
+        "tools_manifest": 1
+      },
+      "turns": [
+        {
+          "turn_id": "O01_proactive_hazard",
+          "text": "I'm walking forward now.",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [
+            "Hello TestUser, I'm here and ready when you are."
+          ],
+          "tool_events": [
+            {
+              "tool": "analyze_scene",
+              "status": "queued",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "identify_person",
+              "status": "queued",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "identify_person",
+              "status": "unavailable",
+              "behavior": "SILENT"
+            }
+          ],
+          "tool_results": [],
+          "lod_updates": [
+            {
+              "lod": 3,
+              "reason": "Rule1:walking→LOD2 + Rule4:detailed_pref→+1 → LOD 3"
+            }
+          ],
+          "frame_acks": [
+            {
+              "queued_agents": [
+                "vision",
+                "face"
+              ]
+            },
+            {
+              "queued_agents": []
+            },
+            {
+              "queued_agents": []
+            },
+            {
+              "queued_agents": []
+            },
+            {
+              "queued_agents": []
+            },
+            {
+              "queued_agents": []
+            }
+          ],
+          "message_counts": {
+            "lod_update": 1,
+            "debug_lod": 1,
+            "tool_event": 3,
+            "identity_update": 1,
+            "frame_ack": 6,
+            "debug_activity": 2,
+            "capability_degraded": 1,
+            "transcript": 1
+          },
+          "raw_messages": [
+            {
+              "type": "lod_update",
+              "lod": 3,
+              "reason": "Rule1:walking→LOD2 + Rule4:detailed_pref→+1 → LOD 3"
+            },
+            {
+              "type": "debug_lod",
+              "data": {
+                "lod": 3,
+                "prev": 2,
+                "reason": "Rule1:walking→LOD2 + Rule4:detailed_pref→+1 → LOD 3",
+                "rules": [
+                  "Rule1:walking→LOD2",
+                  "Rule4:detailed_pref→+1"
+                ],
+                "hr": null,
+                "motion": "walking",
+                "cadence": 95.0,
+                "noise_db": 70.0,
+                "watch_heading": null,
+                "stability": null,
+                "memory_top3": [
+                  "The user receives spatial directions using the clock-position method.",
+                  "The user's name is TestUser.",
+                  "The user was located on a sidewalk in an urban area just north of Times Square."
+                ],
+                "memory_top3_detailed": [
+                  {
+                    "content": "The user receives spatial directions using the clock-position method.",
+                    "category": "preference",
+                    "importance": 0.9,
+                    "score": 0.54
+                  },
+                  {
+                    "content": "The user's name is TestUser.",
+                    "category": "person",
+                    "importance": 0.8,
+                    "score": 0.525
+                  },
+                  {
+                    "content": "The user was located on a sidewalk in an urban area just north of Times Square.",
+                    "category": "location",
+                    "importance": 0.7,
+                    "score": 0.509
+                  }
+                ],
+                "vad_update": {
+                  "lod": 3,
+                  "start_of_speech_sensitivity": "START_SENSITIVITY_LOW",
+                  "end_of_speech_sensitivity": "END_SENSITIVITY_LOW",
+                  "prefix_padding_ms": 300,
+                  "silence_duration_ms": 1500,
+                  "runtime_hot_reconfig_supported": false,
+                  "runtime_note": "LiveRequestQueue does not expose realtime_input_config updates mid-session."
+                }
+              }
+            },
+            {
+              "type": "tool_event",
+              "tool": "analyze_scene",
+              "behavior": "WHEN_IDLE",
+              "status": "queued"
+            },
+            {
+              "type": "tool_event",
+              "tool": "identify_person",
+              "behavior": "SILENT",
+              "status": "queued"
+            },
+            {
+              "type": "identity_update",
+              "person_name": "unknown",
+              "matched": false,
+              "similarity": 0.0,
+              "source": "queued",
+              "behavior": "SILENT"
+            },
+            {
+              "type": "frame_ack",
+              "frame_id": 1,
+              "queued_agents": [
+                "vision",
+                "face"
+              ]
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:20:43.603057+00:00",
+                "event_count": 1
+              }
+            },
+            {
+              "type": "frame_ack",
+              "frame_id": 2,
+              "queued_agents": []
+            },
+            {
+              "type": "frame_ack",
+              "frame_id": 3,
+              "queued_agents": []
+            },
+            {
+              "type": "frame_ack",
+              "frame_id": 4,
+              "queued_agents": []
+            },
+            {
+              "type": "frame_ack",
+              "frame_id": 5,
+              "queued_agents": []
+            },
+            {
+              "type": "frame_ack",
+              "frame_id": 6,
+              "queued_agents": []
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:20:43.611107+00:00",
+                "event_count": 2
+              }
+            },
+            {
+              "type": "tool_event",
+              "tool": "identify_person",
+              "behavior": "SILENT",
+              "status": "unavailable",
+              "data": {
+                "reason": "insightface_unavailable"
+              }
+            },
+            {
+              "type": "capability_degraded",
+              "capability": "face",
+              "reason": "InsightFace runtime unavailable",
+              "recoverable": true
+            },
+            {
+              "type": "transcript",
+              "text": "Hello TestUser, I'm here and ready when you are.",
+              "role": "agent"
+            }
+          ],
+          "audio_bytes_received": 12,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": 12.663986500003375,
+          "collect_duration_sec": 18.60778408299666,
+          "notes": "Safety guidance should trigger even without an explicit hazard question",
+          "request_reconnect": false
+        },
+        {
+          "turn_id": "O02_interrupt_nav",
+          "text": "Stop and navigate me to the nearest pharmacy right now.",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed",
+            "expected_tool_navigate_to_not_called",
+            "expected_tool_behavior_missing_event:navigate_to:INTERRUPT"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:20:54.896700+00:00",
+                "event_count": 3
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:20:58.552003+00:00",
+                "event_count": 4
+              }
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 24.692852541978937,
+          "notes": "INTERRUPT behavior mode check",
+          "request_reconnect": false
+        },
+        {
+          "turn_id": "O03_idle_recall",
+          "text": "When you're done speaking, what do you remember about where I am?",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed",
+            "expected_tool_what_do_you_remember_not_called",
+            "expected_tool_behavior_missing_event:what_do_you_remember:WHEN_IDLE"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:21:19.793187+00:00",
+                "event_count": 5
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:21:24.133970+00:00",
+                "event_count": 6
+              }
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 19.37066320795566,
+          "notes": "WHEN_IDLE behavior mode check",
+          "request_reconnect": false
+        },
+        {
+          "turn_id": "O04_silent_memory_store",
+          "text": "Remember that this crosswalk has a slippery patch today.",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed",
+            "expected_tool_remember_entity_not_called",
+            "expected_tool_behavior_missing_event:remember_entity:SILENT"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:21:39.366226+00:00",
+                "event_count": 7
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:21:43.386150+00:00",
+                "event_count": 8
+              }
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 18.04666279203957,
+          "notes": "SILENT behavior mode check",
+          "request_reconnect": false
+        },
+        {
+          "turn_id": "O05_lod_debug_probe",
+          "text": "Give me less detail for now.",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [
+            {
+              "lod": 2,
+              "reason": "Rule1:walking→LOD2 + Rule4:detailed_pref→+1 + Gesture:lod_down→-1 → LOD 2"
+            }
+          ],
+          "frame_acks": [],
+          "message_counts": {
+            "lod_update": 1,
+            "debug_lod": 1,
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "lod_update",
+              "lod": 2,
+              "reason": "Rule1:walking→LOD2 + Rule4:detailed_pref→+1 + Gesture:lod_down→-1 → LOD 2"
+            },
+            {
+              "type": "debug_lod",
+              "data": {
+                "lod": 2,
+                "prev": 3,
+                "reason": "Rule1:walking→LOD2 + Rule4:detailed_pref→+1 + Gesture:lod_down→-1 → LOD 2",
+                "rules": [
+                  "Rule1:walking→LOD2",
+                  "Rule4:detailed_pref→+1",
+                  "Gesture:lod_down→-1"
+                ],
+                "hr": null,
+                "motion": "walking",
+                "cadence": 95.0,
+                "noise_db": 70.0,
+                "watch_heading": null,
+                "stability": null,
+                "memory_top3": [
+                  "The user receives spatial directions using the clock-position method.",
+                  "The user's name is TestUser.",
+                  "The user was located on a sidewalk in an urban area just north of Times Square."
+                ],
+                "memory_top3_detailed": [
+                  {
+                    "content": "The user receives spatial directions using the clock-position method.",
+                    "category": "preference",
+                    "importance": 0.9,
+                    "score": 0.54
+                  },
+                  {
+                    "content": "The user's name is TestUser.",
+                    "category": "person",
+                    "importance": 0.8,
+                    "score": 0.525
+                  },
+                  {
+                    "content": "The user was located on a sidewalk in an urban area just north of Times Square.",
+                    "category": "location",
+                    "importance": 0.7,
+                    "score": 0.509
+                  }
+                ],
+                "vad_update": {
+                  "lod": 2,
+                  "start_of_speech_sensitivity": "START_SENSITIVITY_LOW",
+                  "end_of_speech_sensitivity": "END_SENSITIVITY_LOW",
+                  "prefix_padding_ms": 300,
+                  "silence_duration_ms": 1500,
+                  "runtime_hot_reconfig_supported": false,
+                  "runtime_note": "LiveRequestQueue does not expose realtime_input_config updates mid-session."
+                }
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:22:01.182411+00:00",
+                "event_count": 9
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:22:01.187072+00:00",
+                "event_count": 10
+              }
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 12.586778083990794,
+          "notes": "LOD debug message validation",
+          "request_reconnect": false
+        },
+        {
+          "turn_id": "O06_goodbye",
+          "text": "Thanks. End of proactive safety check.",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "no_user_transcript_echoed"
+          ],
+          "user_transcripts": [],
+          "agent_transcripts": [],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:22:10.403142+00:00",
+                "event_count": 11
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-05T09:22:13.728505+00:00",
+                "event_count": 12
+              }
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": null,
+          "first_agent_transcript_latency": null,
+          "collect_duration_sec": 11.343230458034668,
+          "notes": "Conversation close",
+          "request_reconnect": false
+        }
+      ],
+      "issues": [
+        {
+          "id": "MT-001",
+          "turn": "O01_proactive_hazard",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [
+              {
+                "tool": "analyze_scene",
+                "status": "queued",
+                "behavior": "WHEN_IDLE"
+              },
+              {
+                "tool": "identify_person",
+                "status": "queued",
+                "behavior": "SILENT"
+              },
+              {
+                "tool": "identify_person",
+                "status": "unavailable",
+                "behavior": "SILENT"
+              }
+            ],
+            "agent_transcripts": [
+              "Hello TestUser, I'm here and ready when you are."
+            ]
+          }
+        },
+        {
+          "id": "MT-002",
+          "turn": "O02_interrupt_nav",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-003",
+          "turn": "O02_interrupt_nav",
+          "title": "expected_tool_navigate_to_not_called",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-004",
+          "turn": "O02_interrupt_nav",
+          "title": "expected_tool_behavior_missing_event:navigate_to:INTERRUPT",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-005",
+          "turn": "O03_idle_recall",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-006",
+          "turn": "O03_idle_recall",
+          "title": "expected_tool_what_do_you_remember_not_called",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-007",
+          "turn": "O03_idle_recall",
+          "title": "expected_tool_behavior_missing_event:what_do_you_remember:WHEN_IDLE",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-008",
+          "turn": "O04_silent_memory_store",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-009",
+          "turn": "O04_silent_memory_store",
+          "title": "expected_tool_remember_entity_not_called",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-010",
+          "turn": "O04_silent_memory_store",
+          "title": "expected_tool_behavior_missing_event:remember_entity:SILENT",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-011",
+          "turn": "O05_lod_debug_probe",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        },
+        {
+          "id": "MT-012",
+          "turn": "O06_goodbye",
+          "title": "no_user_transcript_echoed",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [],
+            "agent_transcripts": []
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_turns": 14,
+    "passed": 14,
+    "failed": 0,
+    "pass_rate": "100.0%",
+    "total_issues": 20,
+    "tool_chain_coverage": {
+      "required": [
+        "analyze_scene",
+        "convert_to_plus_code",
+        "extract_text_from_camera",
+        "forget_entity",
+        "forget_recent_memory",
+        "get_accessibility_info",
+        "get_location_info",
+        "get_walking_directions",
+        "google_search",
+        "identify_person",
+        "maps_query",
+        "navigate_to",
+        "nearby_search",
+        "preload_memory",
+        "preview_destination",
+        "remember_entity",
+        "resolve_plus_code",
+        "reverse_geocode",
+        "validate_address",
+        "what_do_you_remember"
+      ],
+      "observed": [
+        "analyze_scene",
+        "identify_person"
+      ],
+      "missing": [
+        "convert_to_plus_code",
+        "extract_text_from_camera",
+        "forget_entity",
+        "forget_recent_memory",
+        "get_accessibility_info",
+        "get_location_info",
+        "get_walking_directions",
+        "google_search",
+        "maps_query",
+        "navigate_to",
+        "nearby_search",
+        "preload_memory",
+        "preview_destination",
+        "remember_entity",
+        "resolve_plus_code",
+        "reverse_geocode",
+        "validate_address",
+        "what_do_you_remember"
+      ]
+    }
+  },
+  "all_issues": [
+    {
+      "id": "MT-001",
+      "turn": "N01_camera_failure_probe",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": [
+          "Hello TestUser, I'm here and ready to help with whatever you need."
+        ]
+      }
+    },
+    {
+      "id": "MT-002",
+      "turn": "N02_unknown_gesture_probe",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-003",
+      "turn": "N03_malformed_telemetry_probe",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-004",
+      "turn": "N04_profile_update_ack",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-005",
+      "turn": "N05_reload_face_library",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-006",
+      "turn": "N06_clear_face_library",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-007",
+      "turn": "N07_activity_protocol_violation",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-008",
+      "turn": "N08_binary_magic_fuzz",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-001",
+      "turn": "O01_proactive_hazard",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [
+          {
+            "tool": "analyze_scene",
+            "status": "queued",
+            "behavior": "WHEN_IDLE"
+          },
+          {
+            "tool": "identify_person",
+            "status": "queued",
+            "behavior": "SILENT"
+          },
+          {
+            "tool": "identify_person",
+            "status": "unavailable",
+            "behavior": "SILENT"
+          }
+        ],
+        "agent_transcripts": [
+          "Hello TestUser, I'm here and ready when you are."
+        ]
+      }
+    },
+    {
+      "id": "MT-002",
+      "turn": "O02_interrupt_nav",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-003",
+      "turn": "O02_interrupt_nav",
+      "title": "expected_tool_navigate_to_not_called",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-004",
+      "turn": "O02_interrupt_nav",
+      "title": "expected_tool_behavior_missing_event:navigate_to:INTERRUPT",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-005",
+      "turn": "O03_idle_recall",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-006",
+      "turn": "O03_idle_recall",
+      "title": "expected_tool_what_do_you_remember_not_called",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-007",
+      "turn": "O03_idle_recall",
+      "title": "expected_tool_behavior_missing_event:what_do_you_remember:WHEN_IDLE",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-008",
+      "turn": "O04_silent_memory_store",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-009",
+      "turn": "O04_silent_memory_store",
+      "title": "expected_tool_remember_entity_not_called",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-010",
+      "turn": "O04_silent_memory_store",
+      "title": "expected_tool_behavior_missing_event:remember_entity:SILENT",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-011",
+      "turn": "O05_lod_debug_probe",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    },
+    {
+      "id": "MT-012",
+      "turn": "O06_goodbye",
+      "title": "no_user_transcript_echoed",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [],
+        "agent_transcripts": []
+      }
+    }
+  ]
+}
