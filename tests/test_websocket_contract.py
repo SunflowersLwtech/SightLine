@@ -65,6 +65,7 @@ def _receive_until_type(ws, message_type: str, max_reads: int = 6) -> dict:
 @pytest.fixture
 def patched_server(monkeypatch):
     import server
+    from context.habit_detector import HabitDetector
 
     FakeLiveRequestQueue.instances.clear()
     monkeypatch.setattr(
@@ -75,6 +76,16 @@ def patched_server(monkeypatch):
     monkeypatch.setattr(server.session_manager, "remove_session", lambda _session_id: None)
     monkeypatch.setattr(server, "LiveRequestQueue", FakeLiveRequestQueue)
     monkeypatch.setattr(server, "runner", FakeRunner())
+    monkeypatch.setattr(server, "_NEEDS_SESSION_ID_MAPPING", False)
+    monkeypatch.setattr(server, "load_face_library", lambda _user_id: [])
+    monkeypatch.setattr(server, "load_relevant_memories", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(HabitDetector, "detect", lambda self: [])
+
+    async def _noop_async(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(server.SessionMetaTracker, "write_session_start", _noop_async)
+    monkeypatch.setattr(server.SessionMetaTracker, "write_session_end", _noop_async)
     return server
 
 

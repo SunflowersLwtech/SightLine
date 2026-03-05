@@ -39,10 +39,10 @@ final class SileroVAD {
     // MARK: - Configuration
 
     /// Probability threshold for speech detection.
-    private let threshold: Float = 0.5
+    private let threshold: Float = 0.35
 
     /// Number of consecutive speech frames required before onset (2 frames = 64ms).
-    private let onsetFrames: Int = 2
+    private let onsetFrames: Int = 1
 
     /// Number of consecutive non-speech frames required before offset (8 frames = 256ms).
     private let offsetFrames: Int = 8

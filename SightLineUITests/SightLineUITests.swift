@@ -15,6 +15,11 @@ final class SightLineUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
+    }
+
+    private func launchApp(arguments: [String] = []) {
+        app = XCUIApplication()
+        app.launchArguments = arguments
         app.launch()
     }
 
@@ -24,12 +29,37 @@ final class SightLineUITests: XCTestCase {
 
     /// Verify the app launches without crashing.
     func testAppLaunches() throws {
+        launchApp()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+    }
+
+    func testClosingProfileSetupKeepsOnboardingVisible() throws {
+        launchApp(arguments: ["-uitest-reset-onboarding"])
+
+        let getStarted = app.buttons["onboarding-get-started"]
+        XCTAssertTrue(getStarted.waitForExistence(timeout: 5))
+        getStarted.tap()
+
+        let close = app.buttons["onboarding-profile-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        close.tap()
+
+        XCTAssertTrue(getStarted.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["main-open-settings"].exists)
+    }
+
+    func testMainScreenExposesHelpAndSettingsButtons() throws {
+        launchApp(arguments: ["-uitest-complete-onboarding"])
+
+        XCTAssertTrue(app.buttons["main-open-guide"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["main-open-settings"].exists)
     }
 
     /// Verify the app performs a basic accessibility audit.
     @available(iOS 17.0, *)
     func testAccessibilityAudit() throws {
+        launchApp(arguments: ["-uitest-reset-onboarding"])
+        XCTAssertTrue(app.buttons["onboarding-get-started"].waitForExistence(timeout: 5))
         try app.performAccessibilityAudit()
     }
 }

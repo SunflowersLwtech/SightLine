@@ -20,7 +20,8 @@ class AudioSessionManager {
             mode: .voiceChat,
             options: [
                 .defaultToSpeaker,
-                .allowBluetoothHFP
+                .allowBluetoothHFP,
+                .duckOthers
             ]
         )
         try session.setPreferredSampleRate(SightLineConfig.audioInputSampleRate)

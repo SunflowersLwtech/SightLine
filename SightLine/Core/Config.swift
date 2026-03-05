@@ -9,6 +9,7 @@ import Foundation
 
 enum SightLineConfig {
     private static let debugServerBaseURLDefaultsKey = "sightline.debug_server_base_url"
+    static let preferredLanguageDefaultsKey = "sightline.preferred_language"
 
     // Server URL — Debug builds support runtime override for real-device local testing.
     #if DEBUG

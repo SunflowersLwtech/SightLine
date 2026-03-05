@@ -21,15 +21,15 @@ EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
 EMBEDDING_DIM = 2048
 
 
-def _compute_embedding(text: str) -> list[float]:
+def _compute_embedding(text: str) -> Optional[list[float]]:
     """Compute a 2048-D embedding for the given text using google-genai.
 
-    Returns a zero vector on failure so callers can proceed gracefully.
+    Returns None on failure so callers can fall back to non-vector flows.
     """
     normalized = (text or "").strip()
     if not normalized:
-        logger.debug("Embedding input text is empty; using zero vector")
-        return [0.0] * EMBEDDING_DIM
+        logger.debug("Embedding input text is empty; skipping embedding")
+        return None
 
     try:
         from google import genai
@@ -43,8 +43,8 @@ def _compute_embedding(text: str) -> list[float]:
         )
         return result.embeddings[0].values
     except Exception:
-        logger.warning("Embedding computation failed; using zero vector", exc_info=True)
-        return [0.0] * EMBEDDING_DIM
+        logger.warning("Embedding computation failed; using text fallback", exc_info=True)
+        return None
 
 
 class MemoryBankService:
@@ -146,7 +146,6 @@ class MemoryBankService:
                 "category": category,
                 "importance": importance,
                 "timestamp": now,
-                "embedding": Vector(embedding),
                 "memory_layer": memory_layer,
                 "entity_refs": entity_refs or [],
                 "location_ref": location_ref,
@@ -154,6 +153,8 @@ class MemoryBankService:
                 "access_count": 0,
                 "last_accessed": now,
             }
+            if embedding:
+                doc_data["embedding"] = Vector(embedding)
 
             doc_ref = self._memories_collection().document()
             doc_ref.set(doc_data)
@@ -219,6 +220,8 @@ class MemoryBankService:
         from google.cloud.firestore_v1.vector import Vector
 
         query_embedding = _compute_embedding(context)
+        if not query_embedding:
+            raise RuntimeError("embedding_unavailable")
         coll = self._memories_collection()
 
         vector_query = coll.find_nearest(
@@ -421,5 +424,4 @@ def load_relevant_memories(user_id: str, context: str, top_k: int = 3) -> list[s
     bank = _get_bank(user_id)
     results = bank.retrieve_memories(context, top_k=top_k)
     return [_sanitize_memory_content(m["content"]) for m in results]
-
 

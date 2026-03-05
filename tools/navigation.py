@@ -46,7 +46,12 @@ def _get_client() -> googlemaps.Client:
         api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
         if not api_key:
             raise RuntimeError("GOOGLE_MAPS_API_KEY environment variable not set")
-        _client = googlemaps.Client(key=api_key)
+        _client = googlemaps.Client(
+            key=api_key,
+            timeout=5,
+            connect_timeout=5,
+            read_timeout=5,
+        )
     return _client
 
 

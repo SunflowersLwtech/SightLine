@@ -14,6 +14,7 @@ LOD Levels:
 from __future__ import annotations
 
 import base64
+import asyncio
 import json
 import logging
 import os
@@ -32,6 +33,7 @@ logger = logging.getLogger("sightline.vision_agent")
 
 VISION_MODEL = os.getenv("GEMINI_VISION_MODEL", "gemini-3.1-pro-preview")
 _VISION_UNAVAILABLE_COOLDOWN_SEC = float(os.getenv("VISION_UNAVAILABLE_COOLDOWN_SEC", "30"))
+_VISION_REQUEST_TIMEOUT_SEC = float(os.getenv("VISION_REQUEST_TIMEOUT_SEC", "5"))
 
 _MEDIA_RESOLUTION_BY_LOD: dict[int, types.MediaResolution] = {
     1: types.MediaResolution.MEDIA_RESOLUTION_LOW,
@@ -235,6 +237,19 @@ def _get_client() -> genai.Client:
     return _client
 
 
+def _image_part(image_bytes: bytes) -> Any:
+    """Build a bytes part, tolerating lightweight test doubles."""
+    if hasattr(types.Part, "from_bytes"):
+        return types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+    return types.Part(text="[image bytes omitted in test stub]")
+
+
+def _text_part(text: str) -> Any:
+    if hasattr(types.Part, "from_text"):
+        return types.Part.from_text(text=text)
+    return types.Part(text=text)
+
+
 async def analyze_scene(
     image_base64: str,
     lod: int,
@@ -273,31 +288,31 @@ async def analyze_scene(
     global _vision_unavailable_until
     now = time.monotonic()
     if now < _vision_unavailable_until:
-        return dict(_EMPTY_RESULT)
+        return {**_EMPTY_RESULT, "status": "unavailable"}
 
     try:
         client = _get_client()
-        response = await client.aio.models.generate_content(
-            model=VISION_MODEL,
-            contents=[
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_bytes(
-                            data=image_bytes,
-                            mime_type="image/jpeg",
-                        ),
-                        types.Part.from_text(text=user_message),
-                    ],
+        response = await asyncio.wait_for(
+            client.aio.models.generate_content(
+                model=VISION_MODEL,
+                contents=[
+                    types.Content(
+                        role="user",
+                        parts=[
+                            _image_part(image_bytes),
+                            _text_part(user_message),
+                        ],
+                    ),
+                ],
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    media_resolution=media_resolution,
+                    response_mime_type="application/json",
+                    response_schema=_RESPONSE_SCHEMA,
+                    temperature=0.2,
                 ),
-            ],
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                media_resolution=media_resolution,
-                response_mime_type="application/json",
-                response_schema=_RESPONSE_SCHEMA,
-                temperature=0.2,
             ),
+            timeout=_VISION_REQUEST_TIMEOUT_SEC,
         )
 
         if not response.text:
@@ -311,12 +326,16 @@ async def analyze_scene(
             if key not in result:
                 result[key] = default_val
 
+        result.setdefault("status", "ok")
         return result
 
     except json.JSONDecodeError:
         raw = response.text if response else "<no response>"
         logger.error("Failed to parse vision model JSON response: %s", raw)
         return dict(_EMPTY_RESULT)
+    except TimeoutError:
+        logger.warning("Vision analysis timed out after %.1fs", _VISION_REQUEST_TIMEOUT_SEC)
+        return {**_EMPTY_RESULT, "status": "timeout"}
     except Exception as exc:
         status_code = getattr(exc, "status_code", None)
         err_text = str(exc)
@@ -333,6 +352,6 @@ async def analyze_scene(
                 "Vision backend unavailable (503). Cooling down for %.0fs.",
                 _VISION_UNAVAILABLE_COOLDOWN_SEC,
             )
-            return dict(_EMPTY_RESULT)
+            return {**_EMPTY_RESULT, "status": "unavailable"}
         logger.exception("Vision analysis failed")
         return dict(_EMPTY_RESULT)

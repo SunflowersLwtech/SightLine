@@ -35,7 +35,9 @@ final class UserProfileModel: ObservableObject {
 
     // Preferences
     @Published var verbosityPreference: String = "concise"
-    @Published var language: String = "en-US"
+    @Published var language: String = UserDefaults.standard.string(
+        forKey: SightLineConfig.preferredLanguageDefaultsKey
+    ) ?? "en-US"
     @Published var descriptionPriority: String = "spatial"
     @Published var colorDescription: Bool = false
     @Published var ttsSpeed: Double = 1.5
@@ -60,6 +62,10 @@ final class UserProfileModel: ObservableObject {
             .replacingOccurrences(of: "ws://", with: "http://")
     }
 
+    private func persistPreferredLanguage() {
+        UserDefaults.standard.set(language, forKey: SightLineConfig.preferredLanguageDefaultsKey)
+    }
+
     // MARK: - Load Existing Profile
 
     func loadProfile() async {
@@ -81,6 +87,7 @@ final class UserProfileModel: ObservableObject {
             if httpResponse.statusCode == 200 {
                 let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
                 populateFromJSON(json)
+                persistPreferredLanguage()
                 hasExistingProfile = true
                 logger.info("Loaded existing profile for user \(userId)")
             } else {
@@ -104,7 +111,9 @@ final class UserProfileModel: ObservableObject {
         hasGuideDog = json["has_guide_dog"] as? Bool ?? false
         hasWhiteCane = json["has_white_cane"] as? Bool ?? false
         verbosityPreference = json["verbosity_preference"] as? String ?? "concise"
-        language = json["language"] as? String ?? "en-US"
+        language = json["language"] as? String
+            ?? UserDefaults.standard.string(forKey: SightLineConfig.preferredLanguageDefaultsKey)
+            ?? "en-US"
         descriptionPriority = json["description_priority"] as? String ?? "spatial"
         colorDescription = json["color_description"] as? Bool ?? false
         ttsSpeed = json["tts_speed"] as? Double ?? 1.5
@@ -165,6 +174,7 @@ final class UserProfileModel: ObservableObject {
                 saveResult = "Profile saved successfully!"
                 saveSuccess = true
                 hasExistingProfile = true
+                persistPreferredLanguage()
                 logger.info("Profile saved for user \(userId)")
             } else {
                 let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -187,6 +197,11 @@ struct UserProfileOnboardingView: View {
     @StateObject private var model = UserProfileModel()
     @Environment(\.dismiss) private var dismiss
     @State private var showQuickPresets = false
+    let onCompleted: (() -> Void)?
+
+    init(onCompleted: (() -> Void)? = nil) {
+        self.onCompleted = onCompleted
+    }
 
     var body: some View {
         NavigationStack {
@@ -213,6 +228,7 @@ struct UserProfileOnboardingView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") { dismiss() }
+                        .accessibilityIdentifier("onboarding-profile-close")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Presets") { showQuickPresets = true }
@@ -540,6 +556,7 @@ struct UserProfileOnboardingView: View {
                         await model.saveProfile()
                         if model.saveSuccess {
                             try? await Task.sleep(nanoseconds: 1_500_000_000)
+                            onCompleted?()
                             dismiss()
                         }
                     }

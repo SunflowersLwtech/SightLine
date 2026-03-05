@@ -11,6 +11,7 @@ text type (e.g., "user is at a restaurant" prioritizes menu items).
 from __future__ import annotations
 
 import base64
+import asyncio
 import json
 import logging
 import os
@@ -26,6 +27,7 @@ logger = logging.getLogger("sightline.ocr_agent")
 # ---------------------------------------------------------------------------
 
 OCR_MODEL = os.getenv("GEMINI_FLASH_MODEL", "gemini-3-flash-preview")
+_REQUEST_TIMEOUT_SEC = float(os.getenv("OCR_REQUEST_TIMEOUT_SEC", "5"))
 
 _SYSTEM_PROMPT = """\
 You are a text extraction system for a blind user. Your job is to read ALL \
@@ -134,6 +136,19 @@ def _get_client() -> genai.Client:
     return _client
 
 
+def _image_part(image_bytes: bytes) -> Any:
+    """Build a bytes part, tolerating lightweight test doubles."""
+    if hasattr(types.Part, "from_bytes"):
+        return types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+    return types.Part(text="[image bytes omitted in test stub]")
+
+
+def _text_part(text: str) -> Any:
+    if hasattr(types.Part, "from_text"):
+        return types.Part.from_text(text=text)
+    return types.Part(text=text)
+
+
 async def extract_text(
     image_base64: str,
     context_hint: str = "",
@@ -176,27 +191,27 @@ async def extract_text(
     response = None
     try:
         client = _get_client()
-        response = await client.aio.models.generate_content(
-            model=OCR_MODEL,
-            contents=[
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_bytes(
-                            data=image_bytes,
-                            mime_type="image/jpeg",
-                        ),
-                        types.Part.from_text(text=user_message),
-                    ],
+        response = await asyncio.wait_for(
+            client.aio.models.generate_content(
+                model=OCR_MODEL,
+                contents=[
+                    types.Content(
+                        role="user",
+                        parts=[
+                            _image_part(image_bytes),
+                            _text_part(user_message),
+                        ],
+                    ),
+                ],
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    media_resolution=media_res,
+                    response_mime_type="application/json",
+                    response_schema=_RESPONSE_SCHEMA,
+                    temperature=0.1,
                 ),
-            ],
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                media_resolution=media_res,
-                response_mime_type="application/json",
-                response_schema=_RESPONSE_SCHEMA,
-                temperature=0.1,
             ),
+            timeout=_REQUEST_TIMEOUT_SEC,
         )
 
         if not response.text:
@@ -215,6 +230,9 @@ async def extract_text(
     except json.JSONDecodeError:
         raw = response.text if response else "<no response>"
         logger.error("Failed to parse OCR model JSON response: %s", raw)
+        return dict(_EMPTY_RESULT)
+    except TimeoutError:
+        logger.warning("OCR extraction timed out after %.1fs", _REQUEST_TIMEOUT_SEC)
         return dict(_EMPTY_RESULT)
     except Exception:
         logger.exception("OCR extraction failed")

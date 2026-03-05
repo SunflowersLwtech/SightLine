@@ -60,8 +60,8 @@ final class FaceRegistrationModel: ObservableObject {
     @Published var errorMessage: String = ""
 
     @Published var selectedImages: [UIImage] = []
+    @Published var detectionStatuses: [String] = []
     @Published var showCamera: Bool = false
-    @Published var detectionStatus: String = ""
 
     @Published var registeredFaces: [RegisteredFace] = []
     @Published var isLoadingFaces: Bool = false
@@ -106,33 +106,50 @@ final class FaceRegistrationModel: ObservableObject {
             return
         }
         selectedImages.append(image)
+        detectionStatuses.append("Photo \(selectedImages.count): Checking face quality...")
         registrationSuccess = false
         registrationResult = ""
         errorMessage = ""
-        detectFaces(in: image, photoIndex: selectedImages.count)
+        detectFaces(in: image, photoIndex: selectedImages.count - 1)
     }
 
     /// Client-side face detection using Vision framework for immediate feedback.
     private func detectFaces(in image: UIImage, photoIndex: Int) {
+        let photoNumber = photoIndex + 1
         guard let cgImage = image.cgImage else {
-            detectionStatus = "Photo \(photoIndex): Unable to process image"
+            updateDetectionStatus(
+                "Photo \(photoNumber): Unable to process image",
+                at: photoIndex
+            )
             return
         }
         let request = VNDetectFaceRectanglesRequest { [weak self] request, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 if let error = error {
-                    self.detectionStatus = "Photo \(photoIndex): Detection error — \(error.localizedDescription)"
+                    self.updateDetectionStatus(
+                        "Photo \(photoNumber): Detection error — \(error.localizedDescription)",
+                        at: photoIndex
+                    )
                     return
                 }
                 let faceCount = request.results?.count ?? 0
                 switch faceCount {
                 case 0:
-                    self.detectionStatus = "Photo \(photoIndex): No face detected — try a clearer photo"
+                    self.updateDetectionStatus(
+                        "Photo \(photoNumber): No face detected — try a clearer photo",
+                        at: photoIndex
+                    )
                 case 1:
-                    self.detectionStatus = "Photo \(photoIndex): 1 face detected"
+                    self.updateDetectionStatus(
+                        "Photo \(photoNumber): 1 face detected",
+                        at: photoIndex
+                    )
                 default:
-                    self.detectionStatus = "Photo \(photoIndex): \(faceCount) faces detected — use a photo with one face"
+                    self.updateDetectionStatus(
+                        "Photo \(photoNumber): \(faceCount) faces detected — use a photo with one face",
+                        at: photoIndex
+                    )
                 }
             }
         }
@@ -145,12 +162,45 @@ final class FaceRegistrationModel: ObservableObject {
     func removeSelectedImage(at index: Int) {
         guard selectedImages.indices.contains(index) else { return }
         selectedImages.remove(at: index)
+        if detectionStatuses.indices.contains(index) {
+            detectionStatuses.remove(at: index)
+        }
+        renumberDetectionStatuses()
     }
 
-    private func clearDraftAfterSuccess() {
-        selectedImages.removeAll()
-        personName = ""
-        consentConfirmed = false
+    private func updateDetectionStatus(_ status: String, at index: Int) {
+        guard detectionStatuses.indices.contains(index) else { return }
+        detectionStatuses[index] = status
+    }
+
+    private func renumberDetectionStatuses() {
+        detectionStatuses = detectionStatuses.enumerated().map { index, status in
+            let suffix: String
+            if let range = status.range(of: ":") {
+                suffix = String(status[range.lowerBound...])
+            } else {
+                suffix = ": \(status)"
+            }
+            return "Photo \(index + 1)\(suffix)"
+        }
+    }
+
+    private func clearDraftAfterSuccess(keepingFailedIndices failedIndices: Set<Int>) {
+        guard !failedIndices.isEmpty else {
+            selectedImages.removeAll()
+            detectionStatuses.removeAll()
+            personName = ""
+            consentConfirmed = false
+            return
+        }
+
+        selectedImages = selectedImages.enumerated()
+            .filter { failedIndices.contains($0.offset) }
+            .map(\.element)
+        detectionStatuses = detectionStatuses.enumerated()
+            .filter { failedIndices.contains($0.offset) }
+            .map(\.element)
+        renumberDetectionStatuses()
     }
 
     // MARK: - Register Face Samples
@@ -186,12 +236,14 @@ final class FaceRegistrationModel: ObservableObject {
 
         var successCount = 0
         var failures: [String] = []
+        var failedIndices = Set<Int>()
 
         for (index, image) in selectedImages.enumerated() {
             registrationProgress = "Uploading photo \(index + 1) of \(selectedImages.count)..."
 
             guard let base64Image = encodeImageForUpload(image) else {
                 failures.append("Photo \(index + 1): Failed to encode image")
+                failedIndices.insert(index)
                 continue
             }
 
@@ -216,6 +268,7 @@ final class FaceRegistrationModel: ObservableObject {
 
                 guard let httpResponse = response as? HTTPURLResponse else {
                     failures.append("Photo \(index + 1): Invalid server response")
+                    failedIndices.insert(index)
                     continue
                 }
 
@@ -225,9 +278,11 @@ final class FaceRegistrationModel: ObservableObject {
                 } else {
                     let serverError = json["error"] as? String ?? "Unknown error"
                     failures.append("Photo \(index + 1): \(serverError)")
+                    failedIndices.insert(index)
                 }
             } catch {
                 failures.append("Photo \(index + 1): \(error.localizedDescription)")
+                failedIndices.insert(index)
             }
         }
 
@@ -243,7 +298,7 @@ final class FaceRegistrationModel: ObservableObject {
                 errorMessage = "Some photos failed. \(failures.prefix(2).joined(separator: " | "))"
             }
 
-            clearDraftAfterSuccess()
+            clearDraftAfterSuccess(keepingFailedIndices: failedIndices)
             NotificationCenter.default.post(name: .faceLibraryChanged, object: nil)
             await loadFaces()
             return
@@ -601,12 +656,19 @@ struct FaceRegistrationView: View {
                 }
             }
 
-            if !model.detectionStatus.isEmpty {
-                Text(model.detectionStatus)
-                    .font(.caption)
-                    .foregroundStyle(model.detectionStatus.contains("No face") || model.detectionStatus.contains("faces detected")
-                        ? .orange : .green)
-                    .accessibilityLabel("Face detection: \(model.detectionStatus)")
+            if !model.detectionStatuses.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(model.detectionStatuses.enumerated()), id: \.offset) { index, status in
+                        Text(status)
+                            .font(.caption)
+                            .foregroundStyle(
+                                status.contains("No face") || status.contains("faces detected") || status.contains("Unable")
+                                    ? .orange
+                                    : .green
+                            )
+                            .accessibilityLabel("Face detection for photo \(index + 1): \(status)")
+                    }
+                }
             }
         }
         .padding()

@@ -11,15 +11,17 @@
 import CoreML
 import Vision
 import CoreImage
+import Foundation
 import os
 
-class DepthEstimator {
+final class DepthEstimator: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.sightline.app", category: "Depth")
 
+    private let stateLock = NSLock()
     private var vnModel: VNCoreMLModel?
     private var isLoaded = false
 
-    struct DepthSummary: Codable {
+    struct DepthSummary: Codable, Sendable {
         var centerDistance: Float       // Estimated distance at image center (meters)
         var minDistance: Float           // Closest object distance (meters)
         var minDistanceRegion: String   // Region of closest object (topLeft/topRight/bottomLeft/bottomRight/center)
@@ -35,7 +37,10 @@ class DepthEstimator {
 
     /// Load the CoreML depth model. Call once at startup.
     func loadModel() {
-        guard !isLoaded else { return }
+        stateLock.lock()
+        let alreadyLoaded = isLoaded
+        stateLock.unlock()
+        guard !alreadyLoaded else { return }
 
         do {
             let config = MLModelConfiguration()
@@ -49,8 +54,11 @@ class DepthEstimator {
             }
 
             let mlModel = try MLModel(contentsOf: modelURL, configuration: config)
-            vnModel = try VNCoreMLModel(for: mlModel)
+            let loadedModel = try VNCoreMLModel(for: mlModel)
+            stateLock.lock()
+            vnModel = loadedModel
             isLoaded = true
+            stateLock.unlock()
             Self.logger.info("Depth model loaded successfully")
         } catch {
             Self.logger.error("Failed to load depth model: \(error.localizedDescription)")
@@ -58,12 +66,19 @@ class DepthEstimator {
     }
 
     /// Whether the model is available for inference.
-    var isAvailable: Bool { isLoaded && vnModel != nil }
+    var isAvailable: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return isLoaded && vnModel != nil
+    }
 
     /// Estimate depth from a camera pixel buffer.
     /// Returns nil if model is not loaded or inference fails.
     func estimateDepth(from pixelBuffer: CVPixelBuffer) -> DepthSummary? {
-        guard let model = vnModel else { return nil }
+        stateLock.lock()
+        let model = vnModel
+        stateLock.unlock()
+        guard let model else { return nil }
 
         let request = VNCoreMLRequest(model: model)
         request.imageCropAndScaleOption = .scaleFill

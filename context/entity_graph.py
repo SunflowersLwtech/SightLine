@@ -188,6 +188,29 @@ class EntityGraphService:
             logger.error("Failed to get entity %s", entity_id, exc_info=True)
             return None
 
+    def get_entities(self, entity_ids: list[str]) -> list[Entity]:
+        """Fetch multiple entities in one Firestore round-trip when possible."""
+        if not self._ensure_firestore():
+            return []
+        if not entity_ids:
+            return []
+
+        try:
+            refs = [self._entities_coll().document(entity_id) for entity_id in entity_ids]
+            if hasattr(self._firestore, "get_all"):
+                docs = self._firestore.get_all(refs)
+            else:
+                docs = (ref.get() for ref in refs)
+
+            entities = []
+            for doc in docs:
+                if doc.exists:
+                    entities.append(Entity.from_dict(doc.id, doc.to_dict()))
+            return entities
+        except Exception:
+            logger.error("Failed to get entities for user %s", self.user_id, exc_info=True)
+            return []
+
     def find_entity_by_name(self, name: str, entity_type: str | None = None) -> Optional[Entity]:
         """Find an entity by exact name or alias match."""
         if not self._ensure_firestore():
@@ -343,12 +366,17 @@ class EntityGraphService:
             else:
                 connected_ids.add(rel.source_eid)
 
-        entities = []
-        for eid in connected_ids:
-            e = self.get_entity(eid)
-            if e:
-                entities.append(e)
-        return entities
+        ordered_ids = sorted(connected_ids)
+        entities = self.get_entities(ordered_ids)
+        if entities or not ordered_ids:
+            return entities
+
+        fallback_entities = []
+        for entity_id in ordered_ids:
+            entity = self.get_entity(entity_id)
+            if entity:
+                fallback_entities.append(entity)
+        return fallback_entities
 
     # -- Helpers ------------------------------------------------------------
 

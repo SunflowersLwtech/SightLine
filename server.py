@@ -158,14 +158,23 @@ def _coerce_bool(value: object, default: bool = False) -> bool:
 
 TELEMETRY_FORCE_REFRESH_SEC = 60.0
 QUEUE_MAX_AGE_SEC = 15.0
-VISION_SPOKEN_COOLDOWN_SEC = 25.0
+VISION_SPOKEN_COOLDOWN_SEC = 12.0
 QUEUE_FLUSH_CHECK_INTERVAL_SEC = 1.0
-AGENT_TEXT_REPEAT_SUPPRESS_SEC = 14.0
-VISION_REPEAT_SUPPRESS_SEC = 18.0
-OCR_REPEAT_SUPPRESS_SEC = 20.0
+AGENT_TEXT_REPEAT_SUPPRESS_SEC = 6.0
+VISION_REPEAT_SUPPRESS_SEC = 8.0
+OCR_REPEAT_SUPPRESS_SEC = 8.0
 VISION_PREFEEDBACK_COOLDOWN_SEC = 12.0
 OCR_PREFEEDBACK_COOLDOWN_SEC = 15.0
 PASSIVE_SPEECH_GUARD_SEC = 8.0
+DEFAULT_TOOL_TIMEOUT_SEC = 5.0
+STARTUP_HABIT_DETECT_TIMEOUT_SEC = float(os.getenv("STARTUP_HABIT_DETECT_TIMEOUT_SEC", "2.0"))
+TOOL_TIMEOUTS_SEC = {
+    "navigate_to": 8.0,
+    "preview_destination": 10.0,
+    "validate_address": 5.0,
+    "google_search": 5.0,
+    "maps_query": 5.0,
+}
 
 # Regex to strip internal context tags before sending to client
 _INTERNAL_TAG_RE = re.compile(
@@ -335,7 +344,7 @@ class ContextInjectionQueue:
     # Safety-net timeout for DRAINING state (iOS playback stall).
     _DRAINING_TIMEOUT_SEC = 8.0
 
-    BATCH_WINDOW_SEC = 0.4  # 400ms collection window for sub-agent results
+    BATCH_WINDOW_SEC = 0.2  # 200ms collection window for sub-agent results
 
     def __init__(self, live_request_queue: "LiveRequestQueue") -> None:
         self._lrq = live_request_queue
@@ -1344,8 +1353,20 @@ async def _dispatch_function_call(
             }
 
     try:
-        raw_result = await asyncio.to_thread(ALL_FUNCTIONS[func_name], **func_args)
+        timeout_sec = TOOL_TIMEOUTS_SEC.get(func_name, DEFAULT_TOOL_TIMEOUT_SEC)
+        raw_result = await asyncio.wait_for(
+            asyncio.to_thread(ALL_FUNCTIONS[func_name], **func_args),
+            timeout=timeout_sec,
+        )
         return _truncate_tool_result(raw_result) if isinstance(raw_result, dict) else raw_result
+    except TimeoutError:
+        logger.warning("Tool %s timed out after %.1fs", func_name, TOOL_TIMEOUTS_SEC.get(func_name, DEFAULT_TOOL_TIMEOUT_SEC))
+        return {
+            "error": "tool_timeout",
+            "tool": func_name,
+            "message": f"The {func_name} tool timed out. Please try again.",
+            "retryable": True,
+        }
     except Exception:
         logger.exception("Tool %s raised an exception", func_name)
         return {
@@ -1391,19 +1412,25 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     # -- Per-session LOD state -----------------------------------------------
     telemetry_agg = TelemetryAggregator()
     session_ctx = session_manager.get_session_context(session_id)
-    user_profile = await session_manager.load_user_profile(user_id)
+    user_profile_task = asyncio.create_task(session_manager.load_user_profile(user_id))
+    initial_memories_task = None
+    if _memory_available:
+        initial_memories_task = asyncio.create_task(asyncio.to_thread(
+            load_relevant_memories,
+            user_id,
+            session_ctx.active_task or session_ctx.trip_purpose or "",
+            3,
+        ))
+    face_library_task = None
+    if _face_available:
+        face_library_task = asyncio.create_task(asyncio.to_thread(load_face_library, user_id))
+
+    user_profile = await user_profile_task
     session_meta = SessionMetaTracker(user_id=user_id, session_id=session_id)
 
     # -- Per-session face library cache (Phase 3) ----------------------------
     face_library: list[dict] = []
     _face_library_loaded_at: float = 0.0
-    if _face_available:
-        try:
-            face_library = await asyncio.to_thread(load_face_library, user_id)
-            _face_library_loaded_at = time.monotonic()
-            logger.info("Loaded %d face(s) for user %s", len(face_library), user_id)
-        except Exception:
-            logger.exception("Failed to load face library for user %s", user_id)
 
     # -- WebSocket write lock (prevent interleaved frames from concurrent coroutines)
     _ws_write_lock = asyncio.Lock()
@@ -1447,6 +1474,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     _FACE_BACKOFF_THRESHOLD = 3       # consecutive 0-face before slowing
     _FACE_BACKOFF_SKIP_CYCLES = 2     # skip N cycles after threshold hit
     _face_skip_counter: int = 0
+    _face_library_refresh_task: asyncio.Task | None = None
 
     # User activity tracking (for telemetry / future use)
     _last_user_activity_at: float = time.monotonic()
@@ -1626,6 +1654,71 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 "behavior": behavior_to_text(ToolBehavior.SILENT),
             })
 
+    async def _finish_initial_face_library_load() -> None:
+        nonlocal face_library, _face_library_loaded_at, _face_library_refresh_task, face_library_task
+        if face_library_task is None:
+            return
+        try:
+            loaded = await face_library_task
+            face_library = loaded
+            _face_library_loaded_at = time.monotonic()
+            logger.info("Loaded %d face(s) for user %s", len(face_library), user_id)
+        except Exception:
+            logger.exception("Failed to load face library for user %s", user_id)
+        finally:
+            face_library_task = None
+            _face_library_refresh_task = None
+
+    async def _refresh_face_library_background() -> None:
+        nonlocal face_library, _face_library_loaded_at, _face_library_refresh_task
+        try:
+            refreshed = await asyncio.to_thread(load_face_library, user_id)
+            face_library = refreshed
+            _face_library_loaded_at = time.monotonic()
+            logger.info("Refreshed face library (%d faces) for user %s", len(face_library), user_id)
+        except Exception:
+            logger.exception("Failed to refresh face library for user %s", user_id)
+        finally:
+            _face_library_refresh_task = None
+
+    async def _inject_face_memories(known_faces: list[dict]) -> None:
+        if not _memory_available:
+            return
+
+        names = [
+            str(face.get("person_name", "")).strip()
+            for face in known_faces
+            if str(face.get("person_name", "")).strip() and face.get("person_name") != "unknown"
+        ]
+        if not names:
+            return
+
+        memory_tasks = [
+            asyncio.to_thread(load_relevant_memories, user_id, f"person {name}", 2)
+            for name in names
+        ]
+        results = await asyncio.gather(*memory_tasks, return_exceptions=True)
+
+        memory_lines: list[str] = []
+        for name, result in zip(names, results, strict=False):
+            if isinstance(result, Exception):
+                logger.debug("Failed to load memories for person %s", name, exc_info=True)
+                continue
+            if not result:
+                continue
+            memory_lines.append(f"{name}:")
+            memory_lines.extend(f"- {memory}" for memory in result)
+
+        if not memory_lines:
+            return
+
+        ctx_queue.enqueue(
+            category="face_memory",
+            text="[FACE MEMORY]\n" + "\n".join(memory_lines),
+            priority=3,
+            speak=False,
+        )
+
     def _build_tools_manifest() -> dict:
         """Build a tools_manifest payload for the iOS Dev Console."""
         tools_list = [
@@ -1716,19 +1809,30 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         _location_ctx_service = LocationContextService(user_id)
         _lod_evaluator = LODEvaluator()
 
-        # Detect habits from session history (background, best-effort)
         _proactive_hints = []
-        try:
-            _habit_detector = HabitDetector(user_id)
-            _proactive_hints = _habit_detector.detect()
-            if _proactive_hints:
-                logger.info(
-                    "Detected %d habits for user=%s (top: %s)",
-                    len(_proactive_hints), user_id,
-                    _proactive_hints[0].description[:60] if _proactive_hints else "",
+
+        async def _load_proactive_hints_background() -> None:
+            nonlocal _proactive_hints
+            try:
+                hints = await asyncio.wait_for(
+                    asyncio.to_thread(HabitDetector(user_id).detect),
+                    timeout=STARTUP_HABIT_DETECT_TIMEOUT_SEC,
                 )
-        except Exception:
-            logger.debug("Habit detection skipped", exc_info=True)
+                _proactive_hints = hints or []
+                if _proactive_hints:
+                    logger.info(
+                        "Detected %d habits for user=%s (top: %s)",
+                        len(_proactive_hints), user_id,
+                        _proactive_hints[0].description[:60],
+                    )
+            except TimeoutError:
+                logger.warning(
+                    "Habit detection timed out after %.1fs for user %s",
+                    STARTUP_HABIT_DETECT_TIMEOUT_SEC,
+                    user_id,
+                )
+            except Exception:
+                logger.debug("Habit detection skipped", exc_info=True)
 
         # Assemble initial profile
         _assembler = ProfileAssembler()
@@ -1738,6 +1842,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             entities=None,
             memories=None,
         )
+        asyncio.create_task(_load_proactive_hints_background())
     except Exception:
         logger.debug("Context engine init skipped (import error)", exc_info=True)
 
@@ -1748,12 +1853,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     # Inject the full dynamic system prompt so the model has LOD context
     # immediately, rather than waiting for the first telemetry tick.
     _initial_ephemeral = session_manager.get_ephemeral_context(session_id)
-    _initial_memories = await asyncio.to_thread(
-        load_relevant_memories,
-        user_id,
-        session_ctx.active_task or session_ctx.trip_purpose or "",
-        3,
-    )
+    _initial_memories = await initial_memories_task if initial_memories_task is not None else []
     _initial_prompt = build_full_dynamic_prompt(
         lod=session_ctx.current_lod,
         profile=user_profile,
@@ -1845,6 +1945,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     # read-modify-write on Firestore and adds complexity without clear benefit.
     memory_budget = MemoryBudgetTracker() if _memory_available else None
     transcript_history = deque(maxlen=_TRANSCRIPT_HISTORY_MAX_ENTRIES)
+
+    if face_library_task is not None:
+        _face_library_refresh_task = asyncio.create_task(_finish_initial_face_library_load())
 
     async def _load_session_memories(context_hint: str = "") -> list[str]:
         """Load relevant memories for this user session."""
@@ -1998,6 +2101,16 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 "has_guide_dog": user_profile.has_guide_dog,
             }
             result = await analyze_scene(image_base64, session_ctx.current_lod, ctx_dict)
+            result_status = str(result.get("status", "ok")).lower()
+            if result_status in {"unavailable", "timeout"}:
+                await _emit_tool_event(
+                    "analyze_scene",
+                    ToolBehavior.WHEN_IDLE,
+                    status="unavailable" if result_status == "unavailable" else "error",
+                    data={"reason": f"vision_{result_status}"},
+                )
+                await _emit_capability_degraded("vision", f"vision_{result_status}")
+                return
             vision_text = _format_vision_result(result, session_ctx.current_lod)
             vision_repeat_window = VISION_REPEAT_SUPPRESS_SEC
             now_mono = time.monotonic()
@@ -2098,6 +2211,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     async def _run_face_recognition(image_base64: str) -> None:
         """Run face recognition and inject results as SILENT context."""
         nonlocal face_library, _face_library_loaded_at, _face_consecutive_misses, _face_skip_counter
+        nonlocal _face_library_refresh_task, face_library_task
         nonlocal _face_in_progress, _face_runtime_available, _face_unavailable_notified
         if not _face_available or not _face_runtime_available:
             await _emit_tool_event(
@@ -2113,6 +2227,12 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 return
             _face_in_progress = True
 
+        if face_library_task is not None:
+            logger.debug("Face recognition skipped: face library still loading")
+            async with _face_lock:
+                _face_in_progress = False
+            return
+
         # Adaptive backoff: skip cycles when no faces are consistently detected
         if _face_consecutive_misses >= _FACE_BACKOFF_THRESHOLD:
             _face_skip_counter += 1
@@ -2126,12 +2246,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         # Periodic refresh of face library
         now_mono = time.monotonic()
         if now_mono - _face_library_loaded_at >= FACE_LIBRARY_REFRESH_SEC:
-            try:
-                face_library = await asyncio.to_thread(load_face_library, user_id)
-                _face_library_loaded_at = now_mono
-                logger.info("Refreshed face library (%d faces) for user %s", len(face_library), user_id)
-            except Exception:
-                logger.exception("Failed to refresh face library for user %s", user_id)
+            if _face_library_refresh_task is None or _face_library_refresh_task.done():
+                _face_library_refresh_task = asyncio.create_task(_refresh_face_library_background())
 
         try:
             results = await asyncio.to_thread(
@@ -2179,23 +2295,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 )
 
                 face_text = _format_face_results(known)
-                if _memory_available:
-                    for person in known:
-                        pname = person.get("person_name", "")
-                        if pname and pname != "unknown":
-                            try:
-                                person_memories = await asyncio.to_thread(
-                                    load_relevant_memories,
-                                    user_id,
-                                    f"person {pname}",
-                                    2,
-                                )
-                                if person_memories:
-                                    face_text += f"\nMemories about {pname}:"
-                                    for mem in person_memories:
-                                        face_text += f"\n- {mem}"
-                            except Exception:
-                                logger.debug("Failed to load memories for person %s", pname, exc_info=True)
                 if not speak:
                     face_text = "[SILENT - context only, do not speak aloud]\n" + face_text
                 ctx_queue.enqueue(
@@ -2213,6 +2312,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     similarity=float(best.get("similarity", 0.0)),
                     source="face_match",
                 )
+                if _memory_available:
+                    asyncio.create_task(_inject_face_memories(known))
             elif results:
                 await _emit_identity_event(
                     person_name="unknown",

@@ -43,11 +43,9 @@ def test_extract_function_calls_legacy_fallback():
     assert calls[0].name == "legacy_tool"
 
 
-def test_compute_embedding_empty_text_returns_zero_vector():
+def test_compute_embedding_empty_text_returns_none():
     from memory import memory_bank
 
     vec = memory_bank._compute_embedding("   ")
 
-    assert isinstance(vec, list)
-    assert len(vec) == memory_bank.EMBEDDING_DIM
-    assert all(v == 0.0 for v in vec)
+    assert vec is None

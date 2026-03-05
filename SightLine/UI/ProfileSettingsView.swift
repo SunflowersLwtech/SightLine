@@ -24,6 +24,8 @@ struct ProfileSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showUserSwitcher = false
     @State private var availableUsers: [String] = []
+    @State private var isLoadingUsers = false
+    @State private var userSwitchError = ""
     @State private var showSaveBanner = false
 
     var body: some View {
@@ -47,7 +49,15 @@ struct ProfileSettingsView: View {
             .sheet(isPresented: $showUserSwitcher) {
                 UserSwitcherSheet(
                     availableUsers: availableUsers,
+                    isLoading: isLoadingUsers,
+                    errorMessage: userSwitchError,
                     currentUserId: SightLineConfig.defaultUserId,
+                    onRetry: {
+                        Task { await fetchUsers() }
+                    },
+                    onCancel: {
+                        showUserSwitcher = false
+                    },
                     onSelect: { userId in
                         showUserSwitcher = false
                         dismiss()
@@ -223,8 +233,8 @@ struct ProfileSettingsView: View {
             .accessibilityLabel("Current user ID: \(SightLineConfig.defaultUserId)")
 
             Button {
-                Task { await fetchUsers() }
                 showUserSwitcher = true
+                Task { await fetchUsers() }
             } label: {
                 Label("Switch User", systemImage: "person.2.fill")
             }
@@ -290,18 +300,46 @@ struct ProfileSettingsView: View {
     // MARK: - Helpers
 
     private func fetchUsers() async {
+        await MainActor.run {
+            isLoadingUsers = true
+            userSwitchError = ""
+            if availableUsers.isEmpty {
+                availableUsers = []
+            }
+        }
         let baseURL = SightLineConfig.serverBaseURL
             .replacingOccurrences(of: "wss://", with: "https://")
             .replacingOccurrences(of: "ws://", with: "http://")
-        guard let url = URL(string: "\(baseURL)/api/users") else { return }
+        guard let url = URL(string: "\(baseURL)/api/users") else {
+            await MainActor.run {
+                isLoadingUsers = false
+                userSwitchError = "User list is unavailable right now."
+            }
+            return
+        }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let users = json["users"] as? [String] {
-                await MainActor.run { availableUsers = users }
+                await MainActor.run {
+                    availableUsers = users
+                    isLoadingUsers = false
+                    if users.isEmpty {
+                        userSwitchError = "No alternate users are available."
+                    }
+                }
+            } else {
+                await MainActor.run {
+                    isLoadingUsers = false
+                    userSwitchError = "User list response was invalid."
+                }
             }
         } catch {
             logger.error("Failed to fetch users: \(error.localizedDescription)")
+            await MainActor.run {
+                isLoadingUsers = false
+                userSwitchError = "Couldn't load users. Check your connection and try again."
+            }
         }
     }
 }

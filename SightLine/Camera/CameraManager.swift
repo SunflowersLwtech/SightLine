@@ -22,7 +22,9 @@ class CameraManager: NSObject, ObservableObject {
 
     private var captureSession: AVCaptureSession?
     private let sessionQueue = DispatchQueue(label: "com.sightline.camera")
+    private let depthQueue = DispatchQueue(label: "com.sightline.camera.depth", qos: .userInitiated)
     private let context = CIContext()
+    private var depthInferenceInFlight = false
 
     var onFrameCaptured: ((Data) -> Void)?  // JPEG data callback
     var onCameraFailure: ((String) -> Void)?
@@ -110,6 +112,7 @@ class CameraManager: NSObject, ObservableObject {
 
         session.startRunning()
         captureSession = session
+        depthInferenceInFlight = false
 
         DispatchQueue.main.async {
             self.isRunning = true
@@ -123,6 +126,7 @@ class CameraManager: NSObject, ObservableObject {
             guard let self = self else { return }
             self.captureSession?.stopRunning()
             self.captureSession = nil
+            self.depthInferenceInFlight = false
             DispatchQueue.main.async {
                 self.isRunning = false
                 self.previewSession = nil
@@ -148,9 +152,20 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         }
 
         // Run depth estimation on accepted frames (same cadence as vision)
-        if let estimator = depthEstimator, estimator.isAvailable,
-           let summary = estimator.estimateDepth(from: pixelBuffer) {
-            onDepthEstimated?(summary)
+        if let estimator = depthEstimator, estimator.isAvailable, !depthInferenceInFlight {
+            depthInferenceInFlight = true
+            let depthPixelBuffer = pixelBuffer
+            depthQueue.async { [weak self] in
+                let summary = estimator.estimateDepth(from: depthPixelBuffer)
+                DispatchQueue.main.async {
+                    if let summary {
+                        self?.onDepthEstimated?(summary)
+                    }
+                }
+                self?.sessionQueue.async {
+                    self?.depthInferenceInFlight = false
+                }
+            }
         }
 
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)

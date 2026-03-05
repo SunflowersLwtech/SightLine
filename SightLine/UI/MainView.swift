@@ -16,6 +16,12 @@ import os
 
 private let logger = Logger(subsystem: "com.sightline.app", category: "MainView")
 
+private enum DepthModelState {
+    case loading
+    case ready
+    case unavailable
+}
+
 struct MainView: View {
     @StateObject private var webSocketManager = WebSocketManager()
     @StateObject private var audioCapture = AudioCaptureManager()
@@ -44,6 +50,11 @@ struct MainView: View {
     @State private var toastMessage: String?
     @State private var isVoiceOverActive = UIAccessibility.isVoiceOverRunning
     @State private var showPermissionPrompt = false
+    @State private var showInteractionGuide = false
+    @State private var sessionReadyTimeoutTask: Task<Void, Never>?
+    @State private var hasReceivedSessionReady = false
+    @State private var depthModelState: DepthModelState = .loading
+    @State private var pendingCameraActivation = false
     @State private var sessionResumptionHandle = UserDefaults.standard.string(
         forKey: SightLineConfig.sessionResumptionHandleDefaultsKey
     ) ?? ""
@@ -135,6 +146,9 @@ struct MainView: View {
                 switchToUser(userId)
             })
         }
+        .sheet(isPresented: $showInteractionGuide) {
+            InteractionGuideView()
+        }
         .accessibilityLabel(buildAccessibilityDescription())
         .accessibilityAction(.default) {
             handleSingleTap()
@@ -187,6 +201,15 @@ struct MainView: View {
 
             // Bottom toolbar: profile button
             HStack {
+                Button(action: { showInteractionGuide = true }) {
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white.opacity(0.5))
+                        .padding(12)
+                }
+                .accessibilityLabel("Open controls guide")
+                .accessibilityIdentifier("main-open-guide")
+
                 Spacer()
                 Button(action: { showProfileSettings = true }) {
                     Image(systemName: "person.crop.circle")
@@ -195,6 +218,7 @@ struct MainView: View {
                         .padding(12)
                 }
                 .accessibilityLabel("Open settings")
+                .accessibilityIdentifier("main-open-settings")
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 16)
@@ -562,6 +586,158 @@ struct MainView: View {
         return parts.joined(separator: ", ")
     }
 
+    private func currentPreferredLanguage() -> String {
+        UserDefaults.standard.string(forKey: SightLineConfig.preferredLanguageDefaultsKey) ?? "en-US"
+    }
+
+    private func localizedText(
+        english: String,
+        chinese: String,
+        spanish: String,
+        japanese: String
+    ) -> String {
+        let language = currentPreferredLanguage().lowercased()
+        if language.hasPrefix("zh") { return chinese }
+        if language.hasPrefix("es") { return spanish }
+        if language.hasPrefix("ja") { return japanese }
+        return english
+    }
+
+    private func speakLocalStatus(_ message: String) {
+        let utterance = AVSpeechUtterance(string: message)
+        utterance.voice = AVSpeechSynthesisVoice(language: currentPreferredLanguage())
+            ?? AVSpeechSynthesisVoice(language: "en-US")
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        localSynthesizer.speak(utterance)
+    }
+
+    private func cameraPreparingMessage() -> String {
+        localizedText(
+            english: "Preparing camera analysis. Please wait.",
+            chinese: "正在准备相机分析，请稍候。",
+            spanish: "Preparando el analisis de la camara. Espera un momento.",
+            japanese: "カメラ解析を準備しています。少しお待ちください。"
+        )
+    }
+
+    private func cameraDepthUnavailableMessage() -> String {
+        localizedText(
+            english: "Depth alerts are unavailable. Camera descriptions are still on.",
+            chinese: "深度提醒暂时不可用，但相机描述仍然可用。",
+            spanish: "Las alertas de profundidad no estan disponibles, pero la camara sigue describiendo la escena.",
+            japanese: "深度アラートは利用できませんが、カメラの説明は引き続き使えます。"
+        )
+    }
+
+    private func sessionReadyTimedOutMessage() -> String {
+        localizedText(
+            english: "Session initialization timed out. Reconnecting now.",
+            chinese: "会话初始化超时，正在重新连接。",
+            spanish: "La inicializacion de la sesion agoto el tiempo. Reconectando ahora.",
+            japanese: "セッションの初期化がタイムアウトしました。再接続しています。"
+        )
+    }
+
+    private func connectionLostMessage() -> String {
+        localizedText(
+            english: "Connection lost. Safe mode active.",
+            chinese: "连接已断开，已进入安全模式。",
+            spanish: "Se perdio la conexion. El modo seguro esta activo.",
+            japanese: "接続が切れました。セーフモードを有効にしました。"
+        )
+    }
+
+    private func connectionRestoredMessage() -> String {
+        localizedText(
+            english: "Connection restored.",
+            chinese: "连接已恢复。",
+            spanish: "Conexion restablecida.",
+            japanese: "接続が回復しました。"
+        )
+    }
+
+    private func capabilityDegradedMessage(for capability: String) -> String {
+        switch capability.lowercased() {
+        case "vision":
+            return localizedText(
+                english: "Visual analysis is temporarily unavailable.",
+                chinese: "视觉分析暂时不可用。",
+                spanish: "El analisis visual no esta disponible temporalmente.",
+                japanese: "視覚解析は一時的に利用できません。"
+            )
+        case "face":
+            return localizedText(
+                english: "Face recognition is temporarily unavailable.",
+                chinese: "人脸识别暂时不可用。",
+                spanish: "El reconocimiento facial no esta disponible temporalmente.",
+                japanese: "顔認識は一時的に利用できません。"
+            )
+        case "ocr":
+            return localizedText(
+                english: "Text reading is temporarily unavailable.",
+                chinese: "文字识别暂时不可用。",
+                spanish: "La lectura de texto no esta disponible temporalmente.",
+                japanese: "文字読み取りは一時的に利用できません。"
+            )
+        default:
+            return localizedText(
+                english: "A feature is temporarily unavailable.",
+                chinese: "有一项功能暂时不可用。",
+                spanish: "Una funcion no esta disponible temporalmente.",
+                japanese: "一部の機能が一時的に利用できません。"
+            )
+        }
+    }
+
+    private func scheduleSessionReadyTimeout() {
+        sessionReadyTimeoutTask?.cancel()
+        hasReceivedSessionReady = false
+        sessionReadyTimeoutTask = Task {
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard isActive, !hasReceivedSessionReady else { return }
+                let message = sessionReadyTimedOutMessage()
+                connectionStatus = message
+                transcript = message
+                audioCapture.stopCapture()
+                cameraManager.stopCapture()
+                audioPlayback.stopImmediately()
+                isCameraActive = false
+                showToast(message)
+                speakLocalStatus(message)
+                webSocketManager.reconnect(afterMs: 1000)
+            }
+        }
+    }
+
+    private func cancelSessionReadyTimeout() {
+        sessionReadyTimeoutTask?.cancel()
+        sessionReadyTimeoutTask = nil
+    }
+
+    private func activateCamera(announceDepthUnavailable: Bool) {
+        guard isActive, !isPaused else {
+            pendingCameraActivation = false
+            return
+        }
+        cameraManager.startCapture()
+        isCameraActive = true
+        pendingCameraActivation = false
+        connectionStatus = isSafeMode ? "Safe Mode - Reconnecting..." : "Connected"
+        HapticManager.shared.cameraOn()
+        webSocketManager.sendText(UpstreamMessage.cameraToggle(active: true).toJSON())
+        if announceDepthUnavailable {
+            let message = cameraDepthUnavailableMessage()
+            transcript = message
+            showToast(message)
+            UIAccessibility.post(notification: .announcement, argument: message)
+        } else {
+            UIAccessibility.post(notification: .announcement, argument: "Camera on")
+        }
+        logger.info("Camera activated by user")
+    }
+
     private func showToast(_ message: String) {
         toastMessage = message
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -724,10 +900,14 @@ struct MainView: View {
                 debugModel.isConnected = connected
                 if connected {
                     connectionStatus = "Connected"
+                    scheduleSessionReadyTimeout()
                 } else {
+                    cancelSessionReadyTimeout()
                     audioCapture.stopCapture()
                     cameraManager.stopCapture()
+                    audioPlayback.stopImmediately()
                     isCameraActive = false
+                    pendingCameraActivation = false
                 }
             }
         }
@@ -801,15 +981,31 @@ struct MainView: View {
         }
 
         // 2b. Setup depth estimation pipeline (CoreML Depth Anything V2)
+        depthModelState = .loading
+        pendingCameraActivation = false
         let depthEstimator = DepthEstimator()
         cameraManager.depthEstimator = depthEstimator
         cameraManager.onDepthEstimated = { summary in
             sensorManager.updateDepth(summary)
         }
         Task(priority: .userInitiated) {
-            depthEstimator.loadModel()
-            let available = depthEstimator.isAvailable
-            logger.info("Depth model async load complete (available: \(available))")
+            let available = await Task.detached(priority: .userInitiated) {
+                depthEstimator.loadModel()
+                return depthEstimator.isAvailable
+            }.value
+
+            await MainActor.run {
+                depthModelState = available ? .ready : .unavailable
+                logger.info("Depth model async load complete (available: \(available))")
+
+                guard pendingCameraActivation else { return }
+                if available {
+                    connectionStatus = "Connected"
+                    activateCamera(announceDepthUnavailable: false)
+                } else {
+                    activateCamera(announceDepthUnavailable: true)
+                }
+            }
         }
 
         // 3. Setup audio capture -> WebSocket + NoiseMeter RMS feed
@@ -888,8 +1084,16 @@ struct MainView: View {
     private func toggleCamera() {
         guard isActive, !isPaused else { return }
 
+        if pendingCameraActivation {
+            pendingCameraActivation = false
+            connectionStatus = "Connected"
+            showToast("Camera activation canceled")
+            return
+        }
+
         if isCameraActive {
             // Turn off
+            pendingCameraActivation = false
             cameraManager.stopCapture()
             isCameraActive = false
             HapticManager.shared.cameraOff()
@@ -911,12 +1115,19 @@ struct MainView: View {
                     return
                 }
                 await MainActor.run {
-                    cameraManager.startCapture()
-                    isCameraActive = true
-                    HapticManager.shared.cameraOn()
-                    webSocketManager.sendText(UpstreamMessage.cameraToggle(active: true).toJSON())
-                    UIAccessibility.post(notification: .announcement, argument: "Camera on")
-                    logger.info("Camera activated by user")
+                    switch depthModelState {
+                    case .loading:
+                        pendingCameraActivation = true
+                        let message = cameraPreparingMessage()
+                        connectionStatus = message
+                        transcript = message
+                        showToast(message)
+                        UIAccessibility.post(notification: .announcement, argument: message)
+                    case .ready:
+                        activateCamera(announceDepthUnavailable: false)
+                    case .unavailable:
+                        activateCamera(announceDepthUnavailable: true)
+                    }
                 }
             }
         }
@@ -927,6 +1138,8 @@ struct MainView: View {
         case .sessionReady:
             logger.info("Session ready, starting audio capture (camera deferred)")
             DispatchQueue.main.async {
+                hasReceivedSessionReady = true
+                cancelSessionReadyTimeout()
                 // Pre-set model speaking timestamp so silence gate covers
                 // the 200-600ms greeting generation delay, preventing
                 // ambient noise from reaching Gemini VAD and interrupting the greeting.
@@ -953,6 +1166,7 @@ struct MainView: View {
             logger.info("Face library cleared: \(deletedCount)")
         case .error(let message):
             DispatchQueue.main.async {
+                cancelSessionReadyTimeout()
                 connectionStatus = "Server error — retrying..."
                 transcript = "Server error: \(message)"
                 if shouldCaptureDevEvents {
@@ -1079,6 +1293,10 @@ struct MainView: View {
         case .capabilityDegraded(let capability, let reason, _):
             DispatchQueue.main.async {
                 debugModel.markCapabilityDegraded(capability)
+                handleToolMessage(
+                    text: capabilityDegradedMessage(for: capability),
+                    behavior: .WHEN_IDLE
+                )
             }
             logger.warning("Capability degraded: \(capability, privacy: .public) - \(reason, privacy: .public)")
         case .debugLod(let data):
@@ -1107,6 +1325,7 @@ struct MainView: View {
         case .goAway(let retryMs):
             logger.info("GoAway received, reconnecting in \(retryMs)ms")
             DispatchQueue.main.async {
+                cancelSessionReadyTimeout()
                 connectionStatus = "Reconnecting..."
             }
             webSocketManager.reconnect(afterMs: retryMs)
@@ -1150,12 +1369,9 @@ struct MainView: View {
         HapticManager.shared.safeMode()
 
         // Local TTS alert (no network dependency)
-        let utterance = AVSpeechUtterance(string: "Connection lost. Safe mode active.")
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        localSynthesizer.speak(utterance)
-
-        UIAccessibility.post(notification: .announcement, argument: "Connection lost. Safe mode active.")
+        let message = connectionLostMessage()
+        speakLocalStatus(message)
+        UIAccessibility.post(notification: .announcement, argument: message)
         logger.warning("Entered safe mode (LOD 1)")
     }
 
@@ -1166,12 +1382,9 @@ struct MainView: View {
         telemetryAggregator.resume()
 
         // Local TTS confirmation
-        let utterance = AVSpeechUtterance(string: "Connection restored.")
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        localSynthesizer.speak(utterance)
-
-        UIAccessibility.post(notification: .announcement, argument: "Connection restored.")
+        let message = connectionRestoredMessage()
+        speakLocalStatus(message)
+        UIAccessibility.post(notification: .announcement, argument: message)
         logger.info("Exited safe mode")
     }
 
@@ -1257,6 +1470,8 @@ struct MainView: View {
     // MARK: - Teardown
 
     private func teardownPipeline() {
+        cancelSessionReadyTimeout()
+        pendingCameraActivation = false
         telemetryAggregator.stop()
         sensorManager.stopAll()
         audioCapture.stopCapture()
