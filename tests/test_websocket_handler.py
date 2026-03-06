@@ -19,7 +19,8 @@ from google.genai import types
 from starlette.websockets import WebSocketState
 
 from session_state import SessionState
-from websocket_handler import WebSocketHandler
+from tools.tool_behavior import ToolBehavior
+from websocket_handler import WebSocketHandler, _tool_result_fallback_text
 
 
 # =============================================================================
@@ -669,6 +670,195 @@ def test_register_user_activity_starts_new_turn_and_discards_stale_context(handl
 
 @pytest.mark.websocket
 @pytest.mark.asyncio
+async def test_text_hint_updates_transcript_history_and_injects_silent_context(handler, fake_ws, mock_ctx_queue, session_state):
+    fake_ws.queue_message_text({"type": "text_hint", "text": "navigate to the pharmacy"})
+    fake_ws.queue_disconnect()
+
+    with handler_runtime_patches():
+        await handler.run()
+
+    assert session_state.transcript_history[-1]["text"] == "navigate to the pharmacy"
+    mock_ctx_queue.inject_immediate.assert_called()
+    content = mock_ctx_queue.inject_immediate.call_args.args[0]
+    assert "Prefer navigate_to or get_walking_directions" in content.parts[0].text
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_text_hint_and_activity_start_share_same_turn(handler, fake_ws, session_state):
+    fake_ws.queue_message_text({"type": "text_hint", "text": "what's around me"})
+    fake_ws.queue_message_text({"type": "activity_start"})
+    fake_ws.queue_message_text({"type": "activity_end"})
+    fake_ws.queue_disconnect()
+
+    with handler_runtime_patches():
+        await handler.run()
+
+    assert session_state.user_turn_seq == 1
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_text_hint_ocr_request_includes_ocr_preference(handler, fake_ws, mock_ctx_queue):
+    fake_ws.queue_message_text({"type": "text_hint", "text": "Can you read that sign for me?"})
+    fake_ws.queue_disconnect()
+
+    with handler_runtime_patches():
+        await handler.run()
+
+    content = mock_ctx_queue.inject_immediate.call_args.args[0]
+    assert "Prefer extract_text_from_camera" in content.parts[0].text
+
+
+@pytest.mark.asyncio
+async def test_maps_query_redirects_to_navigation_for_explicit_navigation_request(handler, session_state):
+    session_state.transcript_history.append({
+        "role": "user",
+        "text": "Navigate me to the nearest pharmacy please.",
+    })
+
+    with patch("websocket_handler._dispatch_function_call", new_callable=AsyncMock) as mock_dispatch:
+        mock_dispatch.side_effect = [
+            {
+                "success": True,
+                "places": [
+                    {
+                        "name": "CVS Pharmacy",
+                        "address": "123 Main St",
+                        "distance_meters": 80,
+                    }
+                ],
+            },
+            {
+                "success": True,
+                "destination": "123 Main St",
+                "destination_direction": "at 1 o'clock, 80 meters",
+            },
+        ]
+        redirected, redirected_result = await handler._maybe_redirect_maps_query(
+            question="nearest pharmacy",
+            user_speaking=False,
+        )
+
+    assert redirected is True
+    assert redirected_result["redirected_to"] == "navigate_to"
+    assert redirected_result["navigation_result"]["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_direct_navigation_shortcut_emits_navigation_result(handler, session_state, fake_ws):
+    session_state.user_turn_seq = 1
+    session_state.pending_fallback_turn_seq = 1
+    session_state.turn_output_seen = False
+    handler.state.transcript_history.append({
+        "role": "user",
+        "text": "Navigate me to the nearest pharmacy please.",
+    })
+
+    with patch("websocket_handler._dispatch_function_call", new_callable=AsyncMock) as mock_dispatch, \
+         patch("websocket_handler.synthesize_fallback_pcm", new_callable=AsyncMock) as mock_tts, \
+         patch("websocket_handler.session_manager.get_ephemeral_context") as mock_ephemeral:
+        mock_dispatch.side_effect = [
+            {
+                "success": True,
+                "places": [
+                    {"name": "CVS Pharmacy", "address": "123 Main St", "distance_meters": 80}
+                ],
+            },
+            {
+                "success": True,
+                "destination": "123 Main St",
+                "destination_direction": "at 1 o'clock, 80 meters",
+            },
+        ]
+        mock_tts.return_value = b"\x00\x00" * 8
+        mock_ephemeral.return_value = type(
+            "Ephemeral",
+            (),
+            {"gps": type("GPS", (), {"lat": 40.0, "lng": -74.0})()},
+        )()
+        handled = await handler._maybe_handle_direct_navigation_intent(
+            "Navigate me to the nearest pharmacy please."
+        )
+
+    assert handled is True
+    nav_results = fake_ws.get_sent_json_by_type("navigation_result")
+    assert nav_results
+    assert session_state.turn_output_seen is True
+
+
+def test_tool_result_fallback_text_for_navigation():
+    text = _tool_result_fallback_text(
+        "navigate_to",
+        {
+            "destination": "123 Main St",
+            "destination_direction": "at 1 o'clock, 80 meters",
+        },
+    )
+    assert text == "123 Main St is at 1 o'clock, 80 meters. I'll guide you there."
+
+
+@pytest.mark.asyncio
+async def test_emit_pending_fallback_output_marks_turn_output_seen(handler, session_state):
+    session_state.user_turn_seq = 2
+    session_state.pending_fallback_turn_seq = 2
+    session_state.pending_fallback_text = "Fallback response"
+
+    with patch("websocket_handler.synthesize_fallback_pcm", new_callable=AsyncMock) as mock_tts:
+        mock_tts.return_value = b"\x00\x00" * 8
+        emitted = await handler._emit_pending_fallback_output(2)
+
+    assert emitted is True
+    assert session_state.turn_output_seen is True
+    assert session_state.pending_fallback_text is None
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_resume_requested_skips_fresh_greeting_injection():
+    runner = FakeRunner(events=[])
+    mock_ctx_queue = MagicMock()
+    mock_ctx_queue.enqueue = MagicMock()
+    mock_ctx_queue.should_inject = Mock(return_value=False)
+    mock_ctx_queue.model_speaking = False
+    mock_ctx_queue.vision_spoken_cooldown_active = False
+    mock_ctx_queue.inject_immediate = MagicMock()
+
+    handler, fake_ws, _, _ = _make_handler_with_runner(
+        runner,
+        ctx_queue=mock_ctx_queue,
+        resume_requested=True,
+    )
+
+    async def delayed_disconnect():
+        await asyncio.sleep(0.05)
+        fake_ws.queue_disconnect()
+
+    with handler_runtime_patches():
+        asyncio.create_task(delayed_disconnect())
+        await handler.run()
+
+    mock_ctx_queue.inject_immediate.assert_not_called()
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_resume_context_is_prepended_to_next_text_hint(handler, fake_ws, mock_ctx_queue):
+    handler._resume_requested = True
+    fake_ws.queue_message_text({"type": "text_hint", "text": "what's around me"})
+    fake_ws.queue_disconnect()
+
+    with handler_runtime_patches():
+        await handler.run()
+
+    mock_ctx_queue.inject_immediate.assert_called()
+    content = mock_ctx_queue.inject_immediate.call_args.args[0]
+    assert "[SESSION RESUME]" in content.parts[0].text
+    assert "what's around me" in content.parts[0].text
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
 async def test_interrupt_debounce_rapid_interrupts(handler, fake_ws, session_state, mock_ctx_queue):
     """Test rapid barge-in within debounce window: only first processed."""
     # Set model speaking
@@ -805,7 +995,7 @@ async def test_tool_call_dispatched_and_result_sent(fake_ws, fake_queue, session
          patch("websocket_handler._dispatch_function_call", new_callable=AsyncMock) as mock_dispatch, \
          patch("websocket_handler._extract_function_calls") as mock_extract, \
          patch("websocket_handler._allow_navigation_tool_call", return_value=(True, "")), \
-         patch("websocket_handler.resolve_tool_behavior", return_value=MagicMock()), \
+         patch("websocket_handler.resolve_tool_behavior", return_value=ToolBehavior.WHEN_IDLE), \
          patch("websocket_handler.ALL_FUNCTIONS", {"get_current_time": lambda: None}):
         # Mock tool dispatch to return success
         mock_dispatch.return_value = {"status": "success", "result": "12:00 PM"}
@@ -854,6 +1044,8 @@ async def test_tool_call_dispatched_and_result_sent(fake_ws, fake_queue, session
 
         # Verify tool was called
         assert mock_dispatch.called
+        injected_content = mock_ctx_queue.inject_immediate.call_args.args[0]
+        assert "TOOL RESULT READY" in injected_content.parts[0].text
 
 
 @pytest.mark.websocket
@@ -1053,6 +1245,7 @@ def _make_handler_with_runner(runner, **overrides):
     fake_ws = overrides.pop("fake_ws", None) or FakeWebSocket()
     fake_queue = overrides.pop("fake_queue", None) or FakeLiveRequestQueue()
     state = overrides.pop("state", None) or SessionState()
+    resume_requested = overrides.pop("resume_requested", False)
 
     mock_session_ctx = overrides.pop("session_ctx", None)
     if mock_session_ctx is None:
@@ -1131,6 +1324,7 @@ def _make_handler_with_runner(runner, **overrides):
         assembled_profile=MagicMock(),
         memory_budget=MagicMock(),
         initial_memories=None,
+        resume_requested=resume_requested,
     )
     return handler, fake_ws, fake_queue, state
 

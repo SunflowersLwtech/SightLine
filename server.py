@@ -173,8 +173,8 @@ TOOL_TIMEOUTS_SEC = {
     "navigate_to": 8.0,
     "preview_destination": 10.0,
     "validate_address": 5.0,
-    "google_search": 5.0,
-    "maps_query": 5.0,
+    "google_search": 8.0,
+    "maps_query": 8.0,
 }
 
 # Regex to strip internal context tags before sending to client
@@ -809,7 +809,7 @@ _TOOL_CATEGORY_MAP: dict[str, tuple[str, str]] = {
     "get_accessibility_info": ("accessibility", "WHEN_IDLE"),
     "maps_query": ("maps_grounding", "WHEN_IDLE"),
     "preload_memory": ("memory", "SILENT"),
-    "remember_entity": ("memory", "SILENT"),
+    "remember_entity": ("memory", "WHEN_IDLE"),
     "what_do_you_remember": ("memory", "WHEN_IDLE"),
     "forget_entity": ("memory", "SILENT"),
     "forget_recent_memory": ("memory", "SILENT"),
@@ -1380,6 +1380,14 @@ async def _dispatch_function_call(
             from agents.ocr_agent import extract_text as _ocr_extract
             hint = func_args.get("context_hint", "")
             result = await _ocr_extract(frame_b64, context_hint=hint, safety_only=False)
+            if isinstance(result, dict) and not result.get("text"):
+                result = {
+                    **result,
+                    "message": (
+                        str(result.get("message") or "").strip()
+                        or "I couldn't read the text clearly. Please pan the camera a little and try again."
+                    ),
+                }
             return result
         except Exception:
             logger.exception("OCR tool dispatch failed")
@@ -1444,6 +1452,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
     stop_downstream = asyncio.Event()
     resume_handle = (websocket.query_params.get("resume_handle") or "").strip()
+    cached_resume_handle = session_manager.get_handle(session_id)
+    resume_requested = bool(
+        resume_handle or cached_resume_handle or session_manager.has_resumable_state(session_id)
+    )
     if resume_handle:
         session_manager.update_handle(session_id, resume_handle)
         logger.info("Received resume handle from client for session %s", session_id)
@@ -1568,6 +1580,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         assembled_profile=_assembled_profile,
         memory_budget=memory_budget,
         initial_memories=initial_memories,
+        resume_requested=resume_requested,
     )
     await handler.run()
 

@@ -93,7 +93,75 @@ class TestSessionManager:
         mgr.get_session_context("s1")
         mgr.update_handle("s1", "h1")
         mgr.remove_session("s1")
+        assert mgr.get_handle("s1") == "h1"
+        assert mgr.has_resumable_state("s1") is True
+
+    def test_session_cleanup_expires_resumable_state(self):
+        from live_api.session_manager import SessionManager
+        mgr = SessionManager()
+        mgr.get_session_context("s1")
+        mgr.update_handle("s1", "h1")
+        mgr.remove_session("s1")
+        mgr._resumable_expires_at["s1"] = 0.0
         assert mgr.get_handle("s1") is None
+        assert mgr.has_resumable_state("s1") is False
+
+    def test_session_cleanup_preserves_context_without_handle(self):
+        from live_api.session_manager import SessionManager
+        mgr = SessionManager()
+        mgr.get_session_context("s2")
+        mgr.get_ephemeral_context("s2")
+        mgr.remove_session("s2")
+        assert mgr.has_resumable_state("s2") is True
+
+    def test_firestore_runtime_session_roundtrip(self):
+        from live_api import session_manager as sm_mod
+        from live_api.session_manager import SessionManager
+
+        store = {}
+
+        class FakeDoc:
+            def __init__(self, doc_id: str):
+                self.doc_id = doc_id
+
+            def get(self):
+                data = store.get(self.doc_id)
+                return type(
+                    "DocSnap",
+                    (),
+                    {
+                        "exists": data is not None,
+                        "to_dict": lambda self_: data,
+                    },
+                )()
+
+            def set(self, payload):
+                store[self.doc_id] = payload
+
+            def delete(self):
+                store.pop(self.doc_id, None)
+
+        class FakeCollection:
+            def document(self, doc_id: str):
+                return FakeDoc(doc_id)
+
+        class FakeFirestore:
+            def collection(self, _name: str):
+                return FakeCollection()
+
+        with patch.object(sm_mod, "_get_firestore", return_value=FakeFirestore()):
+            mgr = SessionManager()
+            ctx = mgr.get_session_context("s3")
+            ctx.current_lod = 3
+            eph = mgr.get_ephemeral_context("s3")
+            eph.motion_state = "walking"
+            mgr.update_handle("s3", "handle_xyz")
+            mgr.remove_session("s3")
+
+            restored = SessionManager()
+            assert restored.get_handle("s3") == "handle_xyz"
+            assert restored.get_session_context("s3").current_lod == 3
+            assert restored.get_ephemeral_context("s3").motion_state == "walking"
 
     def test_run_config_has_vad_params(self):
         """SL-36: RunConfig should include LOD-specific VAD settings."""

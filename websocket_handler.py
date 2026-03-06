@@ -10,6 +10,7 @@ import asyncio
 import base64
 import json
 import logging
+import re
 import time
 from collections import deque
 from datetime import datetime, timezone
@@ -34,6 +35,8 @@ from server import (
     _changed_signature_fields,
     _should_inject_telemetry_context,
     _detect_voice_intent,
+    _has_navigation_intent,
+    _recent_user_utterances,
     _allow_navigation_tool_call,
     _json_safe,
     _extract_function_calls,
@@ -74,6 +77,7 @@ from telemetry.telemetry_parser import parse_telemetry, parse_telemetry_to_ephem
 from tools import ALL_FUNCTIONS, ALL_TOOL_DECLARATIONS
 from tools.navigation import NAVIGATION_FUNCTIONS
 from tools.tool_behavior import ToolBehavior, behavior_to_text, resolve_tool_behavior
+from live_api.tts_fallback import synthesize_pcm as synthesize_fallback_pcm
 
 logger = logging.getLogger("sightline.server")
 
@@ -90,6 +94,123 @@ _STALE_QUEUE_CATEGORIES = {
 }
 
 _SILENT_TURN_WATCHDOG_SEC = 18.0
+
+
+def _tool_preference_hint(text: str) -> str:
+    lowered = (text or "").strip().lower()
+    if not lowered:
+        return ""
+
+    hints: list[str] = []
+    if any(token in lowered for token in ("read", "sign", "menu", "label", "text")):
+        hints.append(
+            "This is an explicit text-reading request. Prefer extract_text_from_camera "
+            "using the latest camera frame."
+        )
+    if any(token in lowered for token in ("navigate", "directions", "route me", "take me", "guide me")):
+        hints.append(
+            "This is an explicit active navigation request. Prefer navigate_to or "
+            "get_walking_directions. Do not substitute maps_query or nearby_search "
+            "unless the user asked for informational browsing only."
+        )
+    elif any(token in lowered for token in ("around me", "nearby", "near me", "where am i", "what's around")):
+        hints.append(
+            "This is a nearby/location-awareness request. Prefer get_location_info "
+            "or nearby_search."
+        )
+    if any(token in lowered for token in ("weather", "today", "news", "search", "look up")):
+        hints.append(
+            "This is an external knowledge request. Prefer google_search."
+        )
+    if "remember" in lowered and "what do you remember" not in lowered and "what did i mention" not in lowered:
+        hints.append(
+            "This is a memory-store request. Prefer remember_entity."
+        )
+    if any(token in lowered for token in ("what did i mention", "remember earlier", "what pharmacy did i mention", "what do you remember")):
+        hints.append(
+            "This is a memory-recall request. Prefer what_do_you_remember."
+        )
+    return "\n".join(hints)
+
+
+_NAVIGATION_PLACE_TYPE_HINTS: dict[str, list[str]] = {
+    "pharmacy": ["pharmacy"],
+    "drugstore": ["pharmacy"],
+    "cafe": ["cafe"],
+    "coffee": ["cafe"],
+    "restaurant": ["restaurant"],
+    "bus stop": ["bus_stop"],
+    "atm": ["atm"],
+    "bank": ["bank"],
+    "hospital": ["hospital"],
+    "hotel": ["lodging"],
+}
+
+
+def _tool_result_fallback_text(tool_name: str, result: dict[str, object]) -> str | None:
+    name = (tool_name or "").strip().lower()
+    if not isinstance(result, dict):
+        return None
+
+    if name == "extract_text_from_camera":
+        text = str(result.get("text") or "").strip()
+        if text:
+            return text
+        message = str(result.get("message") or "").strip()
+        return message or "I couldn't read the text clearly. Please pan the camera a little and try again."
+
+    if name == "get_location_info":
+        address = str(result.get("address") or "").strip()
+        nearby = result.get("nearby_places") or []
+        if isinstance(nearby, list) and nearby:
+            first = nearby[0]
+            place_name = str(first.get("name") or "a place nearby")
+            distance = first.get("distance_meters")
+            distance_text = f", about {distance} meters away" if distance is not None else ""
+            return f"You're at {address or 'your current location'}. The nearest point of interest is {place_name}{distance_text}."
+        if address:
+            return f"You're at {address}."
+        return None
+
+    if name == "navigate_to":
+        direction = str(result.get("destination_direction") or "").strip()
+        destination = str(result.get("destination") or "").strip()
+        if direction and destination:
+            return f"{destination} is {direction}. I'll guide you there."
+        if destination:
+            return f"I found a route to {destination}."
+        error = str(result.get("error") or "").strip()
+        return error or None
+
+    if name == "google_search":
+        answer = str(result.get("answer") or "").strip()
+        return answer or str(result.get("message") or "").strip() or None
+
+    if name == "remember_entity":
+        message = str(result.get("message") or "").strip()
+        if message:
+            return message
+        content = str(result.get("content") or "").strip()
+        return f"I'll remember that{': ' + content if content else '.'}"
+
+    if name == "what_do_you_remember":
+        answer = str(result.get("answer") or result.get("message") or "").strip()
+        return answer or None
+
+    return None
+
+
+_NAVIGATION_DESTINATION_PATTERNS = (
+    "navigate me to",
+    "navigate to",
+    "take me to",
+    "guide me to",
+    "route me to",
+    "how do i get to",
+    "go to",
+    "walk to",
+    "head to",
+)
 
 
 class WebSocketHandler:
@@ -125,6 +246,7 @@ class WebSocketHandler:
         assembled_profile,
         memory_budget,
         initial_memories: list | None = None,
+        resume_requested: bool = False,
     ) -> None:
         self.websocket = websocket
         self.user_id = user_id
@@ -149,21 +271,36 @@ class WebSocketHandler:
         self.memory_budget = memory_budget
         self._initial_memories = initial_memories or []
         self._response_watchdog_task: asyncio.Task | None = None
+        self._resume_requested = resume_requested
+        self._pending_resume_context: str | None = None
 
     def _is_stale_turn(self, origin_turn_seq: int | None) -> bool:
         return origin_turn_seq is not None and origin_turn_seq < self.state.user_turn_seq
 
-    def _register_user_activity(self, *, explicit_turn_start: bool = False) -> bool:
+    def _register_user_activity(
+        self,
+        *,
+        explicit_turn_start: bool = False,
+        source: str = "generic",
+    ) -> bool:
         """Mark fresh user activity and discard queued context from older turns."""
         now_mono = time.monotonic()
         idle_gap = now_mono - self.state.last_user_activity_at
-        is_new_turn = explicit_turn_start or idle_gap >= self.state.USER_TURN_GAP_SEC
+        hinted_turn_continues = (
+            explicit_turn_start
+            and source == "activity_start"
+            and self.state.last_text_hint_at > 0
+            and (now_mono - self.state.last_text_hint_at) <= self.state.USER_TURN_GAP_SEC
+        )
+        is_new_turn = (explicit_turn_start or idle_gap >= self.state.USER_TURN_GAP_SEC) and not hinted_turn_continues
         self.state.last_user_activity_at = now_mono
         if not is_new_turn:
             return False
 
         self.state.user_turn_seq += 1
         self.state.turn_output_seen = False
+        self.state.pending_fallback_text = None
+        self.state.pending_fallback_turn_seq = self.state.user_turn_seq
         self._schedule_response_watchdog(self.state.user_turn_seq)
         discard_stale = getattr(self.ctx_queue, "discard_stale", None)
         if callable(discard_stale):
@@ -181,29 +318,36 @@ class WebSocketHandler:
             self._response_watchdog_task.cancel()
             self._response_watchdog_task = None
 
-    def _schedule_response_watchdog(self, turn_seq: int) -> None:
+    def _schedule_response_watchdog(
+        self,
+        turn_seq: int,
+        *,
+        delay_sec: float = _SILENT_TURN_WATCHDOG_SEC,
+    ) -> None:
         self._cancel_response_watchdog()
         try:
             asyncio.get_running_loop()
         except RuntimeError:
             return
         self._response_watchdog_task = asyncio.create_task(
-            self._response_watchdog(turn_seq)
+            self._response_watchdog(turn_seq, delay_sec)
         )
 
-    async def _response_watchdog(self, turn_seq: int) -> None:
+    async def _response_watchdog(self, turn_seq: int, delay_sec: float) -> None:
         try:
-            await asyncio.sleep(_SILENT_TURN_WATCHDOG_SEC)
+            await asyncio.sleep(delay_sec)
             if self.stop_downstream.is_set():
                 return
             if turn_seq != self.state.user_turn_seq:
                 return
             if self.state.turn_output_seen:
                 return
+            if await self._emit_pending_fallback_output(turn_seq):
+                return
             logger.warning(
                 "No client-visible output for turn %d within %.1fs; requesting reconnect",
                 turn_seq,
-                _SILENT_TURN_WATCHDOG_SEC,
+                delay_sec,
             )
             await self._safe_send_json({
                 "type": MessageType.GO_AWAY,
@@ -217,6 +361,257 @@ class WebSocketHandler:
                 pass
         except asyncio.CancelledError:
             return
+
+    async def _emit_pending_fallback_output(self, turn_seq: int) -> bool:
+        if not (
+            self.state.pending_fallback_text
+            and self.state.pending_fallback_turn_seq == turn_seq
+        ):
+            return False
+
+        fallback_text = self.state.pending_fallback_text
+        pcm = b""
+        try:
+            pcm = await synthesize_fallback_pcm(fallback_text)
+        except Exception:
+            logger.exception("Fallback TTS synthesis failed")
+        sent = await self._safe_send_json({
+            "type": MessageType.TRANSCRIPT,
+            "text": fallback_text,
+            "role": "agent",
+            "source": "tool_fallback",
+        })
+        if not sent:
+            return False
+        if pcm:
+            await self._safe_send_bytes(pcm)
+        self.state.turn_output_seen = True
+        self.state.pending_fallback_text = None
+        self._cancel_response_watchdog()
+        logger.info("Emitted tool-result fallback output for turn %d", turn_seq)
+        return True
+
+    def _infer_navigation_redirect_types(self, question: str) -> list[str] | None:
+        lowered = (question or "").lower()
+        for token, place_types in _NAVIGATION_PLACE_TYPE_HINTS.items():
+            if token in lowered:
+                return place_types
+        return None
+
+    async def _maybe_redirect_maps_query(
+        self,
+        *,
+        question: str,
+        user_speaking: bool,
+    ) -> tuple[bool, dict[str, object]]:
+        recent_user = _recent_user_utterances(self.state.transcript_history, max_items=3)
+        if not any(_has_navigation_intent(text) for text in recent_user):
+            return False, {}
+
+        search_types = self._infer_navigation_redirect_types(question)
+        search_args: dict[str, object] = {}
+        if search_types:
+            search_args["types"] = search_types
+
+        search_result = await _dispatch_function_call(
+            "nearby_search",
+            search_args,
+            self.session_id,
+            self.user_id,
+        )
+        places = list(search_result.get("places", [])) if isinstance(search_result, dict) else []
+        if not places:
+            return False, {}
+
+        destination = str(places[0].get("address") or places[0].get("name") or question).strip()
+        if not destination:
+            return False, {}
+
+        behavior = resolve_tool_behavior(
+            tool_name="navigate_to",
+            lod=self.session_ctx.current_lod,
+            is_user_speaking=user_speaking,
+        )
+        await self._emit_tool_event(
+            "navigate_to",
+            behavior,
+            status="invoked",
+            data={"redirected_from": "maps_query", "destination": destination},
+        )
+        result = await _dispatch_function_call(
+            "navigate_to",
+            {"destination": destination},
+            self.session_id,
+            self.user_id,
+        )
+        await self._safe_send_json({
+            "type": MessageType.TOOL_RESULT,
+            "tool": "navigate_to",
+            "behavior": behavior_to_text(behavior),
+            "data": _json_safe(result),
+        })
+        await self._safe_send_json({
+            "type": MessageType.NAVIGATION_RESULT,
+            "summary": str(result.get("destination_direction") or result.get("destination") or destination),
+            "behavior": behavior_to_text(behavior),
+            "data": _json_safe(result),
+        })
+        fallback_text = _tool_result_fallback_text("navigate_to", result)
+        if fallback_text:
+            self.state.pending_fallback_text = fallback_text
+            self.state.pending_fallback_turn_seq = self.state.user_turn_seq
+
+        redirected_result = {
+            "success": True,
+            "redirected_to": "navigate_to",
+            "selected_place": places[0],
+            "navigation_result": result,
+        }
+        return True, redirected_result
+
+    def _extract_navigation_destination(self, text: str) -> tuple[str | None, list[str] | None]:
+        lowered = (text or "").strip().lower()
+        if not lowered:
+            return None, None
+
+        search_types = self._infer_navigation_redirect_types(lowered)
+        if search_types and any(token in lowered for token in ("nearest", "closest")):
+            return None, search_types
+
+        destination = None
+        for marker in _NAVIGATION_DESTINATION_PATTERNS:
+            if marker in lowered:
+                start = lowered.index(marker) + len(marker)
+                destination = text[start:].strip()
+                break
+
+        if destination is None:
+            destination = text.strip()
+
+        destination = re.sub(r"^(the|a|an)\s+", "", destination, flags=re.IGNORECASE)
+        destination = re.sub(r"\b(please|thanks?|now)\b", "", destination, flags=re.IGNORECASE)
+        destination = destination.strip(" ,.?!")
+        return (destination or None), search_types
+
+    async def _maybe_handle_direct_navigation_intent(self, input_text: str) -> bool:
+        current_turn = self.state.user_turn_seq
+        if current_turn <= 0 or self.state.direct_tool_handled_turn_seq == current_turn:
+            return False
+        if not _has_navigation_intent(input_text):
+            return False
+        ephemeral = session_manager.get_ephemeral_context(self.session_id)
+        gps = getattr(ephemeral, "gps", None)
+        lat = getattr(gps, "lat", None)
+        lng = getattr(gps, "lng", None)
+        if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
+            return False
+
+        destination, search_types = self._extract_navigation_destination(input_text)
+        user_speaking = self.session_ctx.current_activity_state == "user_speaking"
+        behavior = resolve_tool_behavior(
+            tool_name="navigate_to",
+            lod=self.session_ctx.current_lod,
+            is_user_speaking=user_speaking,
+        )
+
+        result: dict[str, object]
+        selected_place: dict[str, object] | None = None
+        if search_types:
+            await self._emit_tool_event(
+                "nearby_search",
+                ToolBehavior.WHEN_IDLE,
+                status="invoked",
+                data={"source": "server_shortcut", "types": search_types},
+            )
+            search_result = await _dispatch_function_call(
+                "nearby_search",
+                {"types": search_types, "radius": 500},
+                self.session_id,
+                self.user_id,
+            )
+            places = list(search_result.get("places", [])) if isinstance(search_result, dict) else []
+            if not places:
+                result = {
+                    "success": False,
+                    "error": "No nearby destination found.",
+                }
+            else:
+                selected_place = places[0]
+                destination = str(
+                    selected_place.get("address") or selected_place.get("name") or ""
+                ).strip()
+                result = await _dispatch_function_call(
+                    "navigate_to",
+                    {"destination": destination},
+                    self.session_id,
+                    self.user_id,
+                )
+        elif destination:
+            result = await _dispatch_function_call(
+                "navigate_to",
+                {"destination": destination},
+                self.session_id,
+                self.user_id,
+            )
+        else:
+            return False
+
+        await self._emit_tool_event(
+            "navigate_to",
+            behavior,
+            status="invoked",
+            data={"source": "server_shortcut", "destination": destination or input_text},
+        )
+        await self._safe_send_json({
+            "type": MessageType.TOOL_RESULT,
+            "tool": "navigate_to",
+            "behavior": behavior_to_text(behavior),
+            "data": _json_safe(result),
+        })
+        await self._safe_send_json({
+            "type": MessageType.NAVIGATION_RESULT,
+            "summary": str(result.get("destination_direction") or result.get("destination") or destination or ""),
+            "behavior": behavior_to_text(behavior),
+            "data": _json_safe(result),
+        })
+
+        fallback_text = _tool_result_fallback_text("navigate_to", result)
+        if fallback_text:
+            self.state.pending_fallback_text = fallback_text
+            self.state.pending_fallback_turn_seq = current_turn
+            await self._emit_pending_fallback_output(current_turn)
+
+        from google.genai.types import FunctionResponse
+        shortcut_response = {
+            "success": bool(result.get("success", True)),
+            "handled_by": "server_shortcut",
+            "selected_place": selected_place,
+            "navigation_result": result,
+        }
+        fr = FunctionResponse(name="navigate_to", response=shortcut_response)
+        self.ctx_queue.inject_immediate(
+            types.Content(
+                parts=[
+                    types.Part(
+                        text=(
+                            "[TOOL RESULT READY] The navigation request has already been "
+                            "handled. Continue from this result without greeting again."
+                        )
+                    ),
+                    types.Part(function_response=fr),
+                ],
+                role="user",
+            ),
+            is_function_response=True,
+        )
+
+        self.state.direct_tool_handled_turn_seq = current_turn
+        self.state.is_interrupted = True
+        self.state.last_interrupt_at = time.monotonic()
+        self.state.model_audio_last_seen_at = 0.0
+        self.ctx_queue._transition_to(ModelState.IDLE)
+        logger.info("Handled direct navigation shortcut for turn %d", current_turn)
+        return True
 
     # ── Main entry point ───────────────────────────────────────────────
 
@@ -239,7 +634,6 @@ class WebSocketHandler:
         # Send tools manifest so iOS Dev Console shows tool/context status
         await self._safe_send_json(self._build_tools_manifest())
 
-        # Inject combined context (LOD + greeting) so model speaks once
         _initial_prompt = build_full_dynamic_prompt(
             lod=self.session_ctx.current_lod,
             profile=self.user_profile,
@@ -248,27 +642,42 @@ class WebSocketHandler:
             memories=self._initial_memories if self._initial_memories else None,
             assembled_profile=self._assembled_profile,
         )
-        _greeting_parts: list[str] = [
-            "[SESSION START] Greet the user briefly (1-2 sentences).",
-            "Let them know you're ready to help.",
-        ]
-        if self.user_profile and self.user_profile.preferred_name:
-            _greeting_parts.append(
-                f"Address them as '{self.user_profile.preferred_name}'."
+
+        if self._resume_requested:
+            self._pending_resume_context = (
+                "[CONTEXT UPDATE - DO NOT SPEAK]\n"
+                + _initial_prompt
+                + "\n\n[SESSION RESUME] This session has resumed after an interruption. "
+                  "Do not greet again. Continue helping with the user's current request "
+                  "or wait silently for their next input."
             )
-        _greeting_parts.append("Keep it natural and concise — no instructions or tutorials.")
-        _combined_content = types.Content(
-            parts=[
-                types.Part(text="[CONTEXT UPDATE - DO NOT SPEAK]\n" + _initial_prompt),
-                types.Part(text=" ".join(_greeting_parts)),
-            ],
-            role="user",
-        )
-        self.ctx_queue.inject_immediate(_combined_content)
-        logger.info(
-            "Injected combined context (LOD %d) + greeting for session %s",
-            self.session_ctx.current_lod, self.session_id,
-        )
+            logger.info(
+                "Resume requested for session %s; queued silent resume context for next user turn",
+                self.session_id,
+            )
+        else:
+            # Inject combined context (LOD + greeting) so model speaks once
+            _greeting_parts: list[str] = [
+                "[SESSION START] Greet the user briefly (1-2 sentences).",
+                "Let them know you're ready to help.",
+            ]
+            if self.user_profile and self.user_profile.preferred_name:
+                _greeting_parts.append(
+                    f"Address them as '{self.user_profile.preferred_name}'."
+                )
+            _greeting_parts.append("Keep it natural and concise — no instructions or tutorials.")
+            _combined_content = types.Content(
+                parts=[
+                    types.Part(text="[CONTEXT UPDATE - DO NOT SPEAK]\n" + _initial_prompt),
+                    types.Part(text=" ".join(_greeting_parts)),
+                ],
+                role="user",
+            )
+            self.ctx_queue.inject_immediate(_combined_content)
+            logger.info(
+                "Injected combined context (LOD %d) + greeting for session %s",
+                self.session_ctx.current_lod, self.session_id,
+            )
 
         if self.state.face_library_task is not None:
             self.state.face_library_refresh_task = asyncio.create_task(
@@ -408,6 +817,7 @@ class WebSocketHandler:
                 await self.websocket.send_bytes(payload)
             if payload and self.state.user_turn_seq > 0:
                 self.state.turn_output_seen = True
+                self.state.pending_fallback_text = None
                 self._cancel_response_watchdog()
             return True
         except (WebSocketDisconnect, RuntimeError):
@@ -440,6 +850,7 @@ class WebSocketHandler:
             self.state.last_agent_text_sent_at = now_mono
             if self.state.user_turn_seq > 0:
                 self.state.turn_output_seen = True
+                self.state.pending_fallback_text = None
                 self._cancel_response_watchdog()
         return sent
 
@@ -1143,12 +1554,54 @@ class WebSocketHandler:
                 elif msg_type == "telemetry":
                     await self._process_telemetry(message.get("data", {}))
 
+                elif msg_type == "text_hint":
+                    input_text = str(message.get("text", "")).strip()
+                    if not input_text:
+                        continue
+                    self.state.last_text_hint_at = time.monotonic()
+                    self._register_user_activity(explicit_turn_start=True, source="text_hint")
+                    self.session_ctx.current_activity_state = "user_speaking"
+                    self.state.transcript_history.append({"role": "user", "text": input_text})
+                    self.session_meta.record_interaction()
+                    await self._safe_send_json({
+                        "type": MessageType.TRANSCRIPT,
+                        "text": input_text,
+                        "role": "user",
+                        "source": "client_hint",
+                    })
+                    if await self._maybe_handle_direct_navigation_intent(input_text):
+                        continue
+                    hint_text = (
+                        "[TRANSCRIPT HINT - DO NOT SPEAK]\n"
+                        f"The user's current utterance is: {input_text}\n"
+                        "Use this semantic hint to interpret their live audio and "
+                        "respond to the same request. Do not mention the hint."
+                    )
+                    preference_hint = _tool_preference_hint(input_text)
+                    if preference_hint:
+                        hint_text += "\n" + preference_hint
+                    if self._pending_resume_context:
+                        hint_text = self._pending_resume_context + "\n\n" + hint_text
+                        self._pending_resume_context = None
+                    hint_content = types.Content(
+                        parts=[types.Part(
+                            text=hint_text
+                        )],
+                        role="user",
+                    )
+                    self.ctx_queue.inject_immediate(hint_content, is_function_response=True)
+                    await self._maybe_handle_direct_navigation_intent(input_text)
+
                 elif msg_type in {"activity_start", "activity_end"}:
                     event_name = str(msg_type)
                     if event_name == "activity_start":
-                        self._register_user_activity(explicit_turn_start=True)
+                        self._register_user_activity(
+                            explicit_turn_start=True,
+                            source="activity_start",
+                        )
                     else:
                         self.state.last_user_activity_at = time.monotonic()
+                        self.state.last_text_hint_at = 0.0
                     self.session_meta.record_interaction()
                     had_interrupt = self.state.is_interrupted
                     if _should_reset_interrupted_on_activity_start(event_name=event_name, interrupted=had_interrupt):
@@ -1435,9 +1888,10 @@ class WebSocketHandler:
 
                 if event.live_session_resumption_update:
                     update = event.live_session_resumption_update
-                    if update.newHandle:
-                        session_manager.update_handle(self.session_id, update.newHandle)
-                    if not await self._safe_send_json({"type": MessageType.SESSION_RESUMPTION, "handle": update.newHandle}):
+                    new_handle = getattr(update, "new_handle", None) or getattr(update, "newHandle", None)
+                    if new_handle:
+                        session_manager.update_handle(self.session_id, new_handle)
+                    if not await self._safe_send_json({"type": MessageType.SESSION_RESUMPTION, "handle": new_handle or ""}):
                         break
 
                 if hasattr(event, "go_away") and event.go_away:
@@ -1476,22 +1930,16 @@ class WebSocketHandler:
                         logger.info("Turn complete revoked — audio arrived during quiet period")
                     else:
                         self.ctx_queue.on_turn_complete()
+                        if await self._emit_pending_fallback_output(self.state.user_turn_seq):
+                            self.ctx_queue.enqueue(category="turn_boundary", text="<<<INTERNAL_CONTEXT>>>\n[TURN BOUNDARY] Previous request complete. Await user's next request. Do not carry forward tool-calling intent from previous turn.\n<<<END_INTERNAL_CONTEXT>>>", priority=1, speak=False, turn_seq=self.state.user_turn_seq)
+                            self.ctx_queue.flush_or_defer_first_turn(camera_active=self.state.client_camera_active)
+                            continue
                         if self._should_reconnect_silent_turn():
-                            logger.warning(
-                                "Turn %d completed without client-visible output; requesting reconnect",
+                            logger.info(
+                                "Turn %d completed without client-visible output; awaiting watchdog before reconnect",
                                 self.state.user_turn_seq,
                             )
-                            await self._safe_send_json({
-                                "type": MessageType.GO_AWAY,
-                                "retry_ms": 750,
-                                "message": "No response generated for the last turn. Reconnecting.",
-                            })
-                            self.stop_downstream.set()
-                            try:
-                                await self.websocket.close(code=1012, reason="no_response_turn")
-                            except Exception:
-                                pass
-                            return
+                            continue
                         self.ctx_queue.enqueue(category="turn_boundary", text="<<<INTERNAL_CONTEXT>>>\n[TURN BOUNDARY] Previous request complete. Await user's next request. Do not carry forward tool-calling intent from previous turn.\n<<<END_INTERNAL_CONTEXT>>>", priority=1, speak=False, turn_seq=self.state.user_turn_seq)
                         self.ctx_queue.flush_or_defer_first_turn(camera_active=self.state.client_camera_active)
 
@@ -1532,6 +1980,8 @@ class WebSocketHandler:
                         self.session_meta.record_interaction()
                         if not await self._safe_send_json({"type": MessageType.TRANSCRIPT, "text": input_text, "role": "user"}):
                             break
+                        if await self._maybe_handle_direct_navigation_intent(input_text):
+                            continue
                         intent = _detect_voice_intent(input_text)
                         if intent == "detail":
                             self.session_ctx.user_requested_detail = True
@@ -1633,6 +2083,42 @@ class WebSocketHandler:
             user_speaking = self.session_ctx.current_activity_state == "user_speaking"
             behavior = resolve_tool_behavior(tool_name=fc.name, lod=self.session_ctx.current_lod, is_user_speaking=user_speaking)
 
+            if fc.name == "maps_query":
+                redirected, redirected_result = await self._maybe_redirect_maps_query(
+                    question=str(call_args.get("question", "")),
+                    user_speaking=user_speaking,
+                )
+                if redirected:
+                    await self._emit_tool_event(
+                        fc.name,
+                        behavior,
+                        status="redirected",
+                        data={"redirected_to": "navigate_to", "args": _json_safe(call_args)},
+                    )
+                    await self._safe_send_json({
+                        "type": MessageType.TOOL_RESULT,
+                        "tool": fc.name,
+                        "behavior": behavior_to_text(behavior),
+                        "data": _json_safe(redirected_result),
+                    })
+                    from google.genai.types import FunctionResponse
+                    fr = FunctionResponse(name=fc.name, response=redirected_result)
+                    parts = [
+                        types.Part(
+                            text=(
+                                "[TOOL RESULT READY] The navigation request was resolved. "
+                                "Use the redirected navigation result to answer the user now."
+                            )
+                        ),
+                        types.Part(function_response=fr),
+                    ]
+                    self.ctx_queue.inject_immediate(
+                        types.Content(parts=parts, role="user"),
+                        is_function_response=True,
+                    )
+                    logger.info("Redirected maps_query to navigate_to for explicit navigation request")
+                    continue
+
             allow_call, block_reason = _allow_navigation_tool_call(func_name=fc.name, func_args=call_args, transcript_history=self.state.transcript_history)
             if not allow_call:
                 blocked_result = {"status": "blocked", "reason": block_reason, "message": "Navigation tools require an explicit navigation request from the user in this session."}
@@ -1653,6 +2139,15 @@ class WebSocketHandler:
             finally:
                 self.audio_gate.exit()
             await self._safe_send_json({"type": MessageType.TOOL_RESULT, "tool": fc.name, "behavior": behavior_to_text(behavior), "data": _json_safe(result)})
+            if behavior == ToolBehavior.WHEN_IDLE:
+                fallback_text = _tool_result_fallback_text(fc.name, result)
+                if fallback_text:
+                    self.state.pending_fallback_text = fallback_text
+                    self.state.pending_fallback_turn_seq = self.state.user_turn_seq
+                    self._schedule_response_watchdog(
+                        self.state.user_turn_seq,
+                        delay_sec=6.0,
+                    )
 
             if fc.name in NAVIGATION_FUNCTIONS:
                 await self._safe_send_json({"type": MessageType.NAVIGATION_RESULT, "summary": str(result.get("destination_direction") or result.get("destination") or ""), "behavior": behavior_to_text(behavior), "data": _json_safe(result)})
@@ -1666,6 +2161,18 @@ class WebSocketHandler:
             parts = [types.Part(function_response=fr)]
             if behavior == ToolBehavior.INTERRUPT:
                 parts.insert(0, types.Part(text="[SAFETY ALERT — COMPLETE DELIVERY] Do not stop mid-sentence even if you detect user activity. Deliver the full safety information before yielding."))
+            elif behavior == ToolBehavior.WHEN_IDLE:
+                parts.insert(
+                    0,
+                    types.Part(
+                        text=(
+                            "[TOOL RESULT READY] Use the tool result to answer the user's "
+                            "current request now in one concise spoken response. Do not "
+                            "greet again. If the tool failed, briefly explain that and "
+                            "offer the next best step."
+                        )
+                    ),
+                )
             content = types.Content(parts=parts, role="user")
             self.ctx_queue.inject_immediate(content, is_function_response=True)
             logger.info("Sent function response for %s (behavior=%s)", fc.name, behavior_to_text(behavior))

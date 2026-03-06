@@ -14,12 +14,14 @@ Phase 4 additions:
 import logging
 import os
 import time
+from dataclasses import asdict, is_dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
 
-from lod.models import EphemeralContext, SessionContext, UserProfile
+from lod.models import EphemeralContext, GPSData, NarrativeSnapshot, SessionContext, UserProfile
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +212,7 @@ def build_vad_runtime_update_message(lod: int) -> str:
 # ---------------------------------------------------------------------------
 
 _firestore_client = None
+_SESSION_STATE_COLLECTION = "runtime_sessions"
 
 
 def _get_firestore():
@@ -226,6 +229,32 @@ def _get_firestore():
     return _firestore_client if _firestore_client else None
 
 
+def _serialize_for_firestore(value):
+    if is_dataclass(value):
+        return {k: _serialize_for_firestore(v) for k, v in asdict(value).items()}
+    if isinstance(value, list):
+        return [_serialize_for_firestore(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _serialize_for_firestore(v) for k, v in value.items()}
+    return value
+
+
+def _deserialize_session_context(data: dict) -> SessionContext:
+    payload = dict(data or {})
+    narrative = payload.get("narrative_snapshot")
+    if isinstance(narrative, dict):
+        payload["narrative_snapshot"] = NarrativeSnapshot(**narrative)
+    return SessionContext(**payload)
+
+
+def _deserialize_ephemeral_context(data: dict) -> EphemeralContext:
+    payload = dict(data or {})
+    gps = payload.get("gps")
+    if isinstance(gps, dict):
+        payload["gps"] = GPSData(**gps)
+    return EphemeralContext(**payload)
+
+
 class SessionManager:
     """Manages Live API session state and RunConfig construction.
 
@@ -234,6 +263,7 @@ class SessionManager:
     """
 
     _USER_PROFILE_TTL_SEC = 3600.0  # 1 hour
+    _RESUMABLE_STATE_TTL_SEC = 600.0  # 10 minutes
 
     def __init__(self) -> None:
         self._session_handles: dict[str, str] = {}
@@ -242,6 +272,98 @@ class SessionManager:
         self._user_profile_access_times: dict[str, float] = {}
         self._ephemeral_contexts: dict[str, EphemeralContext] = {}
         self._adk_session_ids: dict[str, str] = {}  # logical_id → ADK session ID
+        self._resumable_expires_at: dict[str, float] = {}
+
+    def _session_state_doc(self, session_id: str):
+        db = _get_firestore()
+        if not db:
+            return None
+        return db.collection(_SESSION_STATE_COLLECTION).document(session_id)
+
+    def _restore_remote_session_state(self, session_id: str) -> bool:
+        doc_ref = self._session_state_doc(session_id)
+        if doc_ref is None:
+            return False
+        try:
+            doc = doc_ref.get()
+            if not doc.exists:
+                return False
+            data = doc.to_dict() or {}
+            expires_at = data.get("expires_at")
+            if isinstance(expires_at, datetime):
+                if expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
+                if expires_at <= datetime.now(timezone.utc):
+                    doc_ref.delete()
+                    return False
+            handle = str(data.get("handle") or "").strip()
+            if handle:
+                self._session_handles[session_id] = handle
+            session_ctx_data = data.get("session_context")
+            if isinstance(session_ctx_data, dict):
+                self._session_contexts[session_id] = _deserialize_session_context(session_ctx_data)
+            ephemeral_data = data.get("ephemeral_context")
+            if isinstance(ephemeral_data, dict):
+                self._ephemeral_contexts[session_id] = _deserialize_ephemeral_context(ephemeral_data)
+            logger.info("Restored runtime session state from Firestore for %s", session_id)
+            return bool(handle or session_ctx_data or ephemeral_data)
+        except Exception:
+            logger.exception("Failed to restore runtime session state for %s", session_id)
+            return False
+
+    def _persist_resumable_state(self, session_id: str) -> None:
+        doc_ref = self._session_state_doc(session_id)
+        if doc_ref is None:
+            return
+        payload = {
+            "handle": self._session_handles.get(session_id, ""),
+            "session_context": _serialize_for_firestore(self._session_contexts.get(session_id, SessionContext())),
+            "ephemeral_context": _serialize_for_firestore(self._ephemeral_contexts.get(session_id, EphemeralContext())),
+            "updated_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc).replace(microsecond=0),
+        }
+        payload["expires_at"] = payload["updated_at"] + timedelta(seconds=self._RESUMABLE_STATE_TTL_SEC)
+        try:
+            doc_ref.set(payload)
+            logger.info("Persisted runtime session state to Firestore for %s", session_id)
+        except Exception:
+            logger.exception("Failed to persist runtime session state for %s", session_id)
+
+    def _purge_expired_resumable_state(self, session_id: str) -> None:
+        expires_at = self._resumable_expires_at.get(session_id)
+        if expires_at is None:
+            return
+        if time.monotonic() <= expires_at:
+            return
+        self._session_handles.pop(session_id, None)
+        self._session_contexts.pop(session_id, None)
+        self._ephemeral_contexts.pop(session_id, None)
+        self._resumable_expires_at.pop(session_id, None)
+        doc_ref = self._session_state_doc(session_id)
+        if doc_ref is not None:
+            try:
+                doc_ref.delete()
+            except Exception:
+                logger.debug("Failed to delete expired runtime session state for %s", session_id, exc_info=True)
+        logger.info("Expired resumable state for session %s", session_id)
+
+    def _activate_session(self, session_id: str) -> None:
+        self._purge_expired_resumable_state(session_id)
+        self._resumable_expires_at.pop(session_id, None)
+        if (
+            session_id not in self._session_handles
+            and session_id not in self._session_contexts
+            and session_id not in self._ephemeral_contexts
+        ):
+            self._restore_remote_session_state(session_id)
+
+    def has_resumable_state(self, session_id: str) -> bool:
+        self._purge_expired_resumable_state(session_id)
+        return (
+            session_id in self._session_handles
+            or session_id in self._session_contexts
+            or session_id in self._ephemeral_contexts
+        )
 
     # -- RunConfig ----------------------------------------------------------
 
@@ -257,6 +379,7 @@ class SessionManager:
 
     def get_run_config(self, session_id: str, lod: int = 2, language_code: str = "") -> RunConfig:
         """Build a RunConfig for the given session."""
+        self._activate_session(session_id)
         cached_handle = self._session_handles.get(session_id)
 
         session_resumption = types.SessionResumptionConfig(
@@ -335,17 +458,22 @@ class SessionManager:
 
     def update_handle(self, session_id: str, handle: str) -> None:
         """Cache a session resumption handle."""
+        self._activate_session(session_id)
         self._session_handles[session_id] = handle
         logger.debug("Cached resumption handle for session %s", session_id)
 
     def get_handle(self, session_id: str) -> Optional[str]:
         """Retrieve a cached resumption handle."""
+        self._purge_expired_resumable_state(session_id)
+        if session_id not in self._session_handles:
+            self._restore_remote_session_state(session_id)
         return self._session_handles.get(session_id)
 
     # -- Per-session context ------------------------------------------------
 
     def get_session_context(self, session_id: str) -> SessionContext:
         """Get or create the SessionContext for this session."""
+        self._activate_session(session_id)
         if session_id not in self._session_contexts:
             self._session_contexts[session_id] = SessionContext()
         return self._session_contexts[session_id]
@@ -411,12 +539,14 @@ class SessionManager:
 
     def get_ephemeral_context(self, session_id: str) -> EphemeralContext:
         """Get or create the latest EphemeralContext for this session."""
+        self._activate_session(session_id)
         if session_id not in self._ephemeral_contexts:
             self._ephemeral_contexts[session_id] = EphemeralContext()
         return self._ephemeral_contexts[session_id]
 
     def update_ephemeral_context(self, session_id: str, ctx: EphemeralContext) -> None:
         """Store the latest ephemeral context snapshot."""
+        self._activate_session(session_id)
         self._ephemeral_contexts[session_id] = ctx
 
     # -- ADK session ID mapping (Vertex AI) -----------------------------------
@@ -427,15 +557,38 @@ class SessionManager:
 
     def set_adk_session_id(self, logical_id: str, adk_id: str) -> None:
         """Cache the ADK-generated session ID for a logical session."""
+        self._activate_session(logical_id)
         self._adk_session_ids[logical_id] = adk_id
 
     # -- Cleanup ------------------------------------------------------------
 
     def remove_session(self, session_id: str) -> None:
         """Remove all cached state for a session and evict stale profiles."""
-        self._session_handles.pop(session_id, None)
-        self._session_contexts.pop(session_id, None)
-        self._ephemeral_contexts.pop(session_id, None)
         self._adk_session_ids.pop(session_id, None)
+        has_state = (
+            session_id in self._session_handles
+            or session_id in self._session_contexts
+            or session_id in self._ephemeral_contexts
+        )
+        if has_state:
+            self._resumable_expires_at[session_id] = (
+                time.monotonic() + self._RESUMABLE_STATE_TTL_SEC
+            )
+            self._persist_resumable_state(session_id)
+            logger.info(
+                "Preserving resumable state for session %s for %.0fs",
+                session_id,
+                self._RESUMABLE_STATE_TTL_SEC,
+            )
+        else:
+            self._session_contexts.pop(session_id, None)
+            self._ephemeral_contexts.pop(session_id, None)
+            self._resumable_expires_at.pop(session_id, None)
+            doc_ref = self._session_state_doc(session_id)
+            if doc_ref is not None:
+                try:
+                    doc_ref.delete()
+                except Exception:
+                    logger.debug("Failed to delete runtime session state for %s", session_id, exc_info=True)
         self.evict_stale_profiles()
         logger.debug("Removed session state for %s", session_id)

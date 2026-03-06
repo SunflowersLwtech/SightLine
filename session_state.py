@@ -85,6 +85,10 @@ class SessionState:
     last_user_activity_at: float = field(default_factory=time.monotonic)
     user_turn_seq: int = 0
     turn_output_seen: bool = False
+    last_text_hint_at: float = 0.0
+    pending_fallback_text: str | None = None
+    pending_fallback_turn_seq: int = 0
+    direct_tool_handled_turn_seq: int = 0
 
     # -- Memory (Phase 4) ----------------------------------------------------
     memory_top3: list[str] = field(default_factory=list)

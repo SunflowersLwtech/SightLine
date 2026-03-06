@@ -129,3 +129,59 @@ async def test_turn_detects_json_leak_pattern(tmp_path: Path):
 
     assert result.passed is False
     assert any("context_regex_leaked" in f for f in result.failures)
+
+
+@pytest.mark.asyncio
+async def test_turn_sends_text_hint_before_audio(tmp_path: Path):
+    ws = _FakeWS(
+        [
+            json.dumps({"type": "transcript", "role": "agent", "text": "Ready."}),
+            b"\x00\x01",
+        ]
+    )
+    pcm_cache = {"T03B": b"\x00\x00" * 8}
+    turn_def = {
+        "id": "T03B",
+        "text": "describe around me",
+        "expect_agent_response": True,
+    }
+
+    await _run_single_turn(
+        ws=ws,
+        turn_def=turn_def,
+        pcm_cache=pcm_cache,
+        image_dir=tmp_path,
+        collect_sec=0.02,
+        strict_expectations=True,
+    )
+
+    assert json.loads(ws.sent[0]) == {"type": "text_hint", "text": "describe around me"}
+    assert json.loads(ws.sent[1]) == {"type": "activity_start"}
+
+
+@pytest.mark.asyncio
+async def test_turn_captures_latest_resume_handle(tmp_path: Path):
+    ws = _FakeWS(
+        [
+            json.dumps({"type": "session_resumption", "handle": "resume-123"}),
+            json.dumps({"type": "transcript", "role": "agent", "text": "Recovered."}),
+            b"\x00\x01",
+        ]
+    )
+    pcm_cache = {"T04": b"\x00\x00" * 24}
+    turn_def = {
+        "id": "T04",
+        "text": "continue",
+        "expect_agent_response": True,
+    }
+
+    result = await _run_single_turn(
+        ws=ws,
+        turn_def=turn_def,
+        pcm_cache=pcm_cache,
+        image_dir=tmp_path,
+        collect_sec=0.02,
+        strict_expectations=True,
+    )
+
+    assert result.latest_resume_handle == "resume-123"

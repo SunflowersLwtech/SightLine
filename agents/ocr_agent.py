@@ -27,7 +27,7 @@ logger = logging.getLogger("sightline.ocr_agent")
 # ---------------------------------------------------------------------------
 
 OCR_MODEL = os.getenv("GEMINI_FLASH_MODEL", "gemini-3-flash-preview")
-_REQUEST_TIMEOUT_SEC = float(os.getenv("OCR_REQUEST_TIMEOUT_SEC", "5"))
+_REQUEST_TIMEOUT_SEC = float(os.getenv("OCR_REQUEST_TIMEOUT_SEC", "8"))
 
 _SYSTEM_PROMPT = """\
 You are a text extraction system for a blind user. Your job is to read ALL \

@@ -23,12 +23,13 @@ import re
 import subprocess
 import sys
 import time
+import urllib.parse
 import uuid
 import wave
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import websockets
@@ -1839,6 +1840,7 @@ class TurnResult:
     collect_duration_sec: float = 0.0
     notes: str = ""
     request_reconnect: bool = False
+    latest_resume_handle: str | None = None
 
 
 @dataclass
@@ -2195,11 +2197,24 @@ async def run_conversation(
 
     # Vertex AI session service requires alphanumeric + hyphen IDs (no underscores)
     safe_session_id = conv_id.replace("_", "-")
-    ws_url = f"{ws_base_url.rstrip('/')}/ws/e2e-user/{safe_session_id}"
+    resume_handle: str | None = None
     turn_results: list[TurnResult] = []
     t0_total = time.monotonic()
 
+    def _build_ws_url() -> str:
+        base_ws_url = f"{ws_base_url.rstrip('/')}/ws/e2e-user/{safe_session_id}"
+        if not resume_handle:
+            return base_ws_url
+        query = urllib.parse.urlencode({"resume_handle": resume_handle})
+        return f"{base_ws_url}?{query}"
+
+    def _store_resume_handle(handle: str) -> None:
+        nonlocal resume_handle
+        if handle:
+            resume_handle = handle
+
     async def _open_ws(*, drain_initial_greeting: bool) -> tuple[websockets.ClientConnection, dict[str, int]]:
+        nonlocal resume_handle
         last_exc: Exception | None = None
         attempts = max(1, int(connect_retries))
         for attempt in range(1, attempts + 1):
@@ -2207,7 +2222,7 @@ async def run_conversation(
             bootstrap_counts: dict[str, int] = {}
             try:
                 ws = await websockets.connect(
-                    ws_url,
+                    _build_ws_url(),
                     max_size=None,
                     ping_interval=ws_ping_interval,
                     ping_timeout=ws_ping_timeout,
@@ -2227,12 +2242,18 @@ async def run_conversation(
                     msg = json.loads(raw)
                     msg_type = str(msg.get("type", "unknown"))
                     bootstrap_counts[msg_type] = bootstrap_counts.get(msg_type, 0) + 1
+                    if msg_type == "session_resumption" and msg.get("handle"):
+                        resume_handle = str(msg["handle"])
                     if msg.get("type") == "session_ready":
                         log.info("[%s] session_ready received (attempt %d/%d)", conv_id, attempt, attempts)
                         break
 
                 if drain_initial_greeting:
-                    drained = await _drain_initial_greeting(ws, timeout_sec=15.0)
+                    drained = await _drain_initial_greeting(
+                        ws,
+                        timeout_sec=15.0,
+                        on_session_resumption=lambda handle: _store_resume_handle(handle),
+                    )
                     for k, v in drained.items():
                         bootstrap_counts[k] = bootstrap_counts.get(k, 0) + v
                 return ws, bootstrap_counts
@@ -2355,6 +2376,8 @@ async def run_conversation(
                     text=text,
                     failures=["turn_result_missing"],
                 )
+            if tr.latest_resume_handle:
+                resume_handle = tr.latest_resume_handle
             turn_results.append(tr)
             for k, v in tr.message_counts.items():
                 conv_message_counts[k] = conv_message_counts.get(k, 0) + v
@@ -2428,6 +2451,7 @@ async def run_conversation(
 async def _drain_initial_greeting(
     ws: websockets.ClientConnection,
     timeout_sec: float = 15.0,
+    on_session_resumption: Callable[[str], None] | None = None,
 ) -> dict[str, int]:
     """Drain any initial greeting audio/transcripts from the model."""
     counts: dict[str, int] = {}
@@ -2449,6 +2473,8 @@ async def _drain_initial_greeting(
             payload = json.loads(raw)
             msg_type = str(payload.get("type", "unknown"))
             counts[msg_type] = counts.get(msg_type, 0) + 1
+            if msg_type == "session_resumption" and payload.get("handle") and on_session_resumption:
+                on_session_resumption(str(payload["handle"]))
         except asyncio.TimeoutError:
             continue
         except json.JSONDecodeError:
@@ -2499,6 +2525,9 @@ async def _run_single_turn(
     # 1. Telemetry (context setup)
     if turn_def.get("send_telemetry"):
         await ws.send(json.dumps({"type": "telemetry", "data": turn_def["send_telemetry"]}))
+
+    # 1.5 Optional semantic hint for the current utterance.
+    await ws.send(json.dumps({"type": "text_hint", "text": text}))
 
     # 2. Gesture
     if turn_def.get("send_gesture"):
@@ -2559,6 +2588,7 @@ async def _run_single_turn(
     _collect_warnings: list[str] = []
     _collect_failures: list[str] = []
     request_reconnect = False
+    latest_resume_handle: str | None = None
     deadline = time.monotonic() + collect_sec
     last_agent_ts: float | None = None
 
@@ -2632,6 +2662,9 @@ async def _run_single_turn(
             tool_results.append({"_type": "ocr_result", **payload})
         elif msg_type in ("search_result", "navigation_result"):
             tool_results.append({"_type": msg_type, **payload})
+        elif msg_type == "session_resumption":
+            if payload.get("handle"):
+                latest_resume_handle = str(payload["handle"])
         elif msg_type == "go_away":
             reason = payload.get("reason", "unknown")
             log.warning("Received go_away: %s", reason)
@@ -2644,6 +2677,61 @@ async def _run_single_turn(
             _collect_failures.append(f"server_error: {error_msg}")
             request_reconnect = True
             break  # Stop collecting on error
+
+    tail_deadline = time.monotonic() + 6.0
+    while latest_resume_handle is None and not request_reconnect and time.monotonic() < tail_deadline:
+        try:
+            raw = await asyncio.wait_for(ws.recv(), timeout=0.5)
+        except asyncio.TimeoutError:
+            continue
+
+        now = time.monotonic()
+
+        if isinstance(raw, bytes):
+            audio_bytes_count += 1
+            last_agent_ts = now
+            continue
+
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            _collect_warnings.append("non_json_downstream_payload")
+            continue
+
+        if len(raw_messages) < 200:
+            raw_messages.append(payload)
+        msg_type = str(payload.get("type", "unknown"))
+        counts[msg_type] = counts.get(msg_type, 0) + 1
+
+        if msg_type == "session_resumption":
+            if payload.get("handle"):
+                latest_resume_handle = str(payload["handle"])
+            continue
+        if msg_type == "transcript":
+            role = payload.get("role", "")
+            txt = str(payload.get("text", "")).strip()
+            if not txt:
+                continue
+            if role == "user":
+                user_transcripts.append(txt)
+                if first_user_lat is None:
+                    first_user_lat = now - t0
+            elif role == "agent":
+                agent_transcripts.append(txt)
+                last_agent_ts = now
+                if first_agent_lat is None:
+                    first_agent_lat = now - t0
+            continue
+        if msg_type == "go_away":
+            reason = payload.get("reason", "unknown")
+            _collect_warnings.append(f"go_away_received: {reason}")
+            request_reconnect = True
+            break
+        if msg_type == "error":
+            error_msg = payload.get("message", "unknown error")
+            _collect_failures.append(f"server_error: {error_msg}")
+            request_reconnect = True
+            break
 
     duration = time.monotonic() - t0
 
@@ -2822,6 +2910,7 @@ async def _run_single_turn(
         collect_duration_sec=duration,
         notes=turn_def.get("notes", ""),
         request_reconnect=request_reconnect,
+        latest_resume_handle=latest_resume_handle,
     )
 
 
