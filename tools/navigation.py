@@ -642,14 +642,29 @@ def nearby_search(
         if types:
             body["includedTypes"] = types
         if keyword:
-            # Places (New) uses textQuery in searchNearby via includedTypes
-            # For keyword search, we add it as includedPrimaryTypes fallback
-            # The API doesn't have a direct keyword param; types cover most cases
-            pass
+            body["languageCode"] = "en"
+            if not types:
+                # Use Places Text Search for keyword-based queries
+                _TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
+                text_body: dict[str, Any] = {
+                    "textQuery": keyword,
+                    "locationBias": {
+                        "circle": {
+                            "center": {"latitude": lat, "longitude": lng},
+                            "radius": float(radius),
+                        },
+                    },
+                    "maxResultCount": 10,
+                    "languageCode": "en",
+                }
+                resp = maps_rest_post(_TEXT_SEARCH_URL, text_body, field_mask=_PLACES_NEARBY_FIELD_MASK)
+                # Fall through to shared place-parsing below
+                body = None  # signal to skip nearby search
 
         field_mask = _PLACES_NEARBY_FIELD_MASK
 
-        resp = maps_rest_post(_PLACES_NEARBY_URL, body, field_mask=field_mask)
+        if body is not None:
+            resp = maps_rest_post(_PLACES_NEARBY_URL, body, field_mask=field_mask)
 
         places = []
         for place in resp.get("places", []):

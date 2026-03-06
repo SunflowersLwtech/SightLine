@@ -103,30 +103,54 @@ def _extract_audio(response: types.GenerateContentResponse) -> tuple[bytes, str]
     raise RuntimeError("No audio payload in TTS response")
 
 
+def _silent_pcm(duration_sec: float = 1.0) -> bytes:
+    """Generate silent PCM audio as a last-resort fallback."""
+    num_samples = int(TARGET_SAMPLE_RATE * duration_sec)
+    return np.zeros(num_samples, dtype=np.int16).tobytes()
+
+
 def _local_fallback_pcm(text: str) -> bytes:
+    import platform
+    import shutil
+
     tmp_root = Path("/tmp/sightline_runs/server_tts_fallback")
     tmp_root.mkdir(parents=True, exist_ok=True)
     token = uuid.uuid4().hex[:10]
-    aiff_path = tmp_root / f"{token}.aiff"
     pcm_path = tmp_root / f"{token}.pcm24k.raw"
 
-    say_cmd = ["say", "-v", "Samantha", "-o", str(aiff_path), text]
-    say_result = subprocess.run(say_cmd, capture_output=True, text=True)
-    if say_result.returncode != 0:
-        raise RuntimeError(f"local say fallback failed: {say_result.stderr[:200]}")
+    # macOS: use `say` + ffmpeg
+    if platform.system() == "Darwin" and shutil.which("say"):
+        aiff_path = tmp_root / f"{token}.aiff"
+        say_result = subprocess.run(
+            ["say", "-v", "Samantha", "-o", str(aiff_path), text],
+            capture_output=True, text=True,
+        )
+        if say_result.returncode == 0 and shutil.which("ffmpeg"):
+            ffmpeg_result = subprocess.run(
+                ["ffmpeg", "-y", "-i", str(aiff_path),
+                 "-ac", "1", "-ar", str(TARGET_SAMPLE_RATE), "-f", "s16le",
+                 str(pcm_path)],
+                capture_output=True, text=True,
+            )
+            if ffmpeg_result.returncode == 0:
+                return pcm_path.read_bytes()
 
-    ffmpeg_cmd = [
-        "ffmpeg", "-y",
-        "-i", str(aiff_path),
-        "-ac", "1",
-        "-ar", str(TARGET_SAMPLE_RATE),
-        "-f", "s16le",
-        str(pcm_path),
-    ]
-    ffmpeg_result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
-    if ffmpeg_result.returncode != 0:
-        raise RuntimeError(f"local ffmpeg fallback failed: {ffmpeg_result.stderr[:200]}")
-    return pcm_path.read_bytes()
+    # Linux: use espeak-ng if available
+    if shutil.which("espeak-ng"):
+        wav_path = tmp_root / f"{token}.wav"
+        espeak_result = subprocess.run(
+            ["espeak-ng", "-v", "en", "-w", str(wav_path), text],
+            capture_output=True, text=True,
+        )
+        if espeak_result.returncode == 0 and wav_path.exists():
+            try:
+                samples, src_rate = _wav_to_mono_int16(wav_path.read_bytes())
+                return _resample(samples, src_rate, TARGET_SAMPLE_RATE).tobytes()
+            except Exception:
+                pass
+
+    # Last resort: return silent audio (text transcript still delivered)
+    return _silent_pcm(0.5)
 
 
 async def synthesize_pcm(text: str, voice: str = DEFAULT_VOICE) -> bytes:

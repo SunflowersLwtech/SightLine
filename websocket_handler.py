@@ -1590,7 +1590,6 @@ class WebSocketHandler:
                         role="user",
                     )
                     self.ctx_queue.inject_immediate(hint_content, is_function_response=True)
-                    await self._maybe_handle_direct_navigation_intent(input_text)
 
                 elif msg_type in {"activity_start", "activity_end"}:
                     event_name = str(msg_type)
@@ -1624,6 +1623,14 @@ class WebSocketHandler:
                                 self.session_id,
                             )
                     if event_name == "activity_start":
+                        if self._pending_resume_context:
+                            resume_content = types.Content(
+                                parts=[types.Part(text=self._pending_resume_context)],
+                                role="user",
+                            )
+                            self.ctx_queue.inject_immediate(resume_content)
+                            self._pending_resume_context = None
+                            logger.info("Injected resume context on activity_start for session %s", self.session_id)
                         self.tool_dedup.reset()
                     queue_status = "forwarded"
                     queue_note = ""
@@ -1682,8 +1689,8 @@ class WebSocketHandler:
                 asyncio.create_task(
                     self._run_face_recognition(image_b64, origin_turn_seq=current_turn_seq)
                 )
-            if lod == 1 and now - getattr(self, '_last_safety_ocr_at', 0) >= 15.0:
-                self._last_safety_ocr_at = now
+            if lod == 1 and now - self.state.last_safety_ocr_at >= 15.0:
+                self.state.last_safety_ocr_at = now
                 await self._emit_tool_event("extract_text", ToolBehavior.WHEN_IDLE, status="queued")
                 queued_agents.append("ocr")
                 asyncio.create_task(
@@ -2146,7 +2153,7 @@ class WebSocketHandler:
                     self.state.pending_fallback_turn_seq = self.state.user_turn_seq
                     self._schedule_response_watchdog(
                         self.state.user_turn_seq,
-                        delay_sec=6.0,
+                        delay_sec=3.0,
                     )
 
             if fc.name in NAVIGATION_FUNCTIONS:

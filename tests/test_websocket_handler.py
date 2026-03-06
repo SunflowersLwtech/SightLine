@@ -897,12 +897,11 @@ async def test_echo_detection_client_audio_matches_model_output(handler, fake_ws
     assert handler.live_request_queue.closed
 
 
+@pytest.mark.skip(reason="placeholder — not yet implemented")
 @pytest.mark.websocket
 @pytest.mark.asyncio
 async def test_barge_in_followed_by_silence_agent_resumes():
     """Test that agent resumes after barge-in followed by silence timeout."""
-    # This test requires more complex event sequencing
-    # Placeholder for implementation
     pass
 
 
@@ -1048,44 +1047,43 @@ async def test_tool_call_dispatched_and_result_sent(fake_ws, fake_queue, session
         assert "TOOL RESULT READY" in injected_content.parts[0].text
 
 
+@pytest.mark.skip(reason="placeholder — not yet implemented")
 @pytest.mark.websocket
 @pytest.mark.asyncio
 async def test_tool_execution_timeout_handling():
     """Test tool call timeout returns timeout error to model."""
-    # Placeholder for timeout test
-    # Requires mocking _dispatch_function_call to raise asyncio.TimeoutError
     pass
 
 
+@pytest.mark.skip(reason="placeholder — not yet implemented")
 @pytest.mark.websocket
 @pytest.mark.asyncio
 async def test_tool_execution_error_propagated():
     """Test tool error is propagated as tool result with error status."""
-    # Placeholder for error propagation test
     pass
 
 
+@pytest.mark.skip(reason="placeholder — not yet implemented")
 @pytest.mark.websocket
 @pytest.mark.asyncio
 async def test_concurrent_tool_calls_both_executed():
     """Test concurrent tool calls (navigation + search) both executed."""
-    # Placeholder for concurrent tool test
     pass
 
 
+@pytest.mark.skip(reason="placeholder — not yet implemented")
 @pytest.mark.websocket
 @pytest.mark.asyncio
 async def test_tool_behavior_interrupt_injected_immediately():
     """Test tool with INTERRUPT behavior has result injected immediately."""
-    # Placeholder for interrupt behavior test
     pass
 
 
+@pytest.mark.skip(reason="placeholder — not yet implemented")
 @pytest.mark.websocket
 @pytest.mark.asyncio
 async def test_tool_behavior_when_idle_queued():
     """Test tool with WHEN_IDLE behavior is queued until model idle."""
-    # Placeholder for when_idle behavior test
     pass
 
 
@@ -1162,19 +1160,19 @@ async def test_telemetry_high_noise_caps_lod_to_1(handler, fake_ws):
         assert mock_decide_lod.called
 
 
+@pytest.mark.skip(reason="placeholder — not yet implemented")
 @pytest.mark.websocket
 @pytest.mark.asyncio
 async def test_space_transition_detected_lod_boosted():
     """Test space transition detection boosts LOD."""
-    # Placeholder for space transition test
     pass
 
 
+@pytest.mark.skip(reason="placeholder — not yet implemented")
 @pytest.mark.websocket
 @pytest.mark.asyncio
 async def test_gesture_force_lod_3_overrides_and_injects_context():
     """Test gesture force_lod_3 overrides LOD to 3 and injects context."""
-    # Placeholder for gesture override test
     pass
 
 
@@ -1207,27 +1205,27 @@ async def test_image_frame_triggers_vision_analysis_with_cooldown(handler, fake_
             # This test verifies infrastructure
 
 
+@pytest.mark.skip(reason="placeholder — not yet implemented")
 @pytest.mark.websocket
 @pytest.mark.asyncio
 async def test_image_during_active_vision_skipped():
     """Test image received during active vision analysis is skipped."""
-    # Placeholder for in-progress guard test
     pass
 
 
+@pytest.mark.skip(reason="placeholder — not yet implemented")
 @pytest.mark.websocket
 @pytest.mark.asyncio
 async def test_face_recognition_backoff_after_consecutive_misses():
     """Test face recognition applies backoff after consecutive misses."""
-    # Placeholder for face backoff test
     pass
 
 
+@pytest.mark.skip(reason="placeholder — not yet implemented")
 @pytest.mark.websocket
 @pytest.mark.asyncio
 async def test_ocr_triggered_by_user_request():
     """Test OCR agent launched when triggered by user request."""
-    # Placeholder for OCR trigger test
     pass
 
 

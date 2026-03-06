@@ -52,6 +52,7 @@ class SessionState:
     last_ocr_context_text: str = ""
     last_ocr_context_sent_at: float = 0.0
     last_ocr_prefeedback_at: float = 0.0
+    last_safety_ocr_at: float = 0.0
 
     # -- Audio / interrupt ---------------------------------------------------
     is_interrupted: bool = False
