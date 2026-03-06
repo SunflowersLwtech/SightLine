@@ -86,6 +86,7 @@ from lod.lod_engine import should_speak
 from lod.telemetry_aggregator import TelemetryAggregator
 from telemetry.telemetry_parser import parse_telemetry, parse_telemetry_to_ephemeral
 from telemetry.session_meta_tracker import SessionMetaTracker
+from session_state import SessionState
 
 # ---------------------------------------------------------------------------
 # Environment & logging
@@ -1421,92 +1422,36 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             session_ctx.active_task or session_ctx.trip_purpose or "",
             3,
         ))
-    face_library_task = None
+    _initial_face_library_task = None
     if _face_available:
-        face_library_task = asyncio.create_task(asyncio.to_thread(load_face_library, user_id))
+        _initial_face_library_task = asyncio.create_task(asyncio.to_thread(load_face_library, user_id))
 
     user_profile = await user_profile_task
     session_meta = SessionMetaTracker(user_id=user_id, session_id=session_id)
 
-    # -- Per-session face library cache (Phase 3) ----------------------------
-    face_library: list[dict] = []
-    _face_library_loaded_at: float = 0.0
-
-    # -- WebSocket write lock (prevent interleaved frames from concurrent coroutines)
-    _ws_write_lock = asyncio.Lock()
-
-    # -- Vision analysis state -----------------------------------------------
-    _vision_lock = asyncio.Lock()
-    _vision_in_progress = False
-    _face_lock = asyncio.Lock()
-    _face_in_progress = False
-    _face_runtime_available = _face_available
-    _face_unavailable_notified = False
-    _last_vision_time = 0.0
-    _frame_seq = 0
-    _last_vision_context_text = ""
-    _last_vision_context_sent_at = 0.0
-    _last_vision_prefeedback_at = 0.0
-    _last_ocr_context_text = ""
-    _last_ocr_context_sent_at = 0.0
-    _last_ocr_prefeedback_at = 0.0
-    _last_telemetry_signature: dict[str, object] | None = None
-    _last_telemetry_context_sent_at = 0.0
-    _last_agent_text = ""
-    _last_agent_text_sent_at = 0.0
-    _allow_agent_repeat_until = 0.0
-
-    # Echo detection state (P0_FIX_3)
-    _recent_agent_texts: list[tuple[float, str]] = []
-
-    _model_audio_last_seen_at: float = 0.0
-
-    # Interrupt state — shared between _upstream (client barge-in) and
-    # _downstream (Gemini-side interrupted events).
-    _is_interrupted: bool = False
-    _last_interrupt_at: float = 0.0
-    _INTERRUPT_DEBOUNCE_SEC = 1.0
-    _downstream_retry_count: int = 0
-    _DOWNSTREAM_MAX_RETRIES = 5
-
-    # Adaptive face detection: skip cycles when no faces are consistently detected
-    _face_consecutive_misses: int = 0
-    _FACE_BACKOFF_THRESHOLD = 3       # consecutive 0-face before slowing
-    _FACE_BACKOFF_SKIP_CYCLES = 2     # skip N cycles after threshold hit
-    _face_skip_counter: int = 0
-    _face_library_refresh_task: asyncio.Task | None = None
-
-    # User activity tracking (for telemetry / future use)
-    _last_user_activity_at: float = time.monotonic()
-
-    # Vision spoken tracking for context injection queue
-    _turn_had_vision_content = False
-
-    # Output transcription buffering (avoid flooding client with fragments)
-    _transcript_buffer: str = ""
-    _transcript_buffer_started_at: float = 0.0  # when first fragment arrived
-    _TRANSCRIPT_FLUSH_TIMEOUT_SEC = 1.5
-
-    _SENTENCE_BOUNDARY_RE = re.compile(r"[。！？.!?\n]")
+    # -- Per-session mutable state (replaces nonlocal variables) -------------
+    state = SessionState(
+        face_runtime_available=_face_available,
+        face_library_task=_initial_face_library_task,
+    )
 
     def _has_sentence_boundary(text: str) -> bool:
         """Return True if text contains a sentence-ending punctuation mark."""
-        return bool(_SENTENCE_BOUNDARY_RE.search(text))
+        return bool(state.SENTENCE_BOUNDARY_RE.search(text))
 
     async def _flush_transcript_buffer() -> bool:
         """Flush the accumulated transcript buffer to the client."""
-        nonlocal _transcript_buffer, _transcript_buffer_started_at
-        text = _transcript_buffer.strip()
-        _transcript_buffer = ""
-        _transcript_buffer_started_at = 0.0
+        text = state.transcript_buffer.strip()
+        state.transcript_buffer = ""
+        state.transcript_buffer_started_at = 0.0
         if not text:
             return True
         # Track for echo detection
         now_mono = time.monotonic()
-        _recent_agent_texts.append((now_mono, text))
+        state.recent_agent_texts.append((now_mono, text))
         cutoff = now_mono - 10.0
-        while _recent_agent_texts and _recent_agent_texts[0][0] < cutoff:
-            _recent_agent_texts.pop(0)
+        while state.recent_agent_texts and state.recent_agent_texts[0][0] < cutoff:
+            state.recent_agent_texts.pop(0)
         return await _forward_agent_transcript(text)
 
     def _is_websocket_open() -> bool:
@@ -1520,7 +1465,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             stop_downstream.set()
             return False
         try:
-            async with _ws_write_lock:
+            async with state.ws_write_lock:
                 await websocket.send_json(payload)
             return True
         except (WebSocketDisconnect, RuntimeError):
@@ -1532,7 +1477,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             stop_downstream.set()
             return False
         try:
-            async with _ws_write_lock:
+            async with state.ws_write_lock:
                 await websocket.send_bytes(payload)
             return True
         except (WebSocketDisconnect, RuntimeError):
@@ -1541,14 +1486,13 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
     async def _forward_agent_transcript(text: str) -> bool:
         """Forward agent transcript with short-window duplicate suppression."""
-        nonlocal _last_agent_text, _last_agent_text_sent_at
         now_mono = time.monotonic()
-        can_repeat = now_mono <= _allow_agent_repeat_until
+        can_repeat = now_mono <= state.allow_agent_repeat_until
         is_repeat = _is_repeated_text(
             text,
-            previous_text=_last_agent_text,
+            previous_text=state.last_agent_text,
             now_ts=now_mono,
-            previous_ts=_last_agent_text_sent_at,
+            previous_ts=state.last_agent_text_sent_at,
             cooldown_sec=AGENT_TEXT_REPEAT_SUPPRESS_SEC,
         )
         if is_repeat and not can_repeat:
@@ -1563,8 +1507,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             "role": "agent",
         })
         if sent:
-            _last_agent_text = clean_text
-            _last_agent_text_sent_at = now_mono
+            state.last_agent_text = clean_text
+            state.last_agent_text_sent_at = now_mono
         return sent
 
     def _is_likely_echo(candidate: str, now_ts: float) -> bool:
@@ -1577,7 +1521,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         """
         words_candidate = set(candidate.lower().split())
         # Relaxed mode when model was speaking recently
-        model_speaking = (now_ts - _model_audio_last_seen_at) < 3.0
+        model_speaking = (now_ts - state.model_audio_last_seen_at) < 3.0
 
         min_words = 1 if model_speaking else 3
         jaccard_threshold = 0.35 if model_speaking else 0.6
@@ -1586,7 +1530,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         if len(words_candidate) < min_words:
             return False
         cutoff = now_ts - window_sec
-        for ts, agent_text in reversed(_recent_agent_texts):
+        for ts, agent_text in reversed(state.recent_agent_texts):
             if ts < cutoff:
                 break
             words_agent = set(agent_text.lower().split())
@@ -1655,31 +1599,29 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             })
 
     async def _finish_initial_face_library_load() -> None:
-        nonlocal face_library, _face_library_loaded_at, _face_library_refresh_task, face_library_task
-        if face_library_task is None:
+        if state.face_library_task is None:
             return
         try:
-            loaded = await face_library_task
-            face_library = loaded
-            _face_library_loaded_at = time.monotonic()
-            logger.info("Loaded %d face(s) for user %s", len(face_library), user_id)
+            loaded = await state.face_library_task
+            state.face_library = loaded
+            state.face_library_loaded_at = time.monotonic()
+            logger.info("Loaded %d face(s) for user %s", len(state.face_library), user_id)
         except Exception:
             logger.exception("Failed to load face library for user %s", user_id)
         finally:
-            face_library_task = None
-            _face_library_refresh_task = None
+            state.face_library_task = None
+            state.face_library_refresh_task = None
 
     async def _refresh_face_library_background() -> None:
-        nonlocal face_library, _face_library_loaded_at, _face_library_refresh_task
         try:
             refreshed = await asyncio.to_thread(load_face_library, user_id)
-            face_library = refreshed
-            _face_library_loaded_at = time.monotonic()
-            logger.info("Refreshed face library (%d faces) for user %s", len(face_library), user_id)
+            state.face_library = refreshed
+            state.face_library_loaded_at = time.monotonic()
+            logger.info("Refreshed face library (%d faces) for user %s", len(state.face_library), user_id)
         except Exception:
             logger.exception("Failed to refresh face library for user %s", user_id)
         finally:
-            _face_library_refresh_task = None
+            state.face_library_refresh_task = None
 
     async def _inject_face_memories(known_faces: list[dict]) -> None:
         if not _memory_available:
@@ -1753,7 +1695,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             {"name": "LocationContext", "status": "ready" if _location_ctx_service is not None else "unavailable"},
             {"name": "LODEvaluator", "status": "ready" if _lod_evaluator is not None else "unavailable"},
             {"name": "ProfileAssembler", "status": "ready" if _assembled_profile is not None else "unavailable"},
-            {"name": "HabitDetector", "status": "ready" if _proactive_hints is not None else "unavailable"},
+            {"name": "HabitDetector", "status": "ready" if state.proactive_hints is not None else "unavailable"},
             {"name": "SceneMatcher", "status": "ready" if _location_ctx_service is not None else "unavailable"},
             {"name": "EntityGraph", "status": "ready" if _entity_graph_available else "unavailable"},
         ]
@@ -1797,8 +1739,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     _location_ctx_service = None
     _lod_evaluator = None
     _assembled_profile = None
-    _current_location_ctx = None  # latest LocationContext from GPS
-    _proactive_hints = None  # set by HabitDetector inside try block
+    # state.current_location_ctx is already None via SessionState defaults
+    # state.proactive_hints is already None via SessionState defaults
     try:
         from context.location_context import LocationContextService
         from context.lod_evaluator import LODEvaluator
@@ -1809,21 +1751,20 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         _location_ctx_service = LocationContextService(user_id)
         _lod_evaluator = LODEvaluator()
 
-        _proactive_hints = []
+        state.proactive_hints = []
 
         async def _load_proactive_hints_background() -> None:
-            nonlocal _proactive_hints
             try:
                 hints = await asyncio.wait_for(
                     asyncio.to_thread(HabitDetector(user_id).detect),
                     timeout=STARTUP_HABIT_DETECT_TIMEOUT_SEC,
                 )
-                _proactive_hints = hints or []
-                if _proactive_hints:
+                state.proactive_hints = hints or []
+                if state.proactive_hints:
                     logger.info(
                         "Detected %d habits for user=%s (top: %s)",
-                        len(_proactive_hints), user_id,
-                        _proactive_hints[0].description[:60],
+                        len(state.proactive_hints), user_id,
+                        state.proactive_hints[0].description[:60],
                     )
             except TimeoutError:
                 logger.warning(
@@ -1895,15 +1836,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         session_ctx.current_lod, session_id,
     )
 
-    # -- Track client camera state for context injection ----------------------
-    _client_camera_active = False
-    _camera_activated_at: float = 0.0
-    _CAMERA_GRACE_PERIOD_SEC: float = 12.0
-    _first_vision_after_camera: bool = True  # First vision post-grace period is silent
-
-    # -- Throttle raw frames to Gemini Live API ------------------------------
-    _last_frame_to_gemini_at: float = 0.0
-    _FRAME_TO_GEMINI_INTERVAL: float = 2.0
+    # Camera state and frame throttling are in state (SessionState defaults)
 
     # -- LOD engine helpers --------------------------------------------------
 
@@ -1925,7 +1858,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             reason=reason,
             memories=memories,
             assembled_profile=_assembled_profile,
-            location_ctx=_current_location_ctx,
+            location_ctx=state.current_location_ctx,
         )
         ctx_queue.enqueue(
             category="lod",
@@ -1936,22 +1869,18 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         logger.info("Injected [LOD UPDATE] -> LOD %d (%s)", new_lod, reason)
 
     # -- Per-session memory state (Phase 4) -----------------------------------
-    _TRANSCRIPT_HISTORY_MAX_ENTRIES = 1500
-    memory_top3: list[str] = []
-    memory_top3_detailed: list[dict] = []
+    # state.memory_top3, state.memory_top3_detailed, state.transcript_history are in state
     # Per-session budget tracker — intentionally not persisted to Firestore.
     # Each session starts with a fresh budget to prevent runaway writes from
     # accumulating across reconnections.  Persistence would require atomic
     # read-modify-write on Firestore and adds complexity without clear benefit.
     memory_budget = MemoryBudgetTracker() if _memory_available else None
-    transcript_history = deque(maxlen=_TRANSCRIPT_HISTORY_MAX_ENTRIES)
 
-    if face_library_task is not None:
-        _face_library_refresh_task = asyncio.create_task(_finish_initial_face_library_load())
+    if state.face_library_task is not None:
+        state.face_library_refresh_task = asyncio.create_task(_finish_initial_face_library_load())
 
     async def _load_session_memories(context_hint: str = "") -> list[str]:
         """Load relevant memories for this user session."""
-        nonlocal memory_top3, memory_top3_detailed
         try:
             if _memory_available:
                 def _retrieve_memories_sync(hint: str) -> list[dict]:
@@ -1959,14 +1888,14 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     return bank.retrieve_memories(hint, top_k=3)
 
                 raw_results = await asyncio.to_thread(_retrieve_memories_sync, context_hint)
-                memory_top3 = [m["content"] for m in raw_results][:3]
-                memory_top3_detailed = [{
+                state.memory_top3 = [m["content"] for m in raw_results][:3]
+                state.memory_top3_detailed = [{
                     "content": m.get("content", "")[:120],
                     "category": m.get("category", "general"),
                     "importance": round(float(m.get("importance", 0.5)), 2),
                     "score": round(float(m.get("_composite_score", 0)), 3),
                 } for m in raw_results][:3]
-                return memory_top3
+                return state.memory_top3
             return []
         except Exception:
             logger.exception("Failed to load memories for user %s", user_id)
@@ -2008,9 +1937,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             "lod": new_lod,
             "reason": reason,
         })
-        # SL-77: Include memory_top3 in debug_lod for DebugOverlay
-        debug_dict["memory_top3"] = memory_top3
-        debug_dict["memory_top3_detailed"] = memory_top3_detailed
+        # SL-77: Include state.memory_top3 in debug_lod for DebugOverlay
+        debug_dict["state.memory_top3"] = state.memory_top3
+        debug_dict["state.memory_top3_detailed"] = state.memory_top3_detailed
         if vad_update:
             debug_dict["vad_update"] = vad_update
         await _safe_send_json({
@@ -2051,10 +1980,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
     async def _run_vision_analysis(image_base64: str) -> None:
         """Run async vision analysis and inject results into Live session."""
-        nonlocal _vision_in_progress, _last_vision_context_text
-        nonlocal _last_vision_context_sent_at, _last_vision_prefeedback_at
-        nonlocal _first_vision_after_camera
-        nonlocal _last_user_activity_at
         if not _vision_available:
             await _emit_tool_event(
                 "analyze_scene",
@@ -2068,29 +1993,29 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         # flag reads/writes (no await between acquire and release), so there is
         # no race window.  The lock guards against concurrent task scheduling
         # at the outer await boundary, not against OS-thread preemption.
-        async with _vision_lock:
-            if _vision_in_progress:
+        async with state.vision_lock:
+            if state.vision_in_progress:
                 return
-            _vision_in_progress = True
+            state.vision_in_progress = True
 
         # Camera activation grace period: suppress non-safety vision for 8s
         # after camera opens to prevent immediate narration cascade.
         now_mono = time.monotonic()
-        if _camera_activated_at > 0 and (now_mono - _camera_activated_at) < _CAMERA_GRACE_PERIOD_SEC:
+        if state.camera_activated_at > 0 and (now_mono - state.camera_activated_at) < state.CAMERA_GRACE_PERIOD_SEC:
             logger.info("Suppressed vision: camera activation grace period (%.1fs)",
-                        now_mono - _camera_activated_at)
-            async with _vision_lock:
-                _vision_in_progress = False
+                        now_mono - state.camera_activated_at)
+            async with state.vision_lock:
+                state.vision_in_progress = False
             return
 
         # B-5: Pre-feedback — immediate audio cue before analysis starts
         # Suppress during camera activation grace period AND vision spoken cooldown
-        if (now_mono - _last_vision_prefeedback_at >= VISION_PREFEEDBACK_COOLDOWN_SEC
-                and (_camera_activated_at <= 0 or now_mono - _camera_activated_at >= _CAMERA_GRACE_PERIOD_SEC)
+        if (now_mono - state.last_vision_prefeedback_at >= VISION_PREFEEDBACK_COOLDOWN_SEC
+                and (state.camera_activated_at <= 0 or now_mono - state.camera_activated_at >= state.CAMERA_GRACE_PERIOD_SEC)
                 and not ctx_queue.vision_spoken_cooldown_active
-                and not _first_vision_after_camera):
+                and not state.first_vision_after_camera):
             await _forward_agent_transcript("Let me look at that for you...")
-            _last_vision_prefeedback_at = now_mono
+            state.last_vision_prefeedback_at = now_mono
 
         try:
             ctx_dict = {
@@ -2116,9 +2041,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             now_mono = time.monotonic()
             repeated = _is_repeated_text(
                 vision_text,
-                previous_text=_last_vision_context_text,
+                previous_text=state.last_vision_context_text,
                 now_ts=now_mono,
-                previous_ts=_last_vision_context_sent_at,
+                previous_ts=state.last_vision_context_sent_at,
                 cooldown_sec=vision_repeat_window,
             )
             if not repeated:
@@ -2128,8 +2053,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     "behavior": behavior_to_text(ToolBehavior.WHEN_IDLE),
                     "data": _json_safe(result),
                 })
-                _last_vision_context_text = vision_text
-                _last_vision_context_sent_at = now_mono
+                state.last_vision_context_text = vision_text
+                state.last_vision_context_sent_at = now_mono
             else:
                 logger.debug("Suppressed repeated vision summary within %.1fs window", vision_repeat_window)
 
@@ -2166,14 +2091,14 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
                     # First vision after camera activation is always silent
                     # to avoid unprompted scene narration
-                    if _first_vision_after_camera:
+                    if state.first_vision_after_camera:
                         speak = False
-                        _first_vision_after_camera = False  # type: ignore[has-type]
+                        state.first_vision_after_camera = False  # type: ignore[has-type]
                         logger.info("First vision post-camera: forced silent injection")
 
                     # Passive mode guard: if there has been no user speech/activity
                     # recently, keep vision updates silent to avoid unsolicited narration.
-                    idle_for = time.monotonic() - _last_user_activity_at
+                    idle_for = time.monotonic() - state.last_user_activity_at
                     if idle_for > PASSIVE_SPEECH_GUARD_SEC:
                         speak = False
                         logger.info(
@@ -2205,15 +2130,12 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             )
             await _emit_capability_degraded("vision", str(exc)[:200])
         finally:
-            async with _vision_lock:
-                _vision_in_progress = False
+            async with state.vision_lock:
+                state.vision_in_progress = False
 
     async def _run_face_recognition(image_base64: str) -> None:
         """Run face recognition and inject results as SILENT context."""
-        nonlocal face_library, _face_library_loaded_at, _face_consecutive_misses, _face_skip_counter
-        nonlocal _face_library_refresh_task, face_library_task
-        nonlocal _face_in_progress, _face_runtime_available, _face_unavailable_notified
-        if not _face_available or not _face_runtime_available:
+        if not _face_available or not state.face_runtime_available:
             await _emit_tool_event(
                 "identify_person",
                 ToolBehavior.SILENT,
@@ -2222,39 +2144,39 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             )
             return
 
-        async with _face_lock:
-            if _face_in_progress:
+        async with state.face_lock:
+            if state.face_in_progress:
                 return
-            _face_in_progress = True
+            state.face_in_progress = True
 
-        if face_library_task is not None:
+        if state.face_library_task is not None:
             logger.debug("Face recognition skipped: face library still loading")
-            async with _face_lock:
-                _face_in_progress = False
+            async with state.face_lock:
+                state.face_in_progress = False
             return
 
         # Adaptive backoff: skip cycles when no faces are consistently detected
-        if _face_consecutive_misses >= _FACE_BACKOFF_THRESHOLD:
-            _face_skip_counter += 1
-            if _face_skip_counter <= _FACE_BACKOFF_SKIP_CYCLES:
-                logger.debug("Face detection skipped (backoff: %d misses)", _face_consecutive_misses)
-                async with _face_lock:
-                    _face_in_progress = False
+        if state.face_consecutive_misses >= state.FACE_BACKOFF_THRESHOLD:
+            state.face_skip_counter += 1
+            if state.face_skip_counter <= state.FACE_BACKOFF_SKIP_CYCLES:
+                logger.debug("Face detection skipped (backoff: %d misses)", state.face_consecutive_misses)
+                async with state.face_lock:
+                    state.face_in_progress = False
                 return
-            _face_skip_counter = 0  # run this cycle, then skip again
+            state.face_skip_counter = 0  # run this cycle, then skip again
 
         # Periodic refresh of face library
         now_mono = time.monotonic()
-        if now_mono - _face_library_loaded_at >= FACE_LIBRARY_REFRESH_SEC:
-            if _face_library_refresh_task is None or _face_library_refresh_task.done():
-                _face_library_refresh_task = asyncio.create_task(_refresh_face_library_background())
+        if now_mono - state.face_library_loaded_at >= FACE_LIBRARY_REFRESH_SEC:
+            if state.face_library_refresh_task is None or state.face_library_refresh_task.done():
+                state.face_library_refresh_task = asyncio.create_task(_refresh_face_library_background())
 
         try:
             results = await asyncio.to_thread(
                 identify_persons_in_frame,
                 image_base64,
                 user_id,
-                face_library,
+                state.face_library,
                 ToolBehavior.SILENT,
             )
             await _safe_send_json({
@@ -2273,10 +2195,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             })
             # Update adaptive frequency counters
             if len(results) == 0:
-                _face_consecutive_misses += 1
+                state.face_consecutive_misses += 1
             else:
-                _face_consecutive_misses = 0
-                _face_skip_counter = 0
+                state.face_consecutive_misses = 0
+                state.face_skip_counter = 0
 
             known = [r for r in results if r["person_name"] != "unknown"]
             await _emit_tool_event(
@@ -2324,13 +2246,13 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         except RuntimeError as exc:
             err_text = str(exc)
             if "InsightFace is unavailable" in err_text:
-                _face_runtime_available = False
-                if not _face_unavailable_notified:
+                state.face_runtime_available = False
+                if not state.face_unavailable_notified:
                     logger.warning(
                         "Face runtime unavailable; disabling face recognition for session %s",
                         session_id,
                     )
-                    _face_unavailable_notified = True
+                    state.face_unavailable_notified = True
                 await _emit_tool_event(
                     "identify_person",
                     ToolBehavior.SILENT,
@@ -2357,12 +2279,11 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             )
             await _emit_capability_degraded("face", str(exc)[:200])
         finally:
-            async with _face_lock:
-                _face_in_progress = False
+            async with state.face_lock:
+                state.face_in_progress = False
 
     async def _run_ocr_analysis(image_base64: str, safety_only: bool = False) -> None:
         """Run OCR and inject results into Live session context."""
-        nonlocal _last_ocr_context_text, _last_ocr_context_sent_at, _last_ocr_prefeedback_at
         if not _ocr_available:
             await _emit_tool_event(
                 "extract_text",
@@ -2376,9 +2297,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         # Skip pre-feedback for safety-only scans (LOD 1/2)
         if not safety_only:
             now_mono = time.monotonic()
-            if now_mono - _last_ocr_prefeedback_at >= OCR_PREFEEDBACK_COOLDOWN_SEC:
+            if now_mono - state.last_ocr_prefeedback_at >= OCR_PREFEEDBACK_COOLDOWN_SEC:
                 await _forward_agent_transcript("Reading the text for you...")
-                _last_ocr_prefeedback_at = now_mono
+                state.last_ocr_prefeedback_at = now_mono
 
         try:
             # Build context hint from session state
@@ -2394,9 +2315,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             now_mono = time.monotonic()
             repeated = _is_repeated_text(
                 ocr_text,
-                previous_text=_last_ocr_context_text,
+                previous_text=state.last_ocr_context_text,
                 now_ts=now_mono,
-                previous_ts=_last_ocr_context_sent_at,
+                previous_ts=state.last_ocr_context_sent_at,
                 cooldown_sec=repeat_window,
             )
             if not repeated:
@@ -2406,8 +2327,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     "behavior": behavior_to_text(ToolBehavior.WHEN_IDLE),
                     "data": _json_safe(result),
                 })
-                _last_ocr_context_text = ocr_text
-                _last_ocr_context_sent_at = now_mono
+                state.last_ocr_context_text = ocr_text
+                state.last_ocr_context_sent_at = now_mono
             else:
                 logger.debug("Suppressed repeated OCR summary within %.1fs window", repeat_window)
 
@@ -2461,10 +2382,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
     # -- Upstream handler ----------------------------------------------------
 
-    # Binary frame magic bytes for audio/image binary protocol (Phase 5)
-    _MAGIC_AUDIO = 0x01
-    _MAGIC_IMAGE = 0x02
-
     async def _upstream() -> None:
         """Read messages from the iOS client and forward to the Live API.
 
@@ -2475,9 +2392,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         Handles upstream message types: audio, image, telemetry,
         activity_start, activity_end, gesture.
         """
-        nonlocal _last_vision_time, _frame_seq, _allow_agent_repeat_until, _client_camera_active
-        nonlocal _last_user_activity_at, _is_interrupted, _last_interrupt_at, _model_audio_last_seen_at
-        nonlocal _last_frame_to_gemini_at
 
         try:
             while True:
@@ -2510,8 +2424,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     magic = raw_bytes[0]
                     payload = raw_bytes[1:]
 
-                    if magic == _MAGIC_AUDIO:
-                        _last_user_activity_at = time.monotonic()
+                    if magic == state.MAGIC_AUDIO:
+                        state.last_user_activity_at = time.monotonic()
                         blob = types.Blob(
                             data=payload,
                             mime_type="audio/pcm;rate=16000",
@@ -2519,18 +2433,18 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         live_request_queue.send_realtime(blob)
                         continue
 
-                    elif magic == _MAGIC_IMAGE:
-                        _frame_seq += 1
+                    elif magic == state.MAGIC_IMAGE:
+                        state.frame_seq += 1
                         # Store latest frame for on-demand OCR tool
                         _ocr_set_latest_frame(session_id, base64.b64encode(payload).decode("ascii"))
                         now_frame = time.monotonic()
-                        if now_frame - _last_frame_to_gemini_at >= _FRAME_TO_GEMINI_INTERVAL:
+                        if now_frame - state.last_frame_to_gemini_at >= state.FRAME_TO_GEMINI_INTERVAL:
                             blob = types.Blob(
                                 data=payload,
                                 mime_type="image/jpeg",
                             )
                             live_request_queue.send_realtime(blob)
-                            _last_frame_to_gemini_at = now_frame
+                            state.last_frame_to_gemini_at = now_frame
 
                         # Trigger async sub-agents (same logic as JSON path)
                         now = time.monotonic()
@@ -2538,8 +2452,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         # Vision intervals widened: LOD1: 10s, LOD2: 8s, LOD3: 5s
                         vision_interval = {1: 10.0, 2: 8.0, 3: 5.0}.get(lod, 8.0)
                         queued_agents: list[str] = []
-                        if now - _last_vision_time >= vision_interval:
-                            _last_vision_time = now
+                        if now - state.last_vision_time >= vision_interval:
+                            state.last_vision_time = now
                             image_b64 = base64.b64encode(payload).decode("ascii")
                             await _emit_tool_event(
                                 "analyze_scene", ToolBehavior.WHEN_IDLE, status="queued",
@@ -2548,7 +2462,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                             asyncio.create_task(_run_vision_analysis(image_b64))
 
                             # Face recognition: only at LOD 2/3 (match JSON path)
-                            if lod >= 2 and _face_runtime_available:
+                            if lod >= 2 and state.face_runtime_available:
                                 await _emit_tool_event(
                                     "identify_person", ToolBehavior.SILENT, status="queued",
                                 )
@@ -2572,7 +2486,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                                 asyncio.create_task(_run_ocr_analysis(image_b64, safety_only=True))
                         await _safe_send_json({
                             "type": MessageType.FRAME_ACK,
-                            "frame_id": _frame_seq,
+                            "frame_id": state.frame_seq,
                             "queued_agents": queued_agents,
                         })
                         continue
@@ -2606,18 +2520,18 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 elif message.get("type") == "image":
                     image_bytes = base64.b64decode(message["data"])
                     mime_type = message.get("mimeType", "image/jpeg")
-                    _frame_seq += 1
+                    state.frame_seq += 1
                     # Store latest frame for on-demand OCR tool
                     _ocr_set_latest_frame(session_id, message["data"])
                     # Throttle raw frames to Gemini (sub-agents still run at LOD intervals)
                     now_frame = time.monotonic()
-                    if now_frame - _last_frame_to_gemini_at >= _FRAME_TO_GEMINI_INTERVAL:
+                    if now_frame - state.last_frame_to_gemini_at >= state.FRAME_TO_GEMINI_INTERVAL:
                         blob = types.Blob(
                             data=image_bytes,
                             mime_type=mime_type,
                         )
                         live_request_queue.send_realtime(blob)
-                        _last_frame_to_gemini_at = now_frame
+                        state.last_frame_to_gemini_at = now_frame
 
                     # Phase 3: Trigger async sub-agents on image frames
                     now = time.monotonic()
@@ -2627,8 +2541,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     # LOD 1: every 10s, LOD 2: every 8s, LOD 3: every 5s
                     vision_interval = {1: 10.0, 2: 8.0, 3: 5.0}.get(lod, 8.0)
                     queued_agents: list[str] = []
-                    if now - _last_vision_time >= vision_interval:
-                        _last_vision_time = now
+                    if now - state.last_vision_time >= vision_interval:
+                        state.last_vision_time = now
                         image_b64 = message["data"]
                         await _emit_tool_event(
                             "analyze_scene",
@@ -2640,7 +2554,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         asyncio.create_task(_run_vision_analysis(image_b64))
 
                         # Face recognition: only at LOD 2/3
-                        if lod >= 2 and _face_runtime_available:
+                        if lod >= 2 and state.face_runtime_available:
                             await _emit_tool_event(
                                 "identify_person",
                                 ToolBehavior.SILENT,
@@ -2668,7 +2582,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                             asyncio.create_task(_run_ocr_analysis(image_b64, safety_only=True))
                     await _safe_send_json({
                         "type": MessageType.FRAME_ACK,
-                        "frame_id": _frame_seq,
+                        "frame_id": state.frame_seq,
                         "queued_agents": queued_agents,
                     })
 
@@ -2692,14 +2606,14 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
                 elif message.get("type") in {"activity_start", "activity_end"}:
                     event_name = str(message.get("type"))
-                    _last_user_activity_at = time.monotonic()
+                    state.last_user_activity_at = time.monotonic()
                     session_meta.record_interaction()
 
                     if _should_reset_interrupted_on_activity_start(
                         event_name=event_name,
-                        interrupted=_is_interrupted,
+                        interrupted=state.is_interrupted,
                     ):
-                        _is_interrupted = False
+                        state.is_interrupted = False
                         logger.info(
                             "Reset stale interrupted state on activity_start: user=%s session=%s",
                             user_id,
@@ -2733,7 +2647,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
                 elif message.get("type") == "gesture":
                     gesture = message.get("gesture")
-                    _last_user_activity_at = time.monotonic()
+                    state.last_user_activity_at = time.monotonic()
                     session_meta.record_interaction()
                     if gesture in ("lod_up", "lod_down"):
                         ephemeral_ctx = session_manager.get_ephemeral_context(session_id)
@@ -2808,9 +2722,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         ctx_queue.inject_immediate(content)
 
                     elif gesture == "repeat_last":
-                        _allow_agent_repeat_until = time.monotonic() + 12.0
+                        state.allow_agent_repeat_until = time.monotonic() + 12.0
                         last_agent = None
-                        for entry in reversed(transcript_history):
+                        for entry in reversed(state.transcript_history):
                             if entry.get("role") == "agent":
                                 last_agent = entry.get("text", "")
                                 break
@@ -2864,14 +2778,13 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                             })
 
                     elif gesture == "camera_toggle":
-                        nonlocal _client_camera_active, _camera_activated_at, _first_vision_after_camera
-                        _client_camera_active = _coerce_bool(
-                            message.get("active"), default=not _client_camera_active,
+                        state.client_camera_active = _coerce_bool(
+                            message.get("active"), default=not state.client_camera_active,
                         )
-                        logger.info("Camera toggle: active=%s", _client_camera_active)
-                        if _client_camera_active:
-                            _camera_activated_at = time.monotonic()
-                            _first_vision_after_camera = True
+                        logger.info("Camera toggle: active=%s", state.client_camera_active)
+                        if state.client_camera_active:
+                            state.camera_activated_at = time.monotonic()
+                            state.first_vision_after_camera = True
                             # Camera toggle is informational, not safety-critical → use queue
                             # to avoid interrupting current generation via turn_complete=True
                             ctx_queue.enqueue(
@@ -2904,13 +2817,13 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     logger.info("Reload face library requested for user=%s", user_id)
                     if _face_available:
                         try:
-                            face_library.clear()
-                            face_library.extend(await asyncio.to_thread(load_face_library, user_id))
+                            state.face_library.clear()
+                            state.face_library.extend(await asyncio.to_thread(load_face_library, user_id))
                             await _safe_send_json({
                                 "type": MessageType.FACE_LIBRARY_RELOADED,
-                                "count": len(face_library),
+                                "count": len(state.face_library),
                             })
-                            logger.info("Reloaded %d face(s) for user %s", len(face_library), user_id)
+                            logger.info("Reloaded %d face(s) for user %s", len(state.face_library), user_id)
                         except Exception:
                             logger.exception("Failed to reload face library")
                             await _safe_send_json({
@@ -2929,7 +2842,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         try:
                             from tools.face_tools import clear_face_library
                             count = await asyncio.to_thread(clear_face_library, user_id)
-                            face_library.clear()
+                            state.face_library.clear()
                             await _safe_send_json({
                                 "type": MessageType.FACE_LIBRARY_CLEARED,
                                 "deleted_count": count,
@@ -2999,21 +2912,21 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     # Only suppress if model was actually speaking recently (2.0s
                     # window aligns with iOS 1.5s timeout + network latency).
                     now_mono = time.monotonic()
-                    if (now_mono - _last_interrupt_at) < _INTERRUPT_DEBOUNCE_SEC:
+                    if (now_mono - state.last_interrupt_at) < state.INTERRUPT_DEBOUNCE_SEC:
                         logger.debug("Client barge-in debounced (%.0fms since last)",
-                                     (now_mono - _last_interrupt_at) * 1000)
+                                     (now_mono - state.last_interrupt_at) * 1000)
                     else:
                         model_was_speaking = (
                             (
-                                _model_audio_last_seen_at > 0
-                                and (now_mono - _model_audio_last_seen_at) < 2.0
+                                state.model_audio_last_seen_at > 0
+                                and (now_mono - state.model_audio_last_seen_at) < 2.0
                             )
                             or ctx_queue.model_speaking
                         )
                         if model_was_speaking:
-                            _is_interrupted = True
-                            _last_interrupt_at = now_mono
-                            _model_audio_last_seen_at = 0.0
+                            state.is_interrupted = True
+                            state.last_interrupt_at = now_mono
+                            state.model_audio_last_seen_at = 0.0
                             ctx_queue._transition_to(ModelState.IDLE)
                         sent_interrupted = await _safe_send_json({
                             "type": MessageType.INTERRUPTED,
@@ -3038,7 +2951,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                             if sent_interrupted:
                                 logger.info(
                                     "Client barge-in ignored — model not speaking (last audio %.1fs ago): user=%s session=%s state=%s",
-                                    now_mono - _model_audio_last_seen_at if _model_audio_last_seen_at > 0 else -1,
+                                    now_mono - state.model_audio_last_seen_at if state.model_audio_last_seen_at > 0 else -1,
                                     user_id,
                                     session_id,
                                     ctx_queue.state.value,
@@ -3064,8 +2977,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
     async def _process_telemetry(telemetry_data: dict) -> None:
         """Process a telemetry tick: semantic text + LOD decision."""
-        nonlocal _last_telemetry_signature, _last_telemetry_context_sent_at
-        nonlocal _current_location_ctx
 
         ephemeral_ctx = parse_telemetry_to_ephemeral(telemetry_data)
         session_manager.update_ephemeral_context(session_id, ephemeral_ctx)
@@ -3076,14 +2987,14 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         if telemetry_agg.should_send(now):
             signature = _build_telemetry_signature(ephemeral_ctx)
             should_inject, reasons = _should_inject_telemetry_context(
-                previous_signature=_last_telemetry_signature,
+                previous_signature=state.last_telemetry_signature,
                 current_signature=signature,
-                last_injected_ts=_last_telemetry_context_sent_at,
+                last_injected_ts=state.last_telemetry_context_sent_at,
                 now_ts=now,
             )
             _signature_changed = bool(
-                _last_telemetry_signature is None
-                or _changed_signature_fields(_last_telemetry_signature, signature)
+                state.last_telemetry_signature is None
+                or _changed_signature_fields(state.last_telemetry_signature, signature)
             )
             if should_inject:
                 semantic_text = parse_telemetry(telemetry_data)
@@ -3099,20 +3010,20 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     priority=8,
                     speak=False,
                 )
-                _last_telemetry_context_sent_at = now
+                state.last_telemetry_context_sent_at = now
                 logger.debug("Telemetry context injected: reasons=%s", ",".join(reasons))
-            _last_telemetry_signature = signature
+            state.last_telemetry_signature = signature
             telemetry_agg.mark_sent(now)
 
         # Phase 6B: Location context evaluation from GPS
         if _location_ctx_service and ephemeral_ctx.gps:
             try:
-                _current_location_ctx = await _location_ctx_service.evaluate(
+                state.current_location_ctx = await _location_ctx_service.evaluate(
                     ephemeral_ctx.gps.lat, ephemeral_ctx.gps.lng,
                 )
-                session_ctx.familiarity_score = _current_location_ctx.familiarity_score
+                session_ctx.familiarity_score = state.current_location_ctx.familiarity_score
                 # Track unique locations visited this session
-                place = _current_location_ctx.place_name
+                place = state.current_location_ctx.place_name
                 if place and place not in session_meta.locations_visited:
                     session_meta.locations_visited.append(place)
             except Exception:
@@ -3120,7 +3031,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
         # Only run LOD decision when signature changed or periodic refresh
         # (avoids expensive rule engine + LLM evaluator on every tick)
-        if _signature_changed or (now - _last_telemetry_context_sent_at) >= TELEMETRY_FORCE_REFRESH_SEC:
+        if _signature_changed or (now - state.last_telemetry_context_sent_at) >= TELEMETRY_FORCE_REFRESH_SEC:
             await _process_lod_decision(ephemeral_ctx)
 
     async def _process_lod_decision(ephemeral_ctx) -> None:
@@ -3136,7 +3047,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             try:
                 adjustment = await _lod_evaluator.evaluate(
                     baseline_lod=new_lod,
-                    location_ctx=_current_location_ctx,
+                    location_ctx=state.current_location_ctx,
                     user_profile=user_profile,
                 )
                 if adjustment.delta != 0:
@@ -3196,10 +3107,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         Processes session_resumption_update events, transcriptions,
         function calls, and content parts (audio binary / text JSON).
         """
-        nonlocal _transcript_buffer, _transcript_buffer_started_at, _turn_had_vision_content, _model_audio_last_seen_at
-        nonlocal _last_user_activity_at, _last_interrupt_at, _is_interrupted
-        nonlocal _downstream_retry_count
-
         # Resolve ADK session ID — Vertex AI generates its own IDs,
         # so we pre-create the session and cache the mapping.
         adk_session_id = session_id
@@ -3228,7 +3135,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             )
 
         live_events = await asyncio.to_thread(_start_live_events)
-        _is_interrupted = False
+        state.is_interrupted = False
         try:
             async for event in live_events:
                 if stop_downstream.is_set():
@@ -3269,15 +3176,15 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                      and getattr(event.server_content, "interrupted", False))
                     or getattr(event, "interrupted", False)
                 )
-                if _event_interrupted and not _is_interrupted:
+                if _event_interrupted and not state.is_interrupted:
                     now_mono = time.monotonic()
-                    if (now_mono - _last_interrupt_at) < _INTERRUPT_DEBOUNCE_SEC:
+                    if (now_mono - state.last_interrupt_at) < state.INTERRUPT_DEBOUNCE_SEC:
                         logger.debug("Interrupt debounced (%.0fms since last)",
-                                     (now_mono - _last_interrupt_at) * 1000)
+                                     (now_mono - state.last_interrupt_at) * 1000)
                     else:
-                        _is_interrupted = True
-                        _last_interrupt_at = now_mono
-                        _model_audio_last_seen_at = 0.0
+                        state.is_interrupted = True
+                        state.last_interrupt_at = now_mono
+                        state.model_audio_last_seen_at = 0.0
                         # Interrupt → force state machine to IDLE (no flush)
                         ctx_queue._transition_to(ModelState.IDLE)
                         # Note: do NOT flush queue on interrupt — user is speaking
@@ -3292,21 +3199,21 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 # function call.  If new audio arrives within 500ms, stay
                 # in DRAINING state instead of transitioning to IDLE.
                 if event.turn_complete:
-                    if _is_interrupted:
+                    if state.is_interrupted:
                         logger.info("Turn complete — resuming audio forwarding")
-                    _is_interrupted = False
+                    state.is_interrupted = False
                     # Track vision spoken cooldown
-                    if _turn_had_vision_content:
+                    if state.turn_had_vision_content:
                         ctx_queue.record_vision_spoken()
-                        _turn_had_vision_content = False
+                        state.turn_had_vision_content = False
                     # Flush any remaining transcript buffer
-                    if _transcript_buffer:
+                    if state.transcript_buffer:
                         if not await _flush_transcript_buffer():
                             break
                     # Quiet period: wait 500ms before confirming turn is done
-                    _tc_audio_before = _model_audio_last_seen_at
+                    _tc_audio_before = state.model_audio_last_seen_at
                     await asyncio.sleep(0.5)
-                    if _model_audio_last_seen_at > _tc_audio_before:
+                    if state.model_audio_last_seen_at > _tc_audio_before:
                         # New audio arrived during quiet period — model resumed
                         logger.info("Turn complete revoked — audio arrived during quiet period")
                     else:
@@ -3326,21 +3233,21 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                             speak=False,
                         )
                         # Flush queued context injections
-                        ctx_queue.flush_or_defer_first_turn(camera_active=_client_camera_active)
+                        ctx_queue.flush_or_defer_first_turn(camera_active=state.client_camera_active)
 
                 # --- Content parts (audio / text) — BEFORE function calls ---
                 # Process audio/text first so that any subsequent
                 # inject_immediate (function responses) does not interrupt
                 # audio chunks from the same event.
-                if event.content and event.content.parts and not _is_interrupted:
+                if event.content and event.content.parts and not state.is_interrupted:
                     for part in event.content.parts:
                         if stop_downstream.is_set():
                             break
 
                         if part.inline_data and part.inline_data.data:
-                            _model_audio_last_seen_at = time.monotonic()
+                            state.model_audio_last_seen_at = time.monotonic()
                             # Audio chunk → GENERATING→DRAINING or stay DRAINING
-                            ctx_queue.set_model_audio_timestamp(_model_audio_last_seen_at)
+                            ctx_queue.set_model_audio_timestamp(state.model_audio_last_seen_at)
                             ctx_queue.set_model_speaking(True)
                             audio_data = part.inline_data.data
                             if isinstance(audio_data, str):
@@ -3371,7 +3278,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     input_text = event.input_transcription.text
                     if _is_likely_echo(input_text, now_mono):
                         logger.debug("Echo detected, reclassifying: %s", input_text[:120])
-                        transcript_history.append({
+                        state.transcript_history.append({
                             "role": "echo",
                             "text": input_text,
                         })
@@ -3389,11 +3296,11 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         )
                         logger.info("Queued echo cancellation for Gemini")
                     else:
-                        transcript_history.append({
+                        state.transcript_history.append({
                             "role": "user",
                             "text": input_text,
                         })
-                        _last_user_activity_at = time.monotonic()
+                        state.last_user_activity_at = time.monotonic()
                         session_meta.record_interaction()
                         if not await _safe_send_json({
                             "type": MessageType.TRANSCRIPT,
@@ -3492,7 +3399,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         allow_call, block_reason = _allow_navigation_tool_call(
                             func_name=fc.name,
                             func_args=call_args,
-                            transcript_history=transcript_history,
+                            transcript_history=state.transcript_history,
                         )
                         if not allow_call:
                             blocked_result = {
@@ -3610,7 +3517,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     if _ot_text.replace("[Silence]", "").strip() == "":
                         continue
                     now_mono = time.monotonic()
-                    transcript_history.append({
+                    state.transcript_history.append({
                         "role": "agent",
                         "text": _ot_text,
                     })
@@ -3621,20 +3528,20 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                         "ahead of", "around you", "your surroundings",
                         "to your left", "to your right", "on the left", "on the right",
                     )):
-                        _turn_had_vision_content = True
+                        state.turn_had_vision_content = True
                     # Buffer fragments instead of forwarding immediately
-                    _transcript_buffer += _ot_text
-                    if _transcript_buffer_started_at == 0.0:
-                        _transcript_buffer_started_at = now_mono
+                    state.transcript_buffer += _ot_text
+                    if state.transcript_buffer_started_at == 0.0:
+                        state.transcript_buffer_started_at = now_mono
                     logger.debug("Buffered transcript fragment: %s", _ot_text[:80])
                     # Flush on sentence boundary
-                    if _has_sentence_boundary(_transcript_buffer):
+                    if _has_sentence_boundary(state.transcript_buffer):
                         if not await _flush_transcript_buffer():
                             break
                         _output_transcription_forwarded = True
                     # Flush on timeout (stale buffer since first fragment)
-                    elif (_transcript_buffer_started_at > 0
-                          and (now_mono - _transcript_buffer_started_at) > _TRANSCRIPT_FLUSH_TIMEOUT_SEC):
+                    elif (state.transcript_buffer_started_at > 0
+                          and (now_mono - state.transcript_buffer_started_at) > state.TRANSCRIPT_FLUSH_TIMEOUT_SEC):
                         if not await _flush_transcript_buffer():
                             break
                         _output_transcription_forwarded = True
@@ -3649,15 +3556,15 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             is_keepalive_timeout = "keepalive ping timeout" in exc_text
             if (
                 is_keepalive_timeout
-                and _downstream_retry_count < _DOWNSTREAM_MAX_RETRIES
+                and state.downstream_retry_count < state.DOWNSTREAM_MAX_RETRIES
                 and websocket.client_state == WebSocketState.CONNECTED
             ):
-                _downstream_retry_count += 1
-                backoff_sec = 0.8 * _downstream_retry_count
+                state.downstream_retry_count += 1
+                backoff_sec = 0.8 * state.downstream_retry_count
                 logger.warning(
                     "Transient Live API keepalive timeout; retrying downstream (%d/%d) after %.1fs: user=%s session=%s",
-                    _downstream_retry_count,
-                    _DOWNSTREAM_MAX_RETRIES,
+                    state.downstream_retry_count,
+                    state.DOWNSTREAM_MAX_RETRIES,
                     backoff_sec,
                     user_id,
                     session_id,
@@ -3673,7 +3580,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             if is_keepalive_timeout:
                 logger.warning(
                     "Live API keepalive timeout persisted after %d retries; requesting client reconnect: user=%s session=%s",
-                    _downstream_retry_count,
+                    state.downstream_retry_count,
                     user_id,
                     session_id,
                 )
@@ -3736,7 +3643,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
         logger.exception("Session error: user=%s session=%s", user_id, session_id)
     finally:
         # Phase 5: Auto-extract memories from session transcript
-        if _memory_extractor_available and _memory_available and transcript_history:
+        if _memory_extractor_available and _memory_available and state.transcript_history:
             try:
                 extractor = MemoryExtractor()
                 bank = MemoryBankService(user_id)
@@ -3745,7 +3652,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     extractor.extract_and_store,
                     user_id=user_id,
                     session_id=session_id,
-                    transcript_history=list(transcript_history),
+                    transcript_history=list(state.transcript_history),
                     memory_bank=bank,
                     budget=budget,
                 )
@@ -3761,8 +3668,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
         # Phase 6: Record ACE data to session metadata (best-effort)
         try:
-            if _current_location_ctx:
-                place = getattr(_current_location_ctx, "place_name", "")
+            if state.current_location_ctx:
+                place = getattr(state.current_location_ctx, "place_name", "")
                 if place and place not in session_meta.locations_visited:
                     session_meta.locations_visited.append(place)
         except Exception:
