@@ -331,6 +331,42 @@ class TestCategoryDedup:
 
 
 # ---------------------------------------------------------------------------
+# Tests: stale turn discard
+# ---------------------------------------------------------------------------
+
+
+class TestDiscardStale:
+    def test_discards_only_matching_older_turns(self, queue, lrq):
+        queue.set_model_speaking(True)
+        queue.enqueue("turn_boundary", "old boundary", priority=1, speak=False, turn_seq=1)
+        queue.enqueue("vision", "fresh vision", priority=5, speak=True, turn_seq=2)
+        queue.enqueue("camera_toggle", "camera on", priority=4, speak=True, turn_seq=1)
+
+        dropped = queue.discard_stale(
+            min_turn_seq=2,
+            categories={"turn_boundary", "vision"},
+        )
+
+        assert dropped == ["turn_boundary"]
+        assert set(queue._queue) == {"vision", "camera_toggle"}
+        assert len(lrq.sent) == 0
+
+    def test_cancels_deferred_flush_when_queue_becomes_empty(self, queue):
+        queue.set_model_speaking(True)
+        queue.enqueue("turn_boundary", "old boundary", priority=1, speak=False, turn_seq=1)
+        queue._deferred_flush_handle = MagicMock()
+
+        dropped = queue.discard_stale(
+            min_turn_seq=2,
+            categories={"turn_boundary"},
+        )
+
+        assert dropped == ["turn_boundary"]
+        assert queue._queue == {}
+        assert queue._deferred_flush_handle is None
+
+
+# ---------------------------------------------------------------------------
 # Tests: priority sorting in merged output
 # ---------------------------------------------------------------------------
 

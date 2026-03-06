@@ -10,9 +10,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import tools.navigation as navigation_mod
 from tools.navigation import (
     NAVIGATION_FUNCTIONS,
     NAVIGATION_TOOL_DECLARATIONS,
+    _get_client,
     _haversine_distance,
     _maneuver_to_description,
     _strip_html,
@@ -122,6 +124,21 @@ class TestFormatClockDirection:
     def test_rounding(self):
         result = format_clock_direction(9, 47.6)
         assert result == "at 9 o'clock, 48 meters"
+
+
+class TestGoogleMapsClient:
+    def test_get_client_uses_supported_timeout_arguments(self, monkeypatch):
+        monkeypatch.setenv("GOOGLE_MAPS_API_KEY", "test-key")
+        monkeypatch.setattr(navigation_mod, "_client", None)
+
+        with patch("tools.navigation.googlemaps.Client") as mock_client:
+            _get_client()
+
+        kwargs = mock_client.call_args.kwargs
+        assert kwargs["key"] == "test-key"
+        assert kwargs["connect_timeout"] == 5
+        assert kwargs["read_timeout"] == 5
+        assert "timeout" not in kwargs
 
 
 # ---------------------------------------------------------------------------

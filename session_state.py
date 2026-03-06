@@ -83,6 +83,8 @@ class SessionState:
 
     # -- User activity -------------------------------------------------------
     last_user_activity_at: float = field(default_factory=time.monotonic)
+    user_turn_seq: int = 0
+    turn_output_seen: bool = False
 
     # -- Memory (Phase 4) ----------------------------------------------------
     memory_top3: list[str] = field(default_factory=list)
@@ -99,6 +101,7 @@ class SessionState:
     TRANSCRIPT_FLUSH_TIMEOUT_SEC: float = field(default=1.5, repr=False)
     CAMERA_GRACE_PERIOD_SEC: float = field(default=12.0, repr=False)
     FRAME_TO_GEMINI_INTERVAL: float = field(default=2.0, repr=False)
+    USER_TURN_GAP_SEC: float = field(default=1.0, repr=False)
     SENTENCE_BOUNDARY_RE: re.Pattern = field(
         default_factory=lambda: re.compile(r"[。！？.!?\n]"), repr=False,
     )

@@ -298,6 +298,7 @@ class _QueuedItem:
     text: str
     priority: int  # lower = more important
     speak: bool
+    turn_seq: int = 0
     enqueued_at: float = dc_field(default_factory=time.monotonic)
 
 
@@ -441,16 +442,53 @@ class ContextInjectionQueue:
         text: str,
         priority: int = 5,
         speak: bool = True,
+        turn_seq: int = 0,
     ) -> None:
         """Queue a context injection.  Always queues; never sends immediately."""
         self._queue[category] = _QueuedItem(
-            category=category, text=text, priority=priority, speak=speak,
+            category=category, text=text, priority=priority, speak=speak, turn_seq=turn_seq,
         )
         logger.info("Queued [%s] (priority=%d, speak=%s, queue_size=%d, state=%s)",
                      category, priority, speak, len(self._queue), self._state.value)
         # Only schedule flush if IDLE and no timer pending
         if self._state == ModelState.IDLE and self._deferred_flush_handle is None:
             self._schedule_deferred_flush()
+
+    def discard_stale(
+        self,
+        *,
+        min_turn_seq: int,
+        categories: set[str] | None = None,
+    ) -> list[str]:
+        """Drop queued items that belong to older user turns.
+
+        This prevents silent control messages or delayed sub-agent results from
+        leaking into a newer user request and causing cross-turn carryover.
+        """
+        dropped: list[str] = []
+        kept: dict[str, _QueuedItem] = {}
+        for category, item in self._queue.items():
+            should_drop = item.turn_seq < min_turn_seq
+            if categories is not None:
+                should_drop = should_drop and category in categories
+            if should_drop:
+                dropped.append(category)
+                continue
+            kept[category] = item
+
+        if not dropped:
+            return []
+
+        self._queue = kept
+        if not self._queue:
+            self._cancel_deferred_flush()
+        logger.info(
+            "Discarded %d stale queued item(s) for turn %d: %s",
+            len(dropped),
+            min_turn_seq,
+            ", ".join(sorted(dropped)),
+        )
+        return dropped
 
     # -- Deferred flush (batching window) ------------------------------------
 

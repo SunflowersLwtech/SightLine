@@ -655,6 +655,18 @@ async def test_activity_start_while_model_speaking_triggers_interrupt(handler, f
     assert session_state.is_interrupted
 
 
+def test_register_user_activity_starts_new_turn_and_discards_stale_context(handler, mock_ctx_queue, session_state):
+    mock_ctx_queue.discard_stale = Mock()
+    session_state.last_user_activity_at = time.monotonic() - 5
+
+    started_new_turn = handler._register_user_activity(explicit_turn_start=True)
+
+    assert started_new_turn is True
+    assert session_state.user_turn_seq == 1
+    mock_ctx_queue.discard_stale.assert_called_once()
+    assert mock_ctx_queue.discard_stale.call_args.kwargs["min_turn_seq"] == 1
+
+
 @pytest.mark.websocket
 @pytest.mark.asyncio
 async def test_interrupt_debounce_rapid_interrupts(handler, fake_ws, session_state, mock_ctx_queue):
@@ -1181,6 +1193,16 @@ async def test_gemini_connection_drop_closes_queue():
             pytest.fail("Handler did not exit cleanly when Gemini connection dropped")
 
     assert fake_queue.closed
+
+
+def test_silent_turn_reconnect_predicate(handler, session_state):
+    session_state.user_turn_seq = 1
+    session_state.turn_output_seen = False
+
+    assert handler._should_reconnect_silent_turn() is True
+
+    session_state.turn_output_seen = True
+    assert handler._should_reconnect_silent_turn() is False
 
 
 @pytest.mark.websocket

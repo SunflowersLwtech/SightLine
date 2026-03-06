@@ -77,6 +77,20 @@ from tools.tool_behavior import ToolBehavior, behavior_to_text, resolve_tool_beh
 
 logger = logging.getLogger("sightline.server")
 
+_STALE_QUEUE_CATEGORIES = {
+    "echo_cancel",
+    "face",
+    "lod",
+    "lod_resume",
+    "ocr",
+    "telemetry",
+    "turn_boundary",
+    "vad",
+    "vision",
+}
+
+_SILENT_TURN_WATCHDOG_SEC = 18.0
+
 
 class WebSocketHandler:
     """Manages a single WebSocket session's upstream/downstream lifecycle.
@@ -134,6 +148,75 @@ class WebSocketHandler:
         self._assembled_profile = assembled_profile
         self.memory_budget = memory_budget
         self._initial_memories = initial_memories or []
+        self._response_watchdog_task: asyncio.Task | None = None
+
+    def _is_stale_turn(self, origin_turn_seq: int | None) -> bool:
+        return origin_turn_seq is not None and origin_turn_seq < self.state.user_turn_seq
+
+    def _register_user_activity(self, *, explicit_turn_start: bool = False) -> bool:
+        """Mark fresh user activity and discard queued context from older turns."""
+        now_mono = time.monotonic()
+        idle_gap = now_mono - self.state.last_user_activity_at
+        is_new_turn = explicit_turn_start or idle_gap >= self.state.USER_TURN_GAP_SEC
+        self.state.last_user_activity_at = now_mono
+        if not is_new_turn:
+            return False
+
+        self.state.user_turn_seq += 1
+        self.state.turn_output_seen = False
+        self._schedule_response_watchdog(self.state.user_turn_seq)
+        discard_stale = getattr(self.ctx_queue, "discard_stale", None)
+        if callable(discard_stale):
+            discard_stale(
+                min_turn_seq=self.state.user_turn_seq,
+                categories=_STALE_QUEUE_CATEGORIES,
+            )
+        return True
+
+    def _should_reconnect_silent_turn(self) -> bool:
+        return self.state.user_turn_seq > 0 and not self.state.turn_output_seen
+
+    def _cancel_response_watchdog(self) -> None:
+        if self._response_watchdog_task is not None:
+            self._response_watchdog_task.cancel()
+            self._response_watchdog_task = None
+
+    def _schedule_response_watchdog(self, turn_seq: int) -> None:
+        self._cancel_response_watchdog()
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        self._response_watchdog_task = asyncio.create_task(
+            self._response_watchdog(turn_seq)
+        )
+
+    async def _response_watchdog(self, turn_seq: int) -> None:
+        try:
+            await asyncio.sleep(_SILENT_TURN_WATCHDOG_SEC)
+            if self.stop_downstream.is_set():
+                return
+            if turn_seq != self.state.user_turn_seq:
+                return
+            if self.state.turn_output_seen:
+                return
+            logger.warning(
+                "No client-visible output for turn %d within %.1fs; requesting reconnect",
+                turn_seq,
+                _SILENT_TURN_WATCHDOG_SEC,
+            )
+            await self._safe_send_json({
+                "type": MessageType.GO_AWAY,
+                "retry_ms": 750,
+                "message": "No response generated for the last turn. Reconnecting.",
+            })
+            self.stop_downstream.set()
+            try:
+                await self.websocket.close(code=1012, reason="silent_turn_watchdog")
+            except Exception:
+                pass
+        except asyncio.CancelledError:
+            return
 
     # ── Main entry point ───────────────────────────────────────────────
 
@@ -231,6 +314,7 @@ class WebSocketHandler:
 
     async def _cleanup(self) -> None:
         """Post-session cleanup: extract memories, write metadata, release resources."""
+        self._cancel_response_watchdog()
         if _memory_extractor_available and _memory_available and self.state.transcript_history:
             try:
                 from memory.memory_extractor import MemoryExtractor
@@ -322,6 +406,9 @@ class WebSocketHandler:
         try:
             async with self.state.ws_write_lock:
                 await self.websocket.send_bytes(payload)
+            if payload and self.state.user_turn_seq > 0:
+                self.state.turn_output_seen = True
+                self._cancel_response_watchdog()
             return True
         except (WebSocketDisconnect, RuntimeError):
             self.stop_downstream.set()
@@ -351,6 +438,9 @@ class WebSocketHandler:
         if sent:
             self.state.last_agent_text = clean_text
             self.state.last_agent_text_sent_at = now_mono
+            if self.state.user_turn_seq > 0:
+                self.state.turn_output_seen = True
+                self._cancel_response_watchdog()
         return sent
 
     def _is_likely_echo(self, candidate: str, now_ts: float) -> bool:
@@ -538,7 +628,13 @@ class WebSocketHandler:
             assembled_profile=self._assembled_profile,
             location_ctx=self.state.current_location_ctx,
         )
-        self.ctx_queue.enqueue(category="lod", text=lod_message, priority=3, speak=False)
+        self.ctx_queue.enqueue(
+            category="lod",
+            text=lod_message,
+            priority=3,
+            speak=False,
+            turn_seq=self.state.user_turn_seq,
+        )
         logger.info("Injected [LOD UPDATE] -> LOD %d (%s)", new_lod, reason)
 
     async def _load_session_memories(self, context_hint: str = "") -> list[str]:
@@ -574,7 +670,13 @@ class WebSocketHandler:
         payload = build_vad_runtime_update_payload(new_lod)
         payload["runtime_hot_reconfig_supported"] = supported
         payload["runtime_note"] = "transport_hot_update_applied" if supported else reason
-        self.ctx_queue.enqueue(category="vad", text=build_vad_runtime_update_message(new_lod), priority=7, speak=False)
+        self.ctx_queue.enqueue(
+            category="vad",
+            text=build_vad_runtime_update_message(new_lod),
+            priority=7,
+            speak=False,
+            turn_seq=self.state.user_turn_seq,
+        )
         if supported:
             logger.info("Injected runtime VAD update payload for LOD %d: %s", new_lod, payload)
         else:
@@ -612,7 +714,11 @@ class WebSocketHandler:
 
     # ── Sub-agent runners ──────────────────────────────────────────────
 
-    async def _run_vision_analysis(self, image_base64: str) -> None:
+    async def _run_vision_analysis(
+        self,
+        image_base64: str,
+        origin_turn_seq: int | None = None,
+    ) -> None:
         if not _vision_available:
             await self._emit_tool_event("analyze_scene", ToolBehavior.WHEN_IDLE, status="unavailable", data={"reason": "vision_agent_unavailable"})
             return
@@ -645,6 +751,22 @@ class WebSocketHandler:
                 "has_guide_dog": self.user_profile.has_guide_dog,
             }
             result = await analyze_scene(image_base64, self.session_ctx.current_lod, ctx_dict)
+            if self._is_stale_turn(origin_turn_seq):
+                logger.info(
+                    "Dropping stale vision result from turn %s (current=%d)",
+                    origin_turn_seq,
+                    self.state.user_turn_seq,
+                )
+                await self._emit_tool_event(
+                    "analyze_scene",
+                    ToolBehavior.WHEN_IDLE,
+                    status="stale",
+                    data={
+                        "origin_turn_seq": origin_turn_seq,
+                        "current_turn_seq": self.state.user_turn_seq,
+                    },
+                )
+                return
             result_status = str(result.get("status", "ok")).lower()
             if result_status in {"unavailable", "timeout"}:
                 await self._emit_tool_event("analyze_scene", ToolBehavior.WHEN_IDLE, status="unavailable" if result_status == "unavailable" else "error", data={"reason": f"vision_{result_status}"})
@@ -678,7 +800,13 @@ class WebSocketHandler:
                         logger.info("Vision passive-guard: forcing silent injection after %.1fs user inactivity", idle_for)
                     if not speak:
                         vision_text = "<<<SILENT_SENSOR_DATA>>>\n" + vision_text + "\n<<<END_SILENT_SENSOR_DATA>>>"
-                    self.ctx_queue.enqueue(category="vision", text=vision_text, priority=5, speak=speak)
+                    self.ctx_queue.enqueue(
+                        category="vision",
+                        text=vision_text,
+                        priority=5,
+                        speak=speak,
+                        turn_seq=origin_turn_seq or self.state.user_turn_seq,
+                    )
                     if speak:
                         self.ctx_queue.record_vision_spoken()
                     logger.info("Injected [VISION ANALYSIS] (LOD %d, confidence %.2f, speak=%s)", self.session_ctx.current_lod, result.get("confidence", 0), speak)
@@ -690,7 +818,11 @@ class WebSocketHandler:
             async with self.state.vision_lock:
                 self.state.vision_in_progress = False
 
-    async def _run_face_recognition(self, image_base64: str) -> None:
+    async def _run_face_recognition(
+        self,
+        image_base64: str,
+        origin_turn_seq: int | None = None,
+    ) -> None:
         if not _face_available or not self.state.face_runtime_available:
             await self._emit_tool_event("identify_person", ToolBehavior.SILENT, status="unavailable", data={"reason": "face_runtime_unavailable"})
             return
@@ -718,6 +850,22 @@ class WebSocketHandler:
         try:
             from agents.face_agent import identify_persons_in_frame
             results = await asyncio.to_thread(identify_persons_in_frame, image_base64, self.user_id, self.state.face_library, ToolBehavior.SILENT)
+            if self._is_stale_turn(origin_turn_seq):
+                logger.info(
+                    "Dropping stale face result from turn %s (current=%d)",
+                    origin_turn_seq,
+                    self.state.user_turn_seq,
+                )
+                await self._emit_tool_event(
+                    "identify_person",
+                    ToolBehavior.SILENT,
+                    status="stale",
+                    data={
+                        "origin_turn_seq": origin_turn_seq,
+                        "current_turn_seq": self.state.user_turn_seq,
+                    },
+                )
+                return
             await self._safe_send_json({"type": MessageType.FACE_DEBUG, "data": {"face_boxes": _json_safe([{"bbox": item.get("bbox", []), "label": item.get("person_name", "unknown"), "score": float(item.get("score", 0.0)), "similarity": float(item.get("similarity", 0.0))} for item in results])}})
             if len(results) == 0:
                 self.state.face_consecutive_misses += 1
@@ -732,7 +880,13 @@ class WebSocketHandler:
                 face_text = _format_face_results(known)
                 if not speak:
                     face_text = "[SILENT - context only, do not speak aloud]\n" + face_text
-                self.ctx_queue.enqueue(category="face", text=face_text, priority=4, speak=speak)
+                self.ctx_queue.enqueue(
+                    category="face",
+                    text=face_text,
+                    priority=4,
+                    speak=speak,
+                    turn_seq=origin_turn_seq or self.state.user_turn_seq,
+                )
                 logger.info("Injected [FACE ID] (speak=%s): %s", speak, ", ".join(r["person_name"] for r in known))
                 best = max(known, key=lambda item: float(item.get("similarity", 0.0)))
                 await self._emit_identity_event(person_name=str(best.get("person_name", "unknown")), matched=True, similarity=float(best.get("similarity", 0.0)), source="face_match")
@@ -761,7 +915,12 @@ class WebSocketHandler:
             async with self.state.face_lock:
                 self.state.face_in_progress = False
 
-    async def _run_ocr_analysis(self, image_base64: str, safety_only: bool = False) -> None:
+    async def _run_ocr_analysis(
+        self,
+        image_base64: str,
+        safety_only: bool = False,
+        origin_turn_seq: int | None = None,
+    ) -> None:
         if not _ocr_available:
             await self._emit_tool_event("extract_text", ToolBehavior.WHEN_IDLE, status="unavailable", data={"reason": "ocr_agent_unavailable"})
             return
@@ -778,6 +937,22 @@ class WebSocketHandler:
             if self.session_ctx.active_task:
                 hint += f" Currently: {self.session_ctx.active_task}."
             result = await extract_text(image_base64, context_hint=hint, safety_only=safety_only)
+            if self._is_stale_turn(origin_turn_seq):
+                logger.info(
+                    "Dropping stale OCR result from turn %s (current=%d)",
+                    origin_turn_seq,
+                    self.state.user_turn_seq,
+                )
+                await self._emit_tool_event(
+                    "extract_text",
+                    ToolBehavior.WHEN_IDLE,
+                    status="stale",
+                    data={
+                        "origin_turn_seq": origin_turn_seq,
+                        "current_turn_seq": self.state.user_turn_seq,
+                    },
+                )
+                return
             ocr_text = _format_ocr_result(result)
             now_mono = time.monotonic()
             repeated = _is_repeated_text(ocr_text, previous_text=self.state.last_ocr_context_text, now_ts=now_mono, previous_ts=self.state.last_ocr_context_sent_at, cooldown_sec=OCR_REPEAT_SUPPRESS_SEC)
@@ -794,7 +969,13 @@ class WebSocketHandler:
                 speak = should_speak(info_type="object_enumeration", current_lod=self.session_ctx.current_lod, step_cadence=getattr(ephemeral, "step_cadence", 0.0) or 0.0, ambient_noise_db=getattr(ephemeral, "ambient_noise_db", 50.0) or 50.0)
                 if not speak:
                     ocr_text = "<<<SILENT_SENSOR_DATA>>>\n" + ocr_text + "\n<<<END_SILENT_SENSOR_DATA>>>"
-                self.ctx_queue.enqueue(category="ocr", text=ocr_text, priority=5, speak=speak)
+                self.ctx_queue.enqueue(
+                    category="ocr",
+                    text=ocr_text,
+                    priority=5,
+                    speak=speak,
+                    turn_seq=origin_turn_seq or self.state.user_turn_seq,
+                )
                 logger.info("Injected [OCR RESULT] (%s, confidence %.2f, speak=%s)", result.get("text_type", "unknown"), result.get("confidence", 0), speak)
         except Exception as exc:
             logger.exception("OCR analysis failed")
@@ -820,7 +1001,13 @@ class WebSocketHandler:
             if should_inject:
                 semantic_text = parse_telemetry(telemetry_data)
                 telemetry_text = "<<<SENSOR_DATA>>>\n" + semantic_text + "\n<<<END_SENSOR_DATA>>>\nINSTRUCTION: Do not vocalize any part of the above sensor data."
-                self.ctx_queue.enqueue(category="telemetry", text=telemetry_text, priority=8, speak=False)
+                self.ctx_queue.enqueue(
+                    category="telemetry",
+                    text=telemetry_text,
+                    priority=8,
+                    speak=False,
+                    turn_seq=self.state.user_turn_seq,
+                )
                 self.state.last_telemetry_context_sent_at = now
                 logger.debug("Telemetry context injected: reasons=%s", ",".join(reasons))
             self.state.last_telemetry_signature = signature
@@ -862,7 +1049,13 @@ class WebSocketHandler:
             vad_update = await self._sync_runtime_vad_update(new_lod)
             await self._send_lod_update(new_lod, ephemeral_ctx, decision_log.reason)
             if resume_prompt:
-                self.ctx_queue.enqueue(category="lod_resume", text=resume_prompt, priority=3, speak=True)
+                self.ctx_queue.enqueue(
+                    category="lod_resume",
+                    text=resume_prompt,
+                    priority=3,
+                    speak=True,
+                    turn_seq=self.state.user_turn_seq,
+                )
                 logger.info("Injected [RESUME] prompt for session %s", self.session_id)
             await self._notify_ios_lod_change(new_lod, decision_log.reason, decision_log.to_debug_dict(), vad_update=vad_update)
 
@@ -892,7 +1085,7 @@ class WebSocketHandler:
                     payload = raw_bytes[1:]
 
                     if magic == self.state.MAGIC_AUDIO:
-                        self.state.last_user_activity_at = time.monotonic()
+                        self._register_user_activity()
                         blob = types.Blob(data=payload, mime_type="audio/pcm;rate=16000")
                         self.live_request_queue.send_realtime(blob)
                         continue
@@ -925,6 +1118,7 @@ class WebSocketHandler:
 
                 msg_type = message.get("type")
                 if msg_type == "audio":
+                    self._register_user_activity()
                     audio_bytes = base64.b64decode(message["data"])
                     blob = types.Blob(data=audio_bytes, mime_type="audio/pcm;rate=16000")
                     self.live_request_queue.send_realtime(blob)
@@ -951,11 +1145,31 @@ class WebSocketHandler:
 
                 elif msg_type in {"activity_start", "activity_end"}:
                     event_name = str(msg_type)
-                    self.state.last_user_activity_at = time.monotonic()
+                    if event_name == "activity_start":
+                        self._register_user_activity(explicit_turn_start=True)
+                    else:
+                        self.state.last_user_activity_at = time.monotonic()
                     self.session_meta.record_interaction()
-                    if _should_reset_interrupted_on_activity_start(event_name=event_name, interrupted=self.state.is_interrupted):
+                    had_interrupt = self.state.is_interrupted
+                    if _should_reset_interrupted_on_activity_start(event_name=event_name, interrupted=had_interrupt):
                         self.state.is_interrupted = False
                         logger.info("Reset stale interrupted state on activity_start: user=%s session=%s", self.user_id, self.session_id)
+                    if event_name == "activity_start":
+                        now_mono = time.monotonic()
+                        model_was_speaking = (
+                            self.state.model_audio_last_seen_at > 0
+                            and (now_mono - self.state.model_audio_last_seen_at) < 2.0
+                        ) or self.ctx_queue.model_speaking
+                        if model_was_speaking:
+                            self.state.is_interrupted = True
+                            self.state.last_interrupt_at = now_mono
+                            self.state.model_audio_last_seen_at = 0.0
+                            self.ctx_queue._transition_to(ModelState.IDLE)
+                            logger.info(
+                                "Activity-start barge-in accepted: user=%s session=%s",
+                                self.user_id,
+                                self.session_id,
+                            )
                     if event_name == "activity_start":
                         self.tool_dedup.reset()
                     queue_status = "forwarded"
@@ -1000,21 +1214,32 @@ class WebSocketHandler:
         lod = self.session_ctx.current_lod
         vision_interval = {1: 10.0, 2: 8.0, 3: 5.0}.get(lod, 8.0)
         queued_agents: list[str] = []
+        current_turn_seq = self.state.user_turn_seq
         if now - self.state.last_vision_time >= vision_interval:
             self.state.last_vision_time = now
             await self._emit_tool_event("analyze_scene", ToolBehavior.WHEN_IDLE, status="queued")
             queued_agents.append("vision")
-            asyncio.create_task(self._run_vision_analysis(image_b64))
+            asyncio.create_task(
+                self._run_vision_analysis(image_b64, origin_turn_seq=current_turn_seq)
+            )
             if lod >= 2 and self.state.face_runtime_available:
                 await self._emit_tool_event("identify_person", ToolBehavior.SILENT, status="queued")
                 queued_agents.append("face")
                 await self._emit_identity_event(person_name="unknown", matched=False, similarity=0.0, source="queued")
-                asyncio.create_task(self._run_face_recognition(image_b64))
+                asyncio.create_task(
+                    self._run_face_recognition(image_b64, origin_turn_seq=current_turn_seq)
+                )
             if lod == 1 and now - getattr(self, '_last_safety_ocr_at', 0) >= 15.0:
                 self._last_safety_ocr_at = now
                 await self._emit_tool_event("extract_text", ToolBehavior.WHEN_IDLE, status="queued")
                 queued_agents.append("ocr")
-                asyncio.create_task(self._run_ocr_analysis(image_b64, safety_only=True))
+                asyncio.create_task(
+                    self._run_ocr_analysis(
+                        image_b64,
+                        safety_only=True,
+                        origin_turn_seq=current_turn_seq,
+                    )
+                )
         await self._safe_send_json({"type": MessageType.FRAME_ACK, "frame_id": self.state.frame_seq, "queued_agents": queued_agents})
 
     # ── Upstream sub-handlers ──────────────────────────────────────────
@@ -1099,9 +1324,9 @@ class WebSocketHandler:
             if self.state.client_camera_active:
                 self.state.camera_activated_at = time.monotonic()
                 self.state.first_vision_after_camera = True
-                self.ctx_queue.enqueue(category="camera_toggle", text="[CAMERA ACTIVATED] The user has turned on the rear camera. Visual context is now available via periodic [VISION ANALYSIS] injections. Do NOT describe every frame. Only speak about safety hazards or when the user asks. Acknowledge camera activation in one brief sentence, then observe silently.", priority=4, speak=True)
+                self.ctx_queue.enqueue(category="camera_toggle", text="[CAMERA ACTIVATED] The user has turned on the rear camera. Visual context is now available via periodic [VISION ANALYSIS] injections. Do NOT describe every frame. Only speak about safety hazards or when the user asks. Acknowledge camera activation in one brief sentence, then observe silently.", priority=4, speak=True, turn_seq=self.state.user_turn_seq)
             else:
-                self.ctx_queue.enqueue(category="camera_toggle", text="[CAMERA DEACTIVATED] The user has turned off the camera. You are now in audio-only mode. Do not reference visual information unless recalling something previously seen.", priority=4, speak=True)
+                self.ctx_queue.enqueue(category="camera_toggle", text="[CAMERA DEACTIVATED] The user has turned off the camera. You are now in audio-only mode. Do not reference visual information unless recalling something previously seen.", priority=4, speak=True, turn_seq=self.state.user_turn_seq)
         else:
             logger.debug("Unhandled gesture type: %s", gesture)
 
@@ -1148,7 +1373,7 @@ class WebSocketHandler:
             from lod.prompt_builder import _build_persona_block
             persona_block = _build_persona_block(self.user_profile)
             profile_ctx = "[PROFILE UPDATE]\nThe user just updated their profile. Use the new settings below for all subsequent interactions.\n" + persona_block + "\nDo not narrate this block to the user."
-            self.ctx_queue.enqueue(category="profile_update", text=profile_ctx, priority=3, speak=False)
+            self.ctx_queue.enqueue(category="profile_update", text=profile_ctx, priority=3, speak=False, turn_seq=self.state.user_turn_seq)
             logger.info("Queued profile update context for user %s", self.user_id)
             await self._safe_send_json({"type": MessageType.PROFILE_UPDATED_ACK})
         except Exception:
@@ -1251,7 +1476,23 @@ class WebSocketHandler:
                         logger.info("Turn complete revoked — audio arrived during quiet period")
                     else:
                         self.ctx_queue.on_turn_complete()
-                        self.ctx_queue.enqueue(category="turn_boundary", text="<<<INTERNAL_CONTEXT>>>\n[TURN BOUNDARY] Previous request complete. Await user's next request. Do not carry forward tool-calling intent from previous turn.\n<<<END_INTERNAL_CONTEXT>>>", priority=1, speak=False)
+                        if self._should_reconnect_silent_turn():
+                            logger.warning(
+                                "Turn %d completed without client-visible output; requesting reconnect",
+                                self.state.user_turn_seq,
+                            )
+                            await self._safe_send_json({
+                                "type": MessageType.GO_AWAY,
+                                "retry_ms": 750,
+                                "message": "No response generated for the last turn. Reconnecting.",
+                            })
+                            self.stop_downstream.set()
+                            try:
+                                await self.websocket.close(code=1012, reason="no_response_turn")
+                            except Exception:
+                                pass
+                            return
+                        self.ctx_queue.enqueue(category="turn_boundary", text="<<<INTERNAL_CONTEXT>>>\n[TURN BOUNDARY] Previous request complete. Await user's next request. Do not carry forward tool-calling intent from previous turn.\n<<<END_INTERNAL_CONTEXT>>>", priority=1, speak=False, turn_seq=self.state.user_turn_seq)
                         self.ctx_queue.flush_or_defer_first_turn(camera_active=self.state.client_camera_active)
 
                 if event.content and event.content.parts and not self.state.is_interrupted:
@@ -1283,7 +1524,7 @@ class WebSocketHandler:
                         logger.debug("Echo detected, reclassifying: %s", input_text[:120])
                         self.state.transcript_history.append({"role": "echo", "text": input_text})
                         await self._safe_send_json({"type": MessageType.TRANSCRIPT, "text": input_text, "role": "echo"})
-                        self.ctx_queue.enqueue(category="echo_cancel", text="[SYSTEM: The previous audio input was an echo of your own speech. Do not respond to it.]", priority=1, speak=False)
+                        self.ctx_queue.enqueue(category="echo_cancel", text="[SYSTEM: The previous audio input was an echo of your own speech. Do not respond to it.]", priority=1, speak=False, turn_seq=self.state.user_turn_seq)
                         logger.info("Queued echo cancellation for Gemini")
                     else:
                         self.state.transcript_history.append({"role": "user", "text": input_text})
