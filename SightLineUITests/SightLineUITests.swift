@@ -62,4 +62,23 @@ final class SightLineUITests: XCTestCase {
         XCTAssertTrue(app.buttons["onboarding-get-started"].waitForExistence(timeout: 5))
         try app.performAccessibilityAudit()
     }
+
+    func testDeniedMicrophoneShowsRecoveryButton() throws {
+        launchApp(arguments: ["-uitest-complete-onboarding", "-uitest-mic-denied"])
+
+        let settingsButton = app.buttons["main-open-app-settings"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["main-open-guide"].exists)
+    }
+
+    func testDeniedCameraDoesNotBlockMainScreenAtLaunch() throws {
+        launchApp(arguments: [
+            "-uitest-complete-onboarding",
+            "-uitest-mic-granted",
+            "-uitest-camera-denied"
+        ])
+
+        XCTAssertTrue(app.buttons["main-open-guide"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["main-open-app-settings"].exists)
+    }
 }

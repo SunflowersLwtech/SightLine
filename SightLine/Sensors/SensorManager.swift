@@ -43,11 +43,9 @@ class SensorManager: ObservableObject {
         // WeatherKit: start periodic refresh (every 10 min)
         weatherManager.startMonitoring(locationManager: locationManager)
 
-        // HealthKit needs async authorization (backup channel, 10-20 min delay)
-        Task {
-            await healthKitManager.requestAuthorization()
-            healthKitManager.startMonitoring()
-        }
+        // HealthKit is only a backup HR channel. Avoid surfacing a blocking
+        // system sheet during launch; start only if the user already granted access.
+        healthKitManager.startMonitoringIfAuthorized()
 
         Self.logger.info("All sensors started (watch receiver + weather activated)")
     }

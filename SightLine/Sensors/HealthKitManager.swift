@@ -77,6 +77,21 @@ class HealthKitManager: ObservableObject {
         Self.logger.info("HealthKit heart rate monitoring started")
     }
 
+    /// HealthKit heart rate is a backup signal, so do not interrupt launch
+    /// with a system permission sheet. Only start if access was already granted.
+    func startMonitoringIfAuthorized() {
+        guard let healthStore = healthStore else { return }
+
+        let heartRateType = HKQuantityType(.heartRate)
+        let authorizationStatus = healthStore.authorizationStatus(for: heartRateType)
+        guard authorizationStatus == .sharingAuthorized else {
+            Self.logger.info("HealthKit authorization not granted; skipping backup heart rate startup")
+            return
+        }
+
+        startMonitoring()
+    }
+
     /// Stop heart rate monitoring.
     func stopMonitoring() {
         if let query = heartRateQuery, let healthStore = healthStore {

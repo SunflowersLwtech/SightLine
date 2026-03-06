@@ -22,6 +22,11 @@ private enum DepthModelState {
     case unavailable
 }
 
+private enum PermissionPromptReason {
+    case microphoneRequired
+    case cameraRequired
+}
+
 struct MainView: View {
     @StateObject private var webSocketManager = WebSocketManager()
     @StateObject private var audioCapture = AudioCaptureManager()
@@ -50,6 +55,7 @@ struct MainView: View {
     @State private var toastMessage: String?
     @State private var isVoiceOverActive = UIAccessibility.isVoiceOverRunning
     @State private var showPermissionPrompt = false
+    @State private var permissionPromptReason: PermissionPromptReason?
     @State private var showInteractionGuide = false
     @State private var sessionReadyTimeoutTask: Task<Void, Never>?
     @State private var hasReceivedSessionReady = false
@@ -281,6 +287,7 @@ struct MainView: View {
                 .font(.caption)
                 .foregroundColor(isSafeMode ? .red.opacity(0.7) : .white.opacity(0.5))
                 .accessibilityLabel(connectionStatus)
+                .accessibilityIdentifier("main-connection-status")
 
             statusStrip
 
@@ -467,6 +474,7 @@ struct MainView: View {
         }
         .accessibilityLabel("Open Settings to grant permissions")
         .accessibilityHint("Opens iOS Settings where you can enable camera and microphone access for SightLine")
+        .accessibilityIdentifier("main-open-app-settings")
         .padding(.top, 4)
     }
 
@@ -760,36 +768,80 @@ struct MainView: View {
         UIApplication.shared.open(url)
     }
 
+    private func presentPermissionPrompt(
+        reason: PermissionPromptReason,
+        status: String,
+        transcript: String? = nil,
+        announcement: String
+    ) {
+        permissionPromptReason = reason
+        showPermissionPrompt = true
+        connectionStatus = status
+        if let transcript {
+            self.transcript = transcript
+        }
+        UIAccessibility.post(notification: .announcement, argument: announcement)
+    }
+
+    private func dismissPermissionPrompt() {
+        showPermissionPrompt = false
+        permissionPromptReason = nil
+    }
+
     /// Recheck permissions when returning from Settings. Dismiss prompt if granted.
     /// If WebSocket was blocked due to missing mic permission, connect now.
     private func recheckPermissionsAfterSettings() {
         Task {
-            let granted = await mediaPermissionGate.preflightMediaPermissions()
             let micGranted = await mediaPermissionGate.ensureMicPermission()
+            let cameraDenied = mediaPermissionGate.isCameraPermissionDenied()
             await MainActor.run {
-                if granted {
-                    showPermissionPrompt = false
-                    connectionStatus = "Permissions granted"
-                    UIAccessibility.post(notification: .announcement,
-                                         argument: "Permissions granted. Starting audio.")
-                } else if micGranted {
-                    // Mic restored but camera still denied — audio-only
-                    showPermissionPrompt = true
-                    connectionStatus = "Audio-only mode (camera denied)"
+                guard micGranted else {
+                    presentPermissionPrompt(
+                        reason: .microphoneRequired,
+                        status: "Microphone permission required",
+                        transcript: "Please enable microphone permission.",
+                        announcement: "Microphone permission is required. Use Open Settings button to grant access."
+                    )
+                    return
                 }
 
-                // If mic is now granted and WebSocket was never connected, connect now
-                if micGranted && !webSocketManager.isConnected {
-                    if let url = SightLineConfig.wsURL(
-                        userId: SightLineConfig.defaultUserId,
-                        sessionId: SightLineConfig.defaultSessionId,
-                        resumeHandle: sessionResumptionHandle.isEmpty ? nil : sessionResumptionHandle
-                    ) {
-                        webSocketManager.connect(url: url)
+                switch permissionPromptReason {
+                case .cameraRequired:
+                    guard cameraDenied else {
+                        dismissPermissionPrompt()
+                        transcript = "Camera permission restored. Swipe sideways to turn on camera."
+                        showToast("Camera permission restored")
+                        UIAccessibility.post(
+                            notification: .announcement,
+                            argument: "Camera permission restored. Swipe sideways to turn on camera."
+                        )
+                        return
                     }
-                } else if micGranted {
-                    // Already connected, just start audio
-                    startAudioCapture()
+                    presentPermissionPrompt(
+                        reason: .cameraRequired,
+                        status: "Camera permission required",
+                        transcript: "Camera permission required. Enable in Settings.",
+                        announcement: "Camera permission required. Use Open Settings button to grant access."
+                    )
+
+                case .microphoneRequired, .none:
+                    dismissPermissionPrompt()
+                    connectionStatus = webSocketManager.isConnected ? "Connected" : "Permissions granted"
+                    UIAccessibility.post(
+                        notification: .announcement,
+                        argument: "Microphone permission granted. Starting audio."
+                    )
+                    if !webSocketManager.isConnected {
+                        if let url = SightLineConfig.wsURL(
+                            userId: SightLineConfig.defaultUserId,
+                            sessionId: SightLineConfig.defaultSessionId,
+                            resumeHandle: sessionResumptionHandle.isEmpty ? nil : sessionResumptionHandle
+                        ) {
+                            webSocketManager.connect(url: url)
+                        }
+                    } else {
+                        startAudioCapture()
+                    }
                 }
             }
         }
@@ -927,34 +979,29 @@ struct MainView: View {
 
         // Await permissions before connecting — mic is required, camera is optional (audio-only mode)
         Task {
-            let allGranted = await mediaPermissionGate.preflightMediaPermissions()
             let micGranted = await mediaPermissionGate.ensureMicPermission()
+            let cameraDenied = mediaPermissionGate.isCameraPermissionDenied()
 
             if !micGranted {
                 // Microphone is essential — cannot function without it
                 await MainActor.run {
-                    connectionStatus = "Microphone permission required"
-                    showPermissionPrompt = true
-                    UIAccessibility.post(notification: .announcement,
-                                         argument: "Microphone permission is required. Use Open Settings button to grant access.")
+                    presentPermissionPrompt(
+                        reason: .microphoneRequired,
+                        status: "Microphone permission required",
+                        announcement: "Microphone permission is required. Use Open Settings button to grant access."
+                    )
                 }
                 logger.error("WebSocket connection blocked: microphone permission denied")
                 return
             }
 
-            if !allGranted {
-                // Mic granted but camera denied — audio-only mode
-                await MainActor.run {
-                    connectionStatus = "Audio-only mode (camera denied)"
-                    showPermissionPrompt = true
-                    UIAccessibility.post(notification: .announcement,
-                                         argument: "Camera permission denied. Running in audio-only mode. Use Open Settings to enable camera.")
-                }
-                logger.warning("Camera permission denied — connecting in audio-only mode")
+            if cameraDenied {
+                logger.info("Camera permission denied at launch; deferring prompt until user requests camera")
             }
 
             // Connect only after mic permission confirmed
             await MainActor.run {
+                dismissPermissionPrompt()
                 webSocketManager.connect(url: url)
             }
         }
@@ -1058,11 +1105,12 @@ struct MainView: View {
             let micGranted = await mediaPermissionGate.ensureMicPermission()
             guard micGranted else {
                 await MainActor.run {
-                    connectionStatus = "Enable microphone in Settings"
-                    transcript = "Please enable microphone permission."
-                    showPermissionPrompt = true
-                    UIAccessibility.post(notification: .announcement,
-                                         argument: "Microphone permission required. Use Open Settings button to grant access.")
+                    presentPermissionPrompt(
+                        reason: .microphoneRequired,
+                        status: "Enable microphone in Settings",
+                        transcript: "Please enable microphone permission.",
+                        announcement: "Microphone permission required. Use Open Settings button to grant access."
+                    )
                 }
                 logger.error("Audio capture blocked: microphone permission denied")
                 return
@@ -1106,10 +1154,12 @@ struct MainView: View {
                 let camGranted = await mediaPermissionGate.ensureCamPermission()
                 guard camGranted else {
                     await MainActor.run {
-                        transcript = "Camera permission required. Enable in Settings."
-                        showPermissionPrompt = true
-                        UIAccessibility.post(notification: .announcement,
-                                             argument: "Camera permission required. Use Open Settings button to grant access.")
+                        presentPermissionPrompt(
+                            reason: .cameraRequired,
+                            status: "Camera permission required",
+                            transcript: "Camera permission required. Enable in Settings.",
+                            announcement: "Camera permission required. Use Open Settings button to grant access."
+                        )
                     }
                     logger.error("Camera activation blocked: permission denied")
                     return
@@ -1485,14 +1535,13 @@ struct MainView: View {
 
 @MainActor
 private final class MediaPermissionGate: ObservableObject {
-    @Published private(set) var hasMediaPermissions = false
-
-    func preflightMediaPermissions() async -> Bool {
-        let cameraGranted = await ensureCameraPermission()
-        let microphoneGranted = await ensureMicrophonePermission()
-        hasMediaPermissions = cameraGranted && microphoneGranted
-        return hasMediaPermissions
+    private enum PermissionStatus {
+        case granted
+        case denied
+        case undetermined
     }
+
+    private let launchArguments = Set(ProcessInfo.processInfo.arguments)
 
     /// Check/request microphone permission only.
     func ensureMicPermission() async -> Bool {
@@ -1504,25 +1553,27 @@ private final class MediaPermissionGate: ObservableObject {
         return await ensureCameraPermission()
     }
 
+    func isCameraPermissionDenied() -> Bool {
+        currentCameraPermissionStatus() == .denied
+    }
+
     private func ensureCameraPermission() async -> Bool {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized:
+        switch currentCameraPermissionStatus() {
+        case .granted:
             return true
-        case .notDetermined:
+        case .undetermined:
             return await withCheckedContinuation { continuation in
                 AVCaptureDevice.requestAccess(for: .video) { granted in
                     continuation.resume(returning: granted)
                 }
             }
-        case .denied, .restricted:
-            return false
-        @unknown default:
+        case .denied:
             return false
         }
     }
 
     private func ensureMicrophonePermission() async -> Bool {
-        switch AVAudioApplication.shared.recordPermission {
+        switch currentMicrophonePermissionStatus() {
         case .granted:
             return true
         case .undetermined:
@@ -1533,8 +1584,46 @@ private final class MediaPermissionGate: ObservableObject {
             }
         case .denied:
             return false
+        }
+    }
+
+    private func currentCameraPermissionStatus() -> PermissionStatus {
+        if launchArguments.contains("-uitest-camera-granted") {
+            return .granted
+        }
+        if launchArguments.contains("-uitest-camera-denied") {
+            return .denied
+        }
+
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            return .granted
+        case .notDetermined:
+            return .undetermined
+        case .denied, .restricted:
+            return .denied
         @unknown default:
-            return false
+            return .denied
+        }
+    }
+
+    private func currentMicrophonePermissionStatus() -> PermissionStatus {
+        if launchArguments.contains("-uitest-mic-granted") {
+            return .granted
+        }
+        if launchArguments.contains("-uitest-mic-denied") {
+            return .denied
+        }
+
+        switch AVAudioApplication.shared.recordPermission {
+        case .granted:
+            return .granted
+        case .undetermined:
+            return .undetermined
+        case .denied:
+            return .denied
+        @unknown default:
+            return .denied
         }
     }
 }
