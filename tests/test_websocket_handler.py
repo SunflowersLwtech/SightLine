@@ -1558,6 +1558,83 @@ async def test_transient_keepalive_timeout_recovers_without_client_go_away():
 @pytest.mark.websocket
 @pytest.mark.error_scenario
 @pytest.mark.asyncio
+async def test_transient_stream_end_recovers_without_client_go_away():
+    """Unexpected stream exhaustion should be retried server-side."""
+
+    class RecoveringStreamEndRunner:
+        def __init__(self):
+            self.call_count = 0
+
+        def run_live(self, **kwargs):
+            self.call_count += 1
+
+            async def _stream():
+                if self.call_count == 1:
+                    yield _make_live_event({"content": {"parts": [{"text": "Before drop."}]}})
+                    return
+
+                yield _make_live_event({"content": {"parts": [{"text": "Recovered response."}]}})
+                while True:
+                    await asyncio.sleep(3600)
+
+            return _stream()
+
+    runner = RecoveringStreamEndRunner()
+    handler, fake_ws, _, _ = _make_handler_with_runner(runner)
+
+    async def delayed_disconnect():
+        await asyncio.sleep(1.5)
+        fake_ws.queue_disconnect()
+
+    with handler_runtime_patches():
+        asyncio.create_task(delayed_disconnect())
+        await handler.run()
+
+    assert runner.call_count >= 2, "Downstream should restart after unexpected stream exhaustion"
+    assert fake_ws.get_sent_json_by_type("go_away") == [], (
+        "Client should not receive go_away when the server can recover the stream"
+    )
+    transcript_msgs = fake_ws.get_sent_json_by_type("transcript")
+    assert any(msg.get("text") == "Recovered response." for msg in transcript_msgs)
+
+
+@pytest.mark.websocket
+@pytest.mark.error_scenario
+@pytest.mark.asyncio
+async def test_stream_end_retries_then_requests_client_reconnect():
+    """Persistent stream exhaustion should eventually fall back to client reconnect."""
+
+    class EndingStreamRunner:
+        def __init__(self):
+            self.call_count = 0
+
+        def run_live(self, **kwargs):
+            self.call_count += 1
+
+            async def _stream():
+                if False:
+                    yield None  # pragma: no cover
+                return
+
+            return _stream()
+
+    runner = EndingStreamRunner()
+    state = SessionState()
+    state.DOWNSTREAM_MAX_RETRIES = 2
+    handler, fake_ws, _, _ = _make_handler_with_runner(runner, state=state)
+
+    with handler_runtime_patches():
+        await asyncio.wait_for(handler.run(), timeout=5.0)
+
+    go_away_msgs = fake_ws.get_sent_json_by_type("go_away")
+    assert len(go_away_msgs) >= 1
+    assert "interrupted" in go_away_msgs[-1]["message"].lower()
+    assert runner.call_count == 3, "Initial attempt plus retry budget should be exhausted before reconnect"
+
+
+@pytest.mark.websocket
+@pytest.mark.error_scenario
+@pytest.mark.asyncio
 async def test_keepalive_retry_rebuilds_run_config_for_resumption():
     class RecoveringKeepaliveRunner:
         def __init__(self):
