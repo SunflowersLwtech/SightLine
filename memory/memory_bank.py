@@ -14,7 +14,8 @@ import time
 import uuid
 from typing import Optional
 
-from config import get_google_cloud_project
+from firestore_client import get_firestore_client
+from gemini_client import get_gemini_api_client
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +34,7 @@ def _compute_embedding(text: str) -> Optional[list[float]]:
         return None
 
     try:
-        from google import genai
-
-        api_key = os.environ.get("_GOOGLE_AI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
-        client = genai.Client(api_key=api_key, vertexai=False)
+        client = get_gemini_api_client()
         result = client.models.embed_content(
             model=EMBEDDING_MODEL,
             contents=normalized,
@@ -64,9 +62,7 @@ class MemoryBankService:
     def _try_init(self):
         """Single non-blocking attempt to initialize Firestore backend."""
         try:
-            from google.cloud import firestore
-
-            self._firestore = firestore.Client(project=get_google_cloud_project())
+            self._firestore = get_firestore_client()
             logger.info("MemoryBankService initialized for user %s", self.user_id)
         except Exception as e:
             logger.warning(

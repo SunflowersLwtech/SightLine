@@ -1,6 +1,7 @@
 """WebSocket contract tests for activity_start/activity_end observability."""
 
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -64,29 +65,38 @@ def _receive_until_type(ws, message_type: str, max_reads: int = 6) -> dict:
 
 @pytest.fixture
 def patched_server(monkeypatch):
+    import api.routers.websocket as websocket_router
+    import app_globals
     import server
     from context.habit_detector import HabitDetector
 
     FakeLiveRequestQueue.instances.clear()
     monkeypatch.setattr(
-        server.session_manager,
+        app_globals.session_manager,
         "load_user_profile",
         AsyncMock(return_value=UserProfile.default()),
     )
-    monkeypatch.setattr(server.session_manager, "remove_session", lambda _session_id: None)
-    monkeypatch.setattr(server, "LiveRequestQueue", FakeLiveRequestQueue)
-    monkeypatch.setattr(server, "runner", FakeRunner())
-    monkeypatch.setattr(server, "_NEEDS_SESSION_ID_MAPPING", False)
-    monkeypatch.setattr(server, "load_face_library", lambda _user_id: [])
-    monkeypatch.setattr(server, "load_relevant_memories", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(app_globals.session_manager, "remove_session", lambda _session_id: None)
+    monkeypatch.setattr(websocket_router, "LiveRequestQueue", FakeLiveRequestQueue)
+    monkeypatch.setattr(websocket_router, "runner", FakeRunner())
+    monkeypatch.setattr(app_globals, "_NEEDS_SESSION_ID_MAPPING", False)
+    monkeypatch.setattr(websocket_router, "load_face_library", lambda _user_id: [])
+    monkeypatch.setattr(websocket_router, "load_relevant_memories", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(HabitDetector, "detect", lambda self: [])
+
+    try:
+        import websocket_handler
+
+        monkeypatch.setattr(websocket_handler, "_NEEDS_SESSION_ID_MAPPING", False)
+    except Exception:
+        pass
 
     async def _noop_async(*_args, **_kwargs):
         return None
 
-    monkeypatch.setattr(server.SessionMetaTracker, "write_session_start", _noop_async)
-    monkeypatch.setattr(server.SessionMetaTracker, "write_session_end", _noop_async)
-    return server
+    monkeypatch.setattr(websocket_router.SessionMetaTracker, "write_session_start", _noop_async)
+    monkeypatch.setattr(websocket_router.SessionMetaTracker, "write_session_end", _noop_async)
+    return SimpleNamespace(app=server.app, session_manager=app_globals.session_manager)
 
 
 def test_activity_start_contract_updates_state_and_emits_debug_event(patched_server):

@@ -30,6 +30,7 @@ steps:
       - '--memory=2Gi'
       - '--cpu=2'
       - '--no-cpu-throttling'
+      - '--concurrency=8'
       - '--cpu-boost'
       - '--set-env-vars=GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_LOCATION=us-central1,GEMINI_LIVE_MODEL=gemini-live-2.5-flash-native-audio,AGENT_ENGINE_ID=${_AGENT_ENGINE_ID}'
       - '--set-secrets=GOOGLE_API_KEY=gemini-api-key:latest,GOOGLE_MAPS_API_KEY=google-maps-api-key:latest'

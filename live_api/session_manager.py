@@ -26,6 +26,7 @@ from config import (
     get_google_cloud_region,
     get_session_db_url,
 )
+from firestore_client import get_firestore_client
 from lod.models import (
     EphemeralContext,
     GPSData,
@@ -218,25 +219,16 @@ def build_vad_runtime_update_message(lod: int) -> str:
         "Do not narrate this block to the user."
     )
 
-# ---------------------------------------------------------------------------
-# Firestore client (lazy)
-# ---------------------------------------------------------------------------
-
-_firestore_client = None
 _SESSION_STATE_COLLECTION = "runtime_sessions"
 
 
 def _get_firestore():
-    """Lazily initialize the Firestore client."""
-    global _firestore_client
-    if _firestore_client is None:
-        try:
-            from google.cloud import firestore
-            _firestore_client = firestore.Client(project=get_google_cloud_project())
-        except Exception:
-            logger.warning("Firestore client unavailable; using default profiles")
-            _firestore_client = False  # Sentinel to avoid retrying
-    return _firestore_client if _firestore_client else None
+    """Return the shared Firestore client when available."""
+    try:
+        return get_firestore_client()
+    except Exception:
+        logger.warning("Firestore client unavailable; using default profiles")
+        return None
 
 
 def _serialize_for_firestore(value):

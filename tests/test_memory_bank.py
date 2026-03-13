@@ -319,20 +319,19 @@ class TestFirestoreRetry:
         bank._firestore = None
         bank._memories_cache = []
 
-        # _try_init does: from google.cloud import firestore; firestore.Client(...)
-        with patch("google.cloud.firestore.Client", return_value=mock_client):
+        with patch("memory.memory_bank.get_firestore_client", return_value=mock_client):
             bank._try_init()
 
         assert bank._firestore is mock_client
 
     def test_try_init_falls_back_to_ephemeral_on_failure(self):
-        """_try_init should leave _firestore as None when import fails."""
+        """_try_init should leave _firestore as None when shared client init fails."""
         bank = MemoryBankService.__new__(MemoryBankService)
         bank.user_id = "fail_user"
         bank._firestore = None
         bank._memories_cache = []
 
-        with patch.dict("sys.modules", {"google.cloud.firestore": None, "google.cloud": None}):
+        with patch("memory.memory_bank.get_firestore_client", side_effect=RuntimeError("boom")):
             bank._try_init()
 
         assert bank._firestore is None

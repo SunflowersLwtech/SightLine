@@ -22,7 +22,7 @@ import numpy as np
 from google.cloud import firestore
 from google.cloud.firestore_v1.vector import Vector
 
-from config import get_google_cloud_project
+from firestore_client import get_firestore_client
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ def _get_db() -> firestore.Client:
     """Return a lazily-initialized Firestore client."""
     global _db_client
     if _db_client is None:
-        _db_client = firestore.Client(project=get_google_cloud_project())
+        _db_client = get_firestore_client()
     return _db_client
 
 

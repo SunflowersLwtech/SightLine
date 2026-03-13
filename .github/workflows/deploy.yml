@@ -125,12 +125,14 @@ jobs:
             --memory=2Gi
             --cpu=2
             --no-cpu-throttling
+            --concurrency=8
             --cpu-boost
             --service-account=sightline-backend@sightline-hackathon.iam.gserviceaccount.com
             --set-secrets=GOOGLE_API_KEY=gemini-api-key:latest,GOOGLE_MAPS_API_KEY=google-maps-api-key:latest
           env_vars: |
             GOOGLE_GENAI_USE_VERTEXAI=TRUE
             GOOGLE_CLOUD_LOCATION=us-central1
+            ALLOWED_ORIGINS=https://sightline-backend-kp47ssyf4q-uc.a.run.app
 
       - name: Verify deployment
         run: |

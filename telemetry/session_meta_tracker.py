@@ -14,12 +14,9 @@ import logging
 import time
 from dataclasses import dataclass, field
 
-from config import get_google_cloud_project
+from firestore_client import get_firestore_client
 
 logger = logging.getLogger(__name__)
-
-# Module-level singleton — intentionally shared across all tracker instances
-_firestore_client = None
 
 
 @dataclass
@@ -105,12 +102,8 @@ class SessionMetaTracker:
     # -- Firestore I/O (async, non-blocking) --------------------------------
 
     def _get_firestore(self):
-        """Return a lazily-initialized Firestore client (module-level singleton)."""
-        global _firestore_client
-        if _firestore_client is None:
-            from google.cloud import firestore
-            _firestore_client = firestore.Client(project=get_google_cloud_project())
-        return _firestore_client
+        """Return the shared Firestore client."""
+        return get_firestore_client()
 
     def _get_doc_ref(self):
         """Return the Firestore document reference for this session."""

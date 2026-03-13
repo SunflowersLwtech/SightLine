@@ -1,4 +1,4 @@
-"""Unit tests for ContextInjectionQueue in server.py.
+"""Unit tests for ContextInjectionQueue in context_injection.py.
 
 Tests cover: enqueue/flush/dedup/merge/priority sorting, model speaking
 state switching, max_age timeout, vision spoken cooldown, and SILENT wrapping.
@@ -6,7 +6,7 @@ state switching, max_age timeout, vision spoken cooldown, and SILENT wrapping.
 
 import asyncio
 
-# We need to import the class from server.py.  The module has heavy
+# We need to import the class from context_injection.py.  The module has light
 # dependencies (ADK, Firestore, etc.) so we patch them at import time.
 # Minimal stubs so `import server` doesn't blow up.
 import sys
@@ -132,7 +132,7 @@ def _patch_attr(mod_name: str, attr_name: str, value):
     setattr(mod, attr_name, value)
 
 
-# Patch google.genai so `from google.genai import types` works in server
+# Patch google.genai so `from google.genai import types` works in context_injection
 _patch_attr("google.genai", "types", _genai_types)
 _patch_attr("google.adk.runners", "Runner", MagicMock)
 
@@ -198,14 +198,14 @@ _patch_attr(
 )
 
 # --- Finally, import the real class ----------------------------------------
-# We add the SightLine directory to sys.path so `import server` resolves.
+# We add the SightLine directory to sys.path so `import context_injection` resolves.
 import os
 
 _sightline_dir = os.path.join(os.path.dirname(__file__), "..")
 if _sightline_dir not in sys.path:
     sys.path.insert(0, _sightline_dir)
 
-from server import (
+from context_injection import (
     QUEUE_MAX_AGE_SEC,
     VISION_SPOKEN_COOLDOWN_SEC,
     ContextInjectionQueue,

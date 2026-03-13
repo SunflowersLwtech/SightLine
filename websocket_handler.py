@@ -20,6 +20,47 @@ from google.adk.runners import Runner
 from google.genai import types
 from starlette.websockets import WebSocketState
 
+from api.utils import _coerce_bool, _json_safe
+from app_globals import (
+    _NEEDS_SESSION_ID_MAPPING,
+    _TOOL_CATEGORY_MAP,
+    AGENT_TEXT_REPEAT_SUPPRESS_SEC,
+    FACE_LIBRARY_REFRESH_SEC,
+    OCR_PREFEEDBACK_COOLDOWN_SEC,
+    OCR_REPEAT_SUPPRESS_SEC,
+    PASSIVE_SPEECH_GUARD_SEC,
+    SESSION_TIMEOUT_SEC,
+    VISION_PREFEEDBACK_COOLDOWN_SEC,
+    VISION_REPEAT_SUPPRESS_SEC,
+    WS_INACTIVITY_TIMEOUT_SEC,
+    MessageType,
+    _face_available,
+    _memory_available,
+    _memory_extractor_available,
+    _ocr_available,
+    _vision_available,
+    session_manager,
+)
+from context_injection import ContextInjectionQueue, ModelState, TokenBudgetMonitor
+from dispatch.tool_dispatcher import (
+    _dispatch_function_call as _dispatch_function_call_impl,
+)
+from dispatch.tool_dispatcher import _extract_function_calls
+from formatters import (
+    _INTERNAL_TAG_RE,
+    _format_face_results,
+    _format_ocr_result,
+    _format_vision_result,
+)
+from intent.voice_intent import (
+    _allow_navigation_tool_call,
+    _detect_voice_intent,
+    _has_location_query_intent,
+    _has_navigation_intent,
+    _is_repeated_text,
+    _recent_user_utterances,
+    _should_reset_interrupted_on_activity_start,
+)
 from live_api.direct_intents import (
     DirectIntentMixin,
 )
@@ -41,66 +82,27 @@ from live_api.tts_fallback import (
     synthesize_pcm as synthesize_fallback_pcm,
 )
 from lod import (
+    build_full_dynamic_prompt,
     build_lod_update_message,
     decide_lod,
     on_lod_change,
 )
 from lod.lod_engine import should_speak
-from server import (
-    _INTERNAL_TAG_RE,
-    _TOOL_CATEGORY_MAP,
-    AGENT_TEXT_REPEAT_SUPPRESS_SEC,
-    FACE_LIBRARY_REFRESH_SEC,
-    OCR_PREFEEDBACK_COOLDOWN_SEC,
-    OCR_REPEAT_SUPPRESS_SEC,
-    PASSIVE_SPEECH_GUARD_SEC,
-    SESSION_TIMEOUT_SEC,
+from session_state import SessionState
+from telemetry.signature import (
     TELEMETRY_FORCE_REFRESH_SEC,
-    VISION_PREFEEDBACK_COOLDOWN_SEC,
-    VISION_REPEAT_SUPPRESS_SEC,
-    WS_INACTIVITY_TIMEOUT_SEC,
-    ContextInjectionQueue,
-    MessageType,
-    ModelState,
-    TokenBudgetMonitor,
-    _allow_navigation_tool_call,
     _build_telemetry_signature,
     _changed_signature_fields,
-    _coerce_bool,
-    _detect_voice_intent,
-    _dispatch_function_call,
-    _extract_function_calls,
-    _face_available,
-    _format_face_results,
-    _format_ocr_result,
-    _format_vision_result,
-    _has_location_query_intent,
-    _has_navigation_intent,
-    _is_repeated_text,
-    _json_safe,
-    _memory_available,
-    _memory_extractor_available,
-    _ocr_available,
-    _ocr_clear_session,
-    _ocr_set_latest_frame,
-    _recent_user_utterances,
     _should_inject_telemetry_context,
-    _should_reset_interrupted_on_activity_start,
-    _vision_available,
-    build_full_dynamic_prompt,
-    session_manager,
 )
-from session_state import SessionState
 from telemetry.telemetry_parser import parse_telemetry, parse_telemetry_to_ephemeral
 from tools import ALL_FUNCTIONS, ALL_TOOL_DECLARATIONS
 from tools.navigation import NAVIGATION_FUNCTIONS
+from tools.ocr_tool import clear_session as _ocr_clear_session
+from tools.ocr_tool import set_latest_frame as _ocr_set_latest_frame
 from tools.tool_behavior import ToolBehavior, behavior_to_text, resolve_tool_behavior
 
 logger = logging.getLogger("sightline.server")
-
-# Patchable sentinel: None → read live from server module at runtime.
-# Unit tests can override with patch.multiple("websocket_handler", _NEEDS_SESSION_ID_MAPPING=False).
-_NEEDS_SESSION_ID_MAPPING = None
 
 _STALE_QUEUE_CATEGORIES = {
     "echo_cancel",
@@ -115,6 +117,17 @@ _STALE_QUEUE_CATEGORIES = {
 
 _SILENT_TURN_WATCHDOG_SEC = 18.0
 _LIVE_SESSION_READY_TIMEOUT_SEC = 60.0
+
+
+async def _dispatch_function_call(func_name: str, func_args: dict, session_id: str, user_id: str) -> dict:
+    return await _dispatch_function_call_impl(
+        func_name,
+        func_args,
+        session_id,
+        user_id,
+        session_manager=session_manager,
+    )
+
 
 class WebSocketHandler(DirectIntentMixin):
     """Manages a single WebSocket session's upstream/downstream lifecycle.
@@ -1711,9 +1724,7 @@ class WebSocketHandler(DirectIntentMixin):
         """Read events from the Live API and forward to the iOS client."""
         try:
             adk_session_id = self.session_id
-            import server as _srv_ref
-            _needs_mapping = _NEEDS_SESSION_ID_MAPPING if _NEEDS_SESSION_ID_MAPPING is not None else _srv_ref._NEEDS_SESSION_ID_MAPPING
-            if _needs_mapping:
+            if _NEEDS_SESSION_ID_MAPPING:
                 cached_adk_id = session_manager.get_adk_session_id(self.session_id)
                 if cached_adk_id:
                     adk_session_id = cached_adk_id

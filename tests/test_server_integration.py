@@ -67,7 +67,7 @@ class TestProfileEndpoints:
         mock_db = MagicMock()
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
 
-        with patch("server.get_firestore_client", return_value=mock_db) as mock_get_db:
+        with patch("api.routers.profile.get_firestore_client", return_value=mock_db) as mock_get_db:
             response = client.get("/api/profile/user-123")
 
         assert response.status_code == 200
@@ -80,8 +80,8 @@ class TestProfileEndpoints:
         mock_doc_ref = MagicMock()
         mock_db.collection.return_value.document.return_value = mock_doc_ref
 
-        with patch("server.get_firestore_client", return_value=mock_db) as mock_get_db, \
-             patch("server.session_manager.invalidate_user_profile") as mock_invalidate:
+        with patch("api.routers.profile.get_firestore_client", return_value=mock_db) as mock_get_db, \
+             patch("app_globals.session_manager.invalidate_user_profile") as mock_invalidate:
             response = client.post(
                 "/api/profile/user-123",
                 json={"preferred_name": "Ada", "ignored_field": "noop"},
@@ -102,7 +102,7 @@ class TestProfileEndpoints:
         mock_db = MagicMock()
         mock_db.collection.return_value.stream.return_value = [doc_b, doc_a]
 
-        with patch("server.get_firestore_client", return_value=mock_db) as mock_get_db:
+        with patch("api.routers.profile.get_firestore_client", return_value=mock_db) as mock_get_db:
             response = client.get("/api/users")
 
         assert response.status_code == 200
@@ -386,7 +386,7 @@ class TestRepeatSuppressionGuards:
     """Verify anti-repeat helpers used by server-side speech throttling."""
 
     def test_repeated_text_detected_within_cooldown(self):
-        from server import _is_repeated_text
+        from intent.voice_intent import _is_repeated_text
 
         repeated = _is_repeated_text(
             "Facing north. Hallway ahead.",
@@ -398,7 +398,7 @@ class TestRepeatSuppressionGuards:
         assert repeated is True
 
     def test_short_text_not_suppressed(self):
-        from server import _is_repeated_text
+        from intent.voice_intent import _is_repeated_text
 
         repeated = _is_repeated_text(
             "OK",
@@ -411,7 +411,10 @@ class TestRepeatSuppressionGuards:
 
     def test_telemetry_injection_requires_meaningful_change(self):
         from lod.models import EphemeralContext
-        from server import _build_telemetry_signature, _should_inject_telemetry_context
+        from telemetry.signature import (
+            _build_telemetry_signature,
+            _should_inject_telemetry_context,
+        )
 
         previous_ctx = EphemeralContext(
             motion_state="walking",
@@ -438,7 +441,10 @@ class TestRepeatSuppressionGuards:
 
     def test_telemetry_force_refresh_after_timeout(self):
         from lod.models import EphemeralContext
-        from server import _build_telemetry_signature, _should_inject_telemetry_context
+        from telemetry.signature import (
+            _build_telemetry_signature,
+            _should_inject_telemetry_context,
+        )
 
         ctx = EphemeralContext(motion_state="walking", step_cadence=80, ambient_noise_db=55)
         signature = _build_telemetry_signature(ctx)
@@ -454,7 +460,7 @@ class TestRepeatSuppressionGuards:
         assert "periodic_refresh" in reasons
 
     def test_navigation_guard_blocks_without_explicit_user_intent(self):
-        from server import _allow_navigation_tool_call
+        from intent.voice_intent import _allow_navigation_tool_call
 
         history = deque([
             {"role": "user", "text": "Please summarize what you just perceived and what I should do next."},
@@ -468,7 +474,7 @@ class TestRepeatSuppressionGuards:
         assert reason == "navigation_tool_requires_explicit_user_request"
 
     def test_navigation_guard_allows_explicit_navigation_request(self):
-        from server import _allow_navigation_tool_call
+        from intent.voice_intent import _allow_navigation_tool_call
 
         history = deque([
             {"role": "user", "text": "Use walking directions from Times Square to Central Park."},
@@ -482,7 +488,7 @@ class TestRepeatSuppressionGuards:
         assert reason == "explicit_navigation_intent"
 
     def test_memory_user_id_is_redacted_in_function_log_args(self):
-        from server import _sanitize_function_args_for_log
+        from dispatch.tool_dispatcher import _sanitize_function_args_for_log
 
         safe = _sanitize_function_args_for_log(
             "remember_entity",
@@ -493,7 +499,7 @@ class TestRepeatSuppressionGuards:
         assert safe["_session_user"] == "test_user"
 
     def test_activity_start_resets_stale_interrupted_state(self):
-        from server import _should_reset_interrupted_on_activity_start
+        from intent.voice_intent import _should_reset_interrupted_on_activity_start
 
         assert _should_reset_interrupted_on_activity_start(
             event_name="activity_start",
@@ -501,7 +507,7 @@ class TestRepeatSuppressionGuards:
         ) is True
 
     def test_activity_end_does_not_reset_interrupted_state(self):
-        from server import _should_reset_interrupted_on_activity_start
+        from intent.voice_intent import _should_reset_interrupted_on_activity_start
 
         assert _should_reset_interrupted_on_activity_start(
             event_name="activity_end",
@@ -510,7 +516,7 @@ class TestRepeatSuppressionGuards:
 
     @pytest.mark.asyncio
     async def test_dispatch_injects_navigation_origin_and_heading_from_metadata(self):
-        from server import _dispatch_function_call
+        from dispatch.tool_dispatcher import _dispatch_function_call
 
         captured = {}
 
@@ -522,16 +528,23 @@ class TestRepeatSuppressionGuards:
             gps=SimpleNamespace(lat=3.14159, lng=101.6869),
             heading=270.0,
         )
+        mock_session_manager = MagicMock()
+        mock_session_manager.get_ephemeral_context.return_value = ephemeral
 
-        with patch("server.ALL_FUNCTIONS", {"navigate_to": fake_tool}), \
-             patch("server.ALL_TOOL_RUNTIME_METADATA", {
+        with patch("dispatch.tool_dispatcher.ALL_FUNCTIONS", {"navigate_to": fake_tool}), \
+             patch("dispatch.tool_dispatcher.ALL_TOOL_RUNTIME_METADATA", {
                  "navigate_to": {
                      "gps_injection": "origin_lat_lng_heading",
                      "force_user_id": False,
                  },
-             }), \
-             patch("server.session_manager.get_ephemeral_context", return_value=ephemeral):
-            result = await _dispatch_function_call("navigate_to", {"destination": "station"}, "s1", "u1")
+             }):
+            result = await _dispatch_function_call(
+                "navigate_to",
+                {"destination": "station"},
+                "s1",
+                "u1",
+                session_manager=mock_session_manager,
+            )
 
         assert result == {"ok": True}
         assert captured["destination"] == "station"
@@ -541,7 +554,7 @@ class TestRepeatSuppressionGuards:
 
     @pytest.mark.asyncio
     async def test_dispatch_injects_lat_lng_from_metadata(self):
-        from server import _dispatch_function_call
+        from dispatch.tool_dispatcher import _dispatch_function_call
 
         captured = {}
 
@@ -553,16 +566,23 @@ class TestRepeatSuppressionGuards:
             gps=SimpleNamespace(lat=40.0, lng=-73.0),
             heading=None,
         )
+        mock_session_manager = MagicMock()
+        mock_session_manager.get_ephemeral_context.return_value = ephemeral
 
-        with patch("server.ALL_FUNCTIONS", {"maps_query": fake_tool}), \
-             patch("server.ALL_TOOL_RUNTIME_METADATA", {
+        with patch("dispatch.tool_dispatcher.ALL_FUNCTIONS", {"maps_query": fake_tool}), \
+             patch("dispatch.tool_dispatcher.ALL_TOOL_RUNTIME_METADATA", {
                  "maps_query": {
                      "gps_injection": "lat_lng",
                      "force_user_id": False,
                  },
-             }), \
-             patch("server.session_manager.get_ephemeral_context", return_value=ephemeral):
-            result = await _dispatch_function_call("maps_query", {"question": "nearest pharmacy"}, "s1", "u1")
+             }):
+            result = await _dispatch_function_call(
+                "maps_query",
+                {"question": "nearest pharmacy"},
+                "s1",
+                "u1",
+                session_manager=mock_session_manager,
+            )
 
         assert result == {"ok": True}
         assert captured["question"] == "nearest pharmacy"
@@ -571,7 +591,7 @@ class TestRepeatSuppressionGuards:
 
     @pytest.mark.asyncio
     async def test_dispatch_keeps_explicit_lat_lng_when_gps_missing(self):
-        from server import _dispatch_function_call
+        from dispatch.tool_dispatcher import _dispatch_function_call
 
         captured = {}
 
@@ -580,20 +600,22 @@ class TestRepeatSuppressionGuards:
             return {"ok": True}
 
         ephemeral = SimpleNamespace(gps=None, heading=None)
+        mock_session_manager = MagicMock()
+        mock_session_manager.get_ephemeral_context.return_value = ephemeral
 
-        with patch("server.ALL_FUNCTIONS", {"preview_destination": fake_tool}), \
-             patch("server.ALL_TOOL_RUNTIME_METADATA", {
+        with patch("dispatch.tool_dispatcher.ALL_FUNCTIONS", {"preview_destination": fake_tool}), \
+             patch("dispatch.tool_dispatcher.ALL_TOOL_RUNTIME_METADATA", {
                  "preview_destination": {
                      "gps_injection": "lat_lng",
                      "force_user_id": False,
                  },
-             }), \
-             patch("server.session_manager.get_ephemeral_context", return_value=ephemeral):
+             }):
             result = await _dispatch_function_call(
                 "preview_destination",
                 {"lat": 1.23, "lng": 4.56, "destination": "cafe"},
                 "s1",
                 "u1",
+                session_manager=mock_session_manager,
             )
 
         assert result == {"ok": True}
@@ -603,7 +625,7 @@ class TestRepeatSuppressionGuards:
 
     @pytest.mark.asyncio
     async def test_dispatch_forces_memory_user_id_from_session(self):
-        from server import _dispatch_function_call
+        from dispatch.tool_dispatcher import _dispatch_function_call
 
         captured = {}
 
@@ -611,8 +633,8 @@ class TestRepeatSuppressionGuards:
             captured.update(kwargs)
             return {"status": "created"}
 
-        with patch("server.ALL_FUNCTIONS", {"remember_entity": fake_tool}), \
-             patch("server.ALL_TOOL_RUNTIME_METADATA", {
+        with patch("dispatch.tool_dispatcher.ALL_FUNCTIONS", {"remember_entity": fake_tool}), \
+             patch("dispatch.tool_dispatcher.ALL_TOOL_RUNTIME_METADATA", {
                  "remember_entity": {
                      "gps_injection": None,
                      "force_user_id": True,
@@ -623,6 +645,7 @@ class TestRepeatSuppressionGuards:
                 {"user_id": "forged-user", "content": "Walgreens"},
                 "s1",
                 "real-user",
+                session_manager=MagicMock(),
             )
 
         assert result == {"status": "created"}
@@ -630,7 +653,7 @@ class TestRepeatSuppressionGuards:
         assert captured["content"] == "Walgreens"
 
     def test_activity_start_noop_when_not_interrupted(self):
-        from server import _should_reset_interrupted_on_activity_start
+        from intent.voice_intent import _should_reset_interrupted_on_activity_start
 
         assert _should_reset_interrupted_on_activity_start(
             event_name="activity_start",

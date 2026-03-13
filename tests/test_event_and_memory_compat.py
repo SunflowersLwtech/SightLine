@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 
 def test_extract_function_calls_uses_event_getter():
-    from server import _extract_function_calls
+    from dispatch.tool_dispatcher import _extract_function_calls
 
     call = SimpleNamespace(name="demo_tool", args={"x": 1})
     event = SimpleNamespace(
@@ -19,7 +19,7 @@ def test_extract_function_calls_uses_event_getter():
 
 
 def test_extract_function_calls_handles_missing_actions_field_safely():
-    from server import _extract_function_calls
+    from dispatch.tool_dispatcher import _extract_function_calls
 
     event = SimpleNamespace(
         get_function_calls=lambda: [],
@@ -30,7 +30,7 @@ def test_extract_function_calls_handles_missing_actions_field_safely():
 
 
 def test_extract_function_calls_legacy_fallback():
-    from server import _extract_function_calls
+    from dispatch.tool_dispatcher import _extract_function_calls
 
     call = SimpleNamespace(name="legacy_tool", args={})
     event = SimpleNamespace(
