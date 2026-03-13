@@ -384,6 +384,7 @@ class SessionManager:
 
         session_resumption = types.SessionResumptionConfig(
             handle=cached_handle,
+            transparent=True,
         )
         if cached_handle:
             logger.info("Resuming session %s with cached handle", session_id)

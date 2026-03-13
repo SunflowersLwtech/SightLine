@@ -1482,6 +1482,326 @@ async def test_gemini_keepalive_timeout_retries_then_reconnects():
     assert len(go_away_msgs) >= 1, "Should send go_away when keepalive timeout persists"
 
 
+@pytest.mark.websocket
+@pytest.mark.error_scenario
+@pytest.mark.asyncio
+async def test_transient_keepalive_timeout_recovers_without_client_go_away():
+    """Transient keepalive timeouts should be handled internally.
+
+    If the downstream stream recovers on retry, the client should keep the same
+    websocket session without receiving a go_away reconnect request.
+    """
+
+    class RecoveringKeepaliveRunner:
+        def __init__(self):
+            self.call_count = 0
+
+        def run_live(self, **kwargs):
+            self.call_count += 1
+
+            async def _stream():
+                if self.call_count == 1:
+                    err = RuntimeError("1006 None. abnormal closure [internal]")
+                    err.__cause__ = RuntimeError("keepalive ping timeout")
+                    raise err
+                    yield  # noqa: unreachable
+
+                yield _make_live_event({"content": {"parts": [{"text": "Recovered response."}]}})
+                while True:
+                    await asyncio.sleep(3600)
+
+            return _stream()
+
+    runner = RecoveringKeepaliveRunner()
+    handler, fake_ws, fake_queue, _ = _make_handler_with_runner(runner)
+
+    async def delayed_disconnect():
+        await asyncio.sleep(1.5)
+        fake_ws.queue_disconnect()
+
+    with handler_runtime_patches():
+        asyncio.create_task(delayed_disconnect())
+        await handler.run()
+
+    assert runner.call_count >= 2, "Downstream should retry after transient keepalive timeout"
+    assert fake_ws.get_sent_json_by_type("go_away") == [], (
+        "Client should not receive go_away when downstream recovers internally"
+    )
+    transcript_msgs = fake_ws.get_sent_json_by_type("transcript")
+    assert any(msg.get("role") == "agent" for msg in transcript_msgs), (
+        "Recovered downstream should continue delivering agent transcript"
+    )
+
+
+@pytest.mark.websocket
+@pytest.mark.error_scenario
+@pytest.mark.asyncio
+async def test_keepalive_retry_rebuilds_run_config_for_resumption():
+    class RecoveringKeepaliveRunner:
+        def __init__(self):
+            self.call_count = 0
+            self.run_configs = []
+
+        def run_live(self, **kwargs):
+            self.call_count += 1
+            self.run_configs.append(kwargs.get("run_config"))
+
+            async def _stream():
+                if self.call_count == 1:
+                    err = RuntimeError("1006 None. abnormal closure [internal]")
+                    err.__cause__ = RuntimeError("keepalive ping timeout")
+                    raise err
+                    yield  # noqa: unreachable
+
+                yield _make_live_event({"content": {"parts": [{"text": "Recovered response."}]}})
+                while True:
+                    await asyncio.sleep(3600)
+
+            return _stream()
+
+    runner = RecoveringKeepaliveRunner()
+    handler, fake_ws, _, _ = _make_handler_with_runner(runner)
+
+    run_config_v1 = object()
+    run_config_v2 = object()
+
+    async def delayed_disconnect():
+        await asyncio.sleep(1.5)
+        fake_ws.queue_disconnect()
+
+    mock_sm = MagicMock()
+    mock_sm.remove_session = Mock()
+    mock_sm.get_run_config = Mock(side_effect=[run_config_v1, run_config_v2])
+
+    with patch.multiple(
+        "websocket_handler",
+        build_full_dynamic_prompt=Mock(return_value="test prompt"),
+        _memory_extractor_available=False,
+        _memory_available=False,
+        _ocr_clear_session=Mock(),
+        _ocr_set_latest_frame=Mock(),
+        session_manager=mock_sm,
+        _NEEDS_SESSION_ID_MAPPING=False,
+    ):
+        asyncio.create_task(delayed_disconnect())
+        await handler.run()
+
+    assert runner.call_count >= 2
+    assert runner.run_configs[:2] == [run_config_v1, run_config_v2]
+    assert mock_sm.get_run_config.call_count >= 2
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_prefeedback_output_sends_transcript_and_local_audio():
+    runner = FakeRunner(events=[])
+    handler, fake_ws, _, state = _make_handler_with_runner(runner)
+    state.user_turn_seq = 1
+
+    with patch("websocket_handler.synthesize_local_fallback_pcm", new=AsyncMock(return_value=b"\x01\x02")):
+        sent = await handler._emit_prefeedback_output("Reading the text for you...")
+
+    assert sent is True
+    transcript_msgs = fake_ws.get_sent_json_by_type("transcript")
+    assert transcript_msgs[-1]["text"] == "Reading the text for you..."
+    assert any(isinstance(item, bytes) and item == b"\x01\x02" for item in fake_ws.outgoing)
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_local_agent_response_marks_audio_seen_when_pcm_sent():
+    runner = FakeRunner(events=[])
+    handler, fake_ws, _, state = _make_handler_with_runner(runner)
+    state.user_turn_seq = 1
+
+    with patch("websocket_handler.synthesize_local_fallback_pcm", new=AsyncMock(return_value=b"\x03\x04")):
+        sent = await handler._emit_local_agent_response("Goodbye for now.", source="test")
+
+    assert sent is True
+    assert state.turn_output_seen is True
+    assert state.turn_audio_output_seen is True
+    assert any(isinstance(item, bytes) and item == b"\x03\x04" for item in fake_ws.outgoing)
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_farewell_watchdog_emits_local_goodbye_instead_of_go_away():
+    runner = FakeRunner(events=[])
+    handler, fake_ws, _, state = _make_handler_with_runner(runner)
+    state.user_turn_seq = 1
+    state.transcript_history.append({"role": "user", "text": "Thank you, that's all for now. Goodbye."})
+
+    with patch("websocket_handler.synthesize_local_fallback_pcm", new=AsyncMock(return_value=b"\x05\x06")):
+        await handler._response_watchdog(turn_seq=1, delay_sec=0.0)
+
+    assert fake_ws.get_sent_json_by_type("go_away") == []
+    transcript_msgs = fake_ws.get_sent_json_by_type("transcript")
+    assert transcript_msgs[-1]["text"] == "You're welcome. Goodbye for now."
+    assert any(isinstance(item, bytes) and item == b"\x05\x06" for item in fake_ws.outgoing)
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_silent_turn_watchdog_emits_generic_local_fallback():
+    runner = FakeRunner(events=[])
+    handler, fake_ws, _, state = _make_handler_with_runner(runner)
+    state.user_turn_seq = 1
+    state.transcript_history.append({"role": "user", "text": "What is this building?"})
+
+    with patch("websocket_handler.synthesize_local_fallback_pcm", new=AsyncMock(return_value=b"\x0B\x0C")):
+        await handler._response_watchdog(turn_seq=1, delay_sec=0.0)
+
+    assert fake_ws.get_sent_json_by_type("go_away") == []
+    transcript_msgs = fake_ws.get_sent_json_by_type("transcript")
+    assert transcript_msgs[-1]["text"] == "I'm having trouble responding right now. Please try again."
+    assert any(isinstance(item, bytes) and item == b"\x0B\x0C" for item in fake_ws.outgoing)
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_farewell_text_detection_matches_expected_phrases():
+    runner = FakeRunner(events=[])
+    handler, _, _, _ = _make_handler_with_runner(runner)
+
+    assert handler._is_farewell_text("Thank you, that's all for now. Goodbye.") is True
+    assert handler._is_farewell_text("bye for now") is True
+    assert handler._is_farewell_text("What is ahead of me?") is False
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_google_search_redirects_memory_recall_to_memory_tool():
+    runner = FakeRunner(events=[])
+    handler, _, _, _ = _make_handler_with_runner(runner)
+
+    with patch("websocket_handler._dispatch_function_call", new=AsyncMock(return_value={"summary": "Walgreens"})):
+        redirected, result = await handler._maybe_redirect_google_search(
+            query="What pharmacy did I mention earlier?"
+        )
+
+    assert redirected is True
+    assert result["redirected_to"] == "what_do_you_remember"
+    assert result["summary"] == "Walgreens"
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_google_search_redirects_memory_store_to_remember_entity():
+    runner = FakeRunner(events=[])
+    handler, _, _, _ = _make_handler_with_runner(runner)
+
+    with patch("websocket_handler._dispatch_function_call", new=AsyncMock(return_value={"status": "created", "message": "I'll remember Walgreens."})):
+        redirected, result = await handler._maybe_redirect_google_search(
+            query="Please remember that the pharmacy is called Walgreens on 5th Avenue."
+        )
+
+    assert redirected is True
+    assert result["redirected_to"] == "remember_entity"
+    assert result["status"] == "created"
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_google_search_redirects_scene_query_to_vision_context():
+    runner = FakeRunner(events=[])
+    handler, _, _, _ = _make_handler_with_runner(runner)
+    handler.state.last_vision_context_text = "[VISION ANALYSIS]\nA hallway extends ahead with a person at 2 o'clock."
+
+    mock_sm = MagicMock()
+    mock_sm.get_ephemeral_context.return_value = MagicMock(gps=MagicMock(lat=1.0, lng=2.0))
+
+    with patch("websocket_handler.session_manager", mock_sm), \
+         patch("websocket_handler._dispatch_function_call", new=AsyncMock(return_value={"address": "123 Main St", "nearby_places": []})):
+        redirected, result = await handler._maybe_redirect_google_search(
+            query="What's ahead of me now?"
+        )
+
+    assert redirected is True
+    assert result["redirected_to"] == "vision_context"
+    assert "hallway extends ahead" in result["answer"].lower()
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_maps_query_redirects_area_context_to_vision_context():
+    runner = FakeRunner(events=[])
+    handler, _, _, _ = _make_handler_with_runner(runner)
+    handler.state.last_vision_context_text = "[VISION ANALYSIS]\nA park path continues ahead with trees on both sides."
+
+    mock_sm = MagicMock()
+    mock_sm.get_ephemeral_context.return_value = MagicMock(gps=MagicMock(lat=1.0, lng=2.0))
+
+    with patch("websocket_handler.session_manager", mock_sm), \
+         patch("websocket_handler._dispatch_function_call", new=AsyncMock(return_value={"address": "123 Main St", "nearby_places": []})):
+        redirected, result = await handler._maybe_redirect_maps_query(
+            question="Tell me more about this area.",
+            user_speaking=False,
+        )
+
+    assert redirected is True
+    assert result["redirected_to"] == "vision_context"
+    assert "park path continues ahead" in result["answer"].lower()
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_maps_query_redirects_nearby_food_query_to_nearby_search():
+    runner = FakeRunner(events=[])
+    handler, _, _, _ = _make_handler_with_runner(runner)
+
+    with patch("websocket_handler._dispatch_function_call", new=AsyncMock(return_value={"success": True, "places": [{"name": "Cafe Roma", "distance_meters": 42}]})):
+        redirected, result = await handler._maybe_redirect_maps_query(
+            question="Search for the best Italian restaurant nearby.",
+            user_speaking=False,
+        )
+
+    assert redirected is True
+    assert result["redirected_to"] == "nearby_search"
+    assert "Cafe Roma" in result["answer"]
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_direct_nearby_search_shortcut_handles_restaurant_query():
+    runner = FakeRunner(events=[])
+    handler, fake_ws, _, _ = _make_handler_with_runner(runner)
+    handler.state.user_turn_seq = 1
+
+    mock_sm = MagicMock()
+    mock_sm.get_ephemeral_context.return_value = MagicMock(gps=MagicMock(lat=1.0, lng=2.0))
+
+    with patch("websocket_handler.session_manager", mock_sm), \
+         patch("websocket_handler._dispatch_function_call", new=AsyncMock(return_value={"success": True, "places": [{"name": "Cafe Roma", "distance_meters": 42}]})):
+        handled = await handler._maybe_handle_direct_nearby_search_intent(
+            "Search for the best Italian restaurant nearby."
+        )
+
+    assert handled is True
+    tool_results = fake_ws.get_sent_json_by_type("tool_result")
+    assert tool_results[-1]["tool"] == "nearby_search"
+
+
+@pytest.mark.websocket
+@pytest.mark.asyncio
+async def test_direct_nearby_search_shortcut_without_location_emits_prompt():
+    runner = FakeRunner(events=[])
+    handler, fake_ws, _, _ = _make_handler_with_runner(runner)
+    handler.state.user_turn_seq = 1
+
+    mock_sm = MagicMock()
+    mock_sm.get_ephemeral_context.return_value = MagicMock(gps=None)
+
+    with patch("websocket_handler.session_manager", mock_sm), \
+         patch("websocket_handler.synthesize_local_fallback_pcm", new=AsyncMock(return_value=b"\x09\x0A")):
+        handled = await handler._maybe_handle_direct_nearby_search_intent(
+            "Search for the best Italian restaurant nearby."
+        )
+
+    assert handled is True
+    transcript_msgs = fake_ws.get_sent_json_by_type("transcript")
+    assert transcript_msgs[-1]["text"].startswith("I need your location to search nearby places.")
+
+
 # ── G2. Tool execution edge cases ─────────────────────────────────────
 
 

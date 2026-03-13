@@ -1,0 +1,168 @@
+{
+  "created_at": "2026-03-13T07:47:25.969826+00:00",
+  "output_dir": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures",
+  "ws_url": null,
+  "tts_model": "gemini-2.5-flash-preview-tts",
+  "voice": "Aoede",
+  "language_code": "en-US",
+  "target_sample_rate": 16000,
+  "turns": [
+    {
+      "id": "baseline_ready",
+      "text": "Hello, please confirm you are ready to guide me safely.",
+      "expect_contains": [],
+      "pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/baseline_ready.pcm16000.raw"
+    },
+    {
+      "id": "search_weather",
+      "text": "What's the weather in Kuala Lumpur today? Please answer in one sentence.",
+      "expect_contains": [],
+      "pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/search_weather.pcm16000.raw"
+    },
+    {
+      "id": "nav_central_park",
+      "text": "Start walking navigation now: from Times Square to Central Park. Give one immediate next step.",
+      "expect_contains": [],
+      "pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/nav_central_park.pcm16000.raw"
+    },
+    {
+      "id": "context_followup",
+      "text": "Please summarize what you just perceived and what I should do next.",
+      "expect_contains": [],
+      "pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/context_followup.pcm16000.raw"
+    },
+    {
+      "id": "memory_set",
+      "text": "Please remember this destination: Central Park.",
+      "expect_contains": [],
+      "pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/memory_set.pcm16000.raw"
+    },
+    {
+      "id": "memory_recall",
+      "text": "What destination did I just tell you? Reply with the exact two words only.",
+      "expect_contains": [],
+      "pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/memory_recall.pcm16000.raw"
+    },
+    {
+      "id": "interrupt_long",
+      "text": "Please describe the full scene in as much detail as possible, including people, obstacles, signs, and movement, using at least six sentences.",
+      "expect_contains": [],
+      "pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/interrupt_long.pcm16000.raw"
+    },
+    {
+      "id": "interrupt_barge",
+      "text": "Stop now. Give me only one immediate safety instruction in one short sentence.",
+      "expect_contains": [],
+      "pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/interrupt_barge.pcm16000.raw"
+    },
+    {
+      "id": "active_followup",
+      "text": "Now actively guide me with one concise next action.",
+      "expect_contains": [],
+      "pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/active_followup.pcm16000.raw"
+    }
+  ],
+  "generated_audio": [
+    {
+      "id": "baseline_ready",
+      "source_mime_type": "audio/L16;codec=pcm;rate=24000",
+      "source_sample_rate": 24000,
+      "target_sample_rate": 16000,
+      "source_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/baseline_ready.source.wav",
+      "target_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/baseline_ready.pcm16000.wav",
+      "target_pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/baseline_ready.pcm16000.raw",
+      "source_duration_sec": 4.170958333333333,
+      "target_duration_sec": 4.1709375
+    },
+    {
+      "id": "search_weather",
+      "source_mime_type": "audio/L16;codec=pcm;rate=24000",
+      "source_sample_rate": 24000,
+      "target_sample_rate": 16000,
+      "source_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/search_weather.source.wav",
+      "target_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/search_weather.pcm16000.wav",
+      "target_pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/search_weather.pcm16000.raw",
+      "source_duration_sec": 4.530958333333333,
+      "target_duration_sec": 4.5309375
+    },
+    {
+      "id": "nav_central_park",
+      "source_mime_type": "audio/L16;codec=pcm;rate=24000",
+      "source_sample_rate": 24000,
+      "target_sample_rate": 16000,
+      "source_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/nav_central_park.source.wav",
+      "target_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/nav_central_park.pcm16000.wav",
+      "target_pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/nav_central_park.pcm16000.raw",
+      "source_duration_sec": 4.850958333333334,
+      "target_duration_sec": 4.8509375
+    },
+    {
+      "id": "context_followup",
+      "source_mime_type": "audio/L16;codec=pcm;rate=24000",
+      "source_sample_rate": 24000,
+      "target_sample_rate": 16000,
+      "source_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/context_followup.source.wav",
+      "target_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/context_followup.pcm16000.wav",
+      "target_pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/context_followup.pcm16000.raw",
+      "source_duration_sec": 3.4109583333333333,
+      "target_duration_sec": 3.4109375
+    },
+    {
+      "id": "memory_set",
+      "source_mime_type": "audio/L16;codec=pcm;rate=24000",
+      "source_sample_rate": 24000,
+      "target_sample_rate": 16000,
+      "source_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/memory_set.source.wav",
+      "target_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/memory_set.pcm16000.wav",
+      "target_pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/memory_set.pcm16000.raw",
+      "source_duration_sec": 1.2909583333333334,
+      "target_duration_sec": 1.2909375
+    },
+    {
+      "id": "memory_recall",
+      "source_mime_type": "audio/L16;codec=pcm;rate=24000",
+      "source_sample_rate": 24000,
+      "target_sample_rate": 16000,
+      "source_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/memory_recall.source.wav",
+      "target_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/memory_recall.pcm16000.wav",
+      "target_pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/memory_recall.pcm16000.raw",
+      "source_duration_sec": 6.050958333333333,
+      "target_duration_sec": 6.0509375
+    },
+    {
+      "id": "interrupt_long",
+      "source_mime_type": "audio/L16;codec=pcm;rate=24000",
+      "source_sample_rate": 24000,
+      "target_sample_rate": 16000,
+      "source_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/interrupt_long.source.wav",
+      "target_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/interrupt_long.pcm16000.wav",
+      "target_pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/interrupt_long.pcm16000.raw",
+      "source_duration_sec": 48.81095833333333,
+      "target_duration_sec": 48.8109375
+    },
+    {
+      "id": "interrupt_barge",
+      "source_mime_type": "audio/L16;codec=pcm;rate=24000",
+      "source_sample_rate": 24000,
+      "target_sample_rate": 16000,
+      "source_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/interrupt_barge.source.wav",
+      "target_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/interrupt_barge.pcm16000.wav",
+      "target_pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/interrupt_barge.pcm16000.raw",
+      "source_duration_sec": 7.130958333333333,
+      "target_duration_sec": 7.1309375
+    },
+    {
+      "id": "active_followup",
+      "source_mime_type": "audio/L16;codec=pcm;rate=24000",
+      "source_sample_rate": 24000,
+      "target_sample_rate": 16000,
+      "source_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/active_followup.source.wav",
+      "target_wav_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/active_followup.pcm16000.wav",
+      "target_pcm_path": "/Users/sunfl/Documents/study/glac/SightLine/artifacts/live_diagnostic_suite_real/20260313_154445/loop_01/tts_fixtures/audio/active_followup.pcm16000.raw",
+      "source_duration_sec": 4.490958333333333,
+      "target_duration_sec": 4.4909375
+    }
+  ],
+  "results": [],
+  "all_passed": null
+}

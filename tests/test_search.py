@@ -194,6 +194,18 @@ class TestGoogleSearch:
         assert len(result["sources"]) == 1
         assert result["sources"][0]["title"] == "Google Search"
 
+    def test_transient_error_retries_then_succeeds(self, mock_genai):
+        mock_genai.models.generate_content.side_effect = [
+            Exception("503 UNAVAILABLE"),
+            _make_mock_response(text="Recovered answer"),
+        ]
+
+        result = google_search("recover please")
+
+        assert result["success"] is True
+        assert result["answer"] == "Recovered answer"
+        assert mock_genai.models.generate_content.call_count == 2
+
 
 # ---------------------------------------------------------------------------
 # _extract_sources tests

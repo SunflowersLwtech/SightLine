@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 
 import httpx
 
 logger = logging.getLogger("sightline.tools._maps_http")
 
 _API_KEY: str | None = None
+_RETRY_ATTEMPTS = 3
+_RETRY_BACKOFF_SEC = 0.35
 
 
 def _get_api_key() -> str:
@@ -52,8 +55,13 @@ def maps_rest_post(
     if field_mask:
         headers["X-Goog-FieldMask"] = field_mask
 
-    resp = httpx.post(url, json=body, headers=headers, timeout=timeout)
-    resp.raise_for_status()
+    resp = _request_with_retry(
+        method="POST",
+        url=url,
+        json=body,
+        headers=headers,
+        timeout=timeout,
+    )
     return resp.json()
 
 
@@ -69,6 +77,73 @@ def maps_rest_get(
     if params is None:
         params = {}
     params["key"] = _get_api_key()
-    resp = httpx.get(url, params=params, timeout=timeout)
+    resp = _request_with_retry(
+        method="GET",
+        url=url,
+        params=params,
+        timeout=timeout,
+    )
     resp.raise_for_status()
     return resp
+
+
+def _request_with_retry(
+    *,
+    method: str,
+    url: str,
+    timeout: float,
+    **kwargs,
+) -> httpx.Response:
+    last_exc: Exception | None = None
+    for attempt in range(1, _RETRY_ATTEMPTS + 1):
+        try:
+            resp = httpx.request(method, url, timeout=timeout, **kwargs)
+            if resp.status_code in {429, 500, 502, 503, 504} and attempt < _RETRY_ATTEMPTS:
+                backoff = _RETRY_BACKOFF_SEC * attempt
+                logger.warning(
+                    "Maps API transient HTTP %s for %s %s; retrying in %.2fs (%d/%d)",
+                    resp.status_code,
+                    method,
+                    url,
+                    backoff,
+                    attempt,
+                    _RETRY_ATTEMPTS,
+                )
+                time.sleep(backoff)
+                continue
+            resp.raise_for_status()
+            return resp
+        except (httpx.TimeoutException, httpx.RequestError) as exc:
+            last_exc = exc
+            if attempt >= _RETRY_ATTEMPTS:
+                raise
+            backoff = _RETRY_BACKOFF_SEC * attempt
+            logger.warning(
+                "Maps API %s for %s %s; retrying in %.2fs (%d/%d)",
+                type(exc).__name__,
+                method,
+                url,
+                backoff,
+                attempt,
+                _RETRY_ATTEMPTS,
+            )
+            time.sleep(backoff)
+        except httpx.HTTPStatusError as exc:
+            last_exc = exc
+            if exc.response.status_code not in {429, 500, 502, 503, 504} or attempt >= _RETRY_ATTEMPTS:
+                raise
+            backoff = _RETRY_BACKOFF_SEC * attempt
+            logger.warning(
+                "Maps API HTTPStatusError %s for %s %s; retrying in %.2fs (%d/%d)",
+                exc.response.status_code,
+                method,
+                url,
+                backoff,
+                attempt,
+                _RETRY_ATTEMPTS,
+            )
+            time.sleep(backoff)
+
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError(f"Maps API request failed unexpectedly: {method} {url}")

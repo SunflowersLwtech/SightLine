@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from functools import lru_cache
 import io
 import os
 import re
@@ -151,6 +152,15 @@ def _local_fallback_pcm(text: str) -> bytes:
 
     # Last resort: return silent audio (text transcript still delivered)
     return _silent_pcm(0.5)
+
+
+@lru_cache(maxsize=32)
+def _cached_local_fallback_pcm(text: str) -> bytes:
+    return _local_fallback_pcm(text)
+
+
+async def synthesize_local_pcm(text: str) -> bytes:
+    return await asyncio.to_thread(_cached_local_fallback_pcm, text)
 
 
 async def synthesize_pcm(text: str, voice: str = DEFAULT_VOICE) -> bytes:

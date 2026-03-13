@@ -3042,16 +3042,17 @@ async def async_main(args: argparse.Namespace) -> int:
             pcm_cache[turn_id] = pcm
             dur = len(pcm) / 2.0 / TARGET_SAMPLE_RATE
             log.info("  → %d bytes, %.1fs", len(pcm), dur)
-            # TTS rate limit: 10 RPM. Sleep 7s between requests to stay safe.
+            # Cooldown is configurable so local regression runs can trade
+            # quota safety for speed explicitly.
             if i + 1 < len(all_turns):
-                await asyncio.sleep(7.0)
+                await asyncio.sleep(max(0.0, float(args.tts_cooldown_sec)))
         except Exception as exc:
             log.error("  → TTS FAILED: %s", exc)
             pcm_cache[turn_id] = b""
             # On rate limit, wait longer before next attempt
             if "429" in str(exc) or "RESOURCE_EXHAUSTED" in str(exc):
-                log.info("  → Rate limited, waiting 30s...")
-                await asyncio.sleep(30.0)
+                log.info("  → Rate limited, waiting %.1fs...", float(args.tts_backoff_sec))
+                await asyncio.sleep(max(0.0, float(args.tts_backoff_sec)))
 
     # Step 3: Run Session 1 conversations (single WS per conversation)
     log.info("--- Session 1: Running %d conversations ---", len(session_1_conversations))
@@ -3262,6 +3263,8 @@ def main() -> int:
     p.add_argument("--turn-retry-on-reconnect", type=int, default=1, help="How many times to retry a turn after reconnect/go_away.")
     p.add_argument("--inter-turn-delay-sec", type=float, default=1.5, help="Delay between turns.")
     p.add_argument("--conversation-cooldown-sec", type=float, default=8.0, help="Delay between conversations to avoid local capacity overlap.")
+    p.add_argument("--tts-cooldown-sec", type=float, default=7.0, help="Cooldown between TTS fixture requests.")
+    p.add_argument("--tts-backoff-sec", type=float, default=30.0, help="Backoff after TTS rate-limit errors.")
     p.add_argument("--strict-real-env", action="store_true", help="Disable local synthetic fallbacks (require real Imagen/TTS services).")
     p.add_argument("--strict-expectations", action="store_true", help="Treat expectation misses as failures instead of warnings.")
     p.add_argument("--enforce-tool-coverage", action="store_true", help="Fail suite when required tool chain coverage is incomplete.")

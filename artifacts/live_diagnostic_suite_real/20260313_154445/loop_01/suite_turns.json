@@ -1,0 +1,38 @@
+[
+  {
+    "id": "baseline_ready",
+    "text": "Hello, please confirm you are ready to guide me safely."
+  },
+  {
+    "id": "search_weather",
+    "text": "What's the weather in Kuala Lumpur today? Please answer in one sentence."
+  },
+  {
+    "id": "nav_central_park",
+    "text": "Start walking navigation now: from Times Square to Central Park. Give one immediate next step."
+  },
+  {
+    "id": "context_followup",
+    "text": "Please summarize what you just perceived and what I should do next."
+  },
+  {
+    "id": "memory_set",
+    "text": "Please remember this destination: Central Park."
+  },
+  {
+    "id": "memory_recall",
+    "text": "What destination did I just tell you? Reply with the exact two words only."
+  },
+  {
+    "id": "interrupt_long",
+    "text": "Please describe the full scene in as much detail as possible, including people, obstacles, signs, and movement, using at least six sentences."
+  },
+  {
+    "id": "interrupt_barge",
+    "text": "Stop now. Give me only one immediate safety instruction in one short sentence."
+  },
+  {
+    "id": "active_followup",
+    "text": "Now actively guide me with one concise next action."
+  }
+]

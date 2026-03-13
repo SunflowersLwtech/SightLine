@@ -10,6 +10,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 XCODEPROJ="$PROJECT_DIR/SightLine.xcodeproj"
 PYTHON="${PYTHON:-}"
 PORT="${PORT:-8100}"
+SERVER_START_TIMEOUT_SEC="${SERVER_START_TIMEOUT_SEC:-30}"
 IPHONE_NAME="${IPHONE_NAME:-iPhone}"
 WATCH_NAME="${WATCH_NAME:-Watch}"
 IPHONE_ID="${IPHONE_ID:-}"
@@ -131,23 +132,40 @@ kill_server() {
 start_server() {
     echo -e "${GREEN}[2/7] Starting backend server...${NC}"
     cd "$PROJECT_DIR"
-    nohup "$PYTHON" server.py > /tmp/sightline-server.log 2>&1 &
+    if command -v setsid >/dev/null 2>&1; then
+        setsid "$PYTHON" server.py </dev/null > /tmp/sightline-server.log 2>&1 &
+    else
+        nohup "$PYTHON" server.py </dev/null > /tmp/sightline-server.log 2>&1 &
+    fi
     local pid=$!
     echo "$pid" > "$SERVER_PID_FILE"
 
-    # Wait for server to be ready
-    for i in {1..10}; do
-        if curl -s http://localhost:$PORT/health > /dev/null 2>&1; then
+    # Wait for server to be ready. Cold starts can take longer because the
+    # backend imports ML/runtime dependencies before Uvicorn begins serving.
+    local attempts elapsed
+    attempts="$SERVER_START_TIMEOUT_SEC"
+    elapsed=0
+    for ((i=1; i<=attempts; i++)); do
+        if curl -sf http://localhost:$PORT/health > /dev/null 2>&1; then
             echo -e "${GREEN}      Server running (PID $pid) on port $PORT${NC}"
             echo -e "${GREEN}      Log: /tmp/sightline-server.log${NC}"
             return 0
         fi
-        sleep 0.5
+
+        if ! kill -0 "$pid" 2>/dev/null; then
+            echo -e "${RED}      Server exited before becoming healthy. Check /tmp/sightline-server.log${NC}"
+            rm -f "$SERVER_PID_FILE"
+            tail -n 80 /tmp/sightline-server.log || true
+            return 1
+        fi
+
+        sleep 1
+        elapsed=$i
     done
 
-    echo -e "${RED}      Server failed to start. Check /tmp/sightline-server.log${NC}"
+    echo -e "${RED}      Server failed to become healthy within ${elapsed}s. Check /tmp/sightline-server.log${NC}"
     rm -f "$SERVER_PID_FILE"
-    tail -n 60 /tmp/sightline-server.log || true
+    tail -n 80 /tmp/sightline-server.log || true
     return 1
 }
 

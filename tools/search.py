@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from typing import Any
 
 from google import genai
@@ -43,6 +44,8 @@ def _get_client() -> genai.Client:
 # ---------------------------------------------------------------------------
 
 SEARCH_MODEL = "gemini-3-flash-preview"
+_SEARCH_RETRY_ATTEMPTS = 3
+_SEARCH_RETRY_BACKOFF_SEC = 0.4
 
 
 def google_search(query: str) -> dict[str, Any]:
@@ -64,14 +67,7 @@ def google_search(query: str) -> dict[str, Any]:
     """
     try:
         client = _get_client()
-
-        response = client.models.generate_content(
-            model=SEARCH_MODEL,
-            contents=query,
-            config=genai.types.GenerateContentConfig(
-                tools=[genai.types.Tool(google_search=genai.types.GoogleSearch())],
-            ),
-        )
+        response = _generate_search_with_retry(client=client, query=query)
 
         # Extract the answer text
         answer = ""
@@ -116,6 +112,54 @@ def google_search(query: str) -> dict[str, Any]:
             "sources": [],
             "confidence": 0.0,
         }
+
+
+def _generate_search_with_retry(*, client: genai.Client, query: str):
+    last_exc: Exception | None = None
+    for attempt in range(1, _SEARCH_RETRY_ATTEMPTS + 1):
+        try:
+            return client.models.generate_content(
+                model=SEARCH_MODEL,
+                contents=query,
+                config=genai.types.GenerateContentConfig(
+                    tools=[genai.types.Tool(google_search=genai.types.GoogleSearch())],
+                ),
+            )
+        except Exception as exc:
+            last_exc = exc
+            if not _is_transient_search_error(exc) or attempt >= _SEARCH_RETRY_ATTEMPTS:
+                raise
+            backoff = _SEARCH_RETRY_BACKOFF_SEC * attempt
+            logger.warning(
+                "google_search transient failure (%s); retrying in %.2fs (%d/%d)",
+                type(exc).__name__,
+                backoff,
+                attempt,
+                _SEARCH_RETRY_ATTEMPTS,
+            )
+            time.sleep(backoff)
+
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("google_search failed without an exception")
+
+
+def _is_transient_search_error(exc: Exception) -> bool:
+    status_code = getattr(exc, "status_code", None)
+    err_text = str(exc).upper()
+    if status_code in {429, 500, 502, 503, 504}:
+        return True
+    return any(
+        token in err_text for token in (
+            "RESOURCE_EXHAUSTED",
+            "RATE LIMIT",
+            "UNAVAILABLE",
+            "DEADLINE_EXCEEDED",
+            "503",
+            "504",
+            "429",
+        )
+    )
 
 
 def _extract_sources(response: Any) -> list[dict[str, str]]:
