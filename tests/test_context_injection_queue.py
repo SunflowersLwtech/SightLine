@@ -173,6 +173,7 @@ _patch_attr("telemetry.session_meta_tracker", "SessionMetaTracker", MagicMock)
 # Stub tool registries/functions imported at server module scope
 _patch_attr("tools", "ALL_FUNCTIONS", {})
 _patch_attr("tools", "ALL_TOOL_DECLARATIONS", [])
+_patch_attr("tools", "ALL_TOOL_RUNTIME_METADATA", {})
 _patch_attr("tools.navigation", "NAVIGATION_FUNCTIONS", set())
 _patch_attr("tools.search", "SEARCH_FUNCTIONS", set())
 _patch_attr("tools.plus_codes", "PLUS_CODES_FUNCTIONS", set())

@@ -7,16 +7,14 @@ Firestore path: user_profiles/{uid}/scene_patterns/{pid}
 """
 
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
+from config import get_google_cloud_project
 
 logger = logging.getLogger(__name__)
-
-PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "sightline-hackathon")
 
 _COSINE_THRESHOLD = 0.8  # minimum similarity for a match
 _MAX_PATTERNS = 50
@@ -92,7 +90,7 @@ class SceneMatcher:
     def _try_init(self):
         try:
             from google.cloud import firestore
-            self._firestore = firestore.Client(project=PROJECT_ID)
+            self._firestore = firestore.Client(project=get_google_cloud_project())
         except Exception as e:
             logger.warning("Firestore init failed for SceneMatcher user=%s: %s", self.user_id, e)
 

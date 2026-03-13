@@ -12,7 +12,7 @@ from typing import Optional
 
 import numpy as np
 
-from memory.memory_bank import MemoryBankService, _compute_embedding, EMBEDDING_DIM
+from memory.memory_bank import MemoryBankService, _compute_embedding
 from memory.memory_budget import MemoryBudgetTracker
 
 logger = logging.getLogger(__name__)

@@ -12,11 +12,11 @@ Behavior mode: WHEN_IDLE — results delivered after speech finishes.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from google import genai
 from google.genai import types
+from gemini_client import get_gemini_vertex_client
 
 logger = logging.getLogger("sightline.tools.maps_grounding")
 
@@ -30,25 +30,13 @@ MAPS_MODEL = "gemini-2.5-flash"  # Maps grounding supported model
 # Client singleton (Vertex AI mode)
 # ---------------------------------------------------------------------------
 
-_client: genai.Client | None = None
-
-
 def _get_client() -> genai.Client:
     """Return a lazily-initialised Genai client in Vertex AI mode.
 
     Uses Application Default Credentials (ADC) for authentication.
     Different from search.py which uses API key mode.
     """
-    global _client
-    if _client is None:
-        project = os.environ.get("GOOGLE_CLOUD_PROJECT", "sightline-hackathon")
-        location = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
-        _client = genai.Client(
-            vertexai=True,
-            project=project,
-            location=location,
-        )
-    return _client
+    return get_gemini_vertex_client()
 
 
 # ---------------------------------------------------------------------------

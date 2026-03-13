@@ -10,10 +10,9 @@ import asyncio
 import base64
 import json
 import logging
-import re
 import time
-from collections import deque
 from datetime import datetime, timezone
+from importlib.util import find_spec
 
 from fastapi import WebSocket, WebSocketDisconnect
 from google.adk.agents.live_request_queue import LiveRequestQueue
@@ -56,7 +55,6 @@ from server import (
     FACE_LIBRARY_REFRESH_SEC,
     WS_INACTIVITY_TIMEOUT_SEC,
     SESSION_TIMEOUT_SEC,
-    STARTUP_HABIT_DETECT_TIMEOUT_SEC,
     session_manager,
     _vision_available,
     _ocr_available,
@@ -774,12 +772,7 @@ class WebSocketHandler(DirectIntentMixin):
                 cat, beh = _TOOL_CATEGORY_MAP[mem_name]
                 tools_list.append({"name": mem_name, "category": cat, "behavior": beh, "description": ""})
 
-        _entity_graph_available = False
-        try:
-            from context.entity_graph import EntityGraphService  # noqa: F811
-            _entity_graph_available = True
-        except ImportError:
-            pass
+        _entity_graph_available = find_spec("context.entity_graph") is not None
 
         context_modules = [
             {"name": "LocationContext", "status": "ready" if self._location_ctx_service is not None else "unavailable"},

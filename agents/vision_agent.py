@@ -24,6 +24,7 @@ from typing import Any
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
+from gemini_client import get_gemini_api_client
 
 logger = logging.getLogger("sightline.vision_agent")
 
@@ -219,22 +220,18 @@ def _build_context_user_message(lod: int, session_context: dict) -> str:
 # Public API
 # ---------------------------------------------------------------------------
 
-_client: genai.Client | None = None
 _vision_unavailable_until: float = 0.0
 
 
 def _get_client() -> genai.Client:
-    """Lazily initialize the Gemini client."""
-    global _client
-    if _client is None:
-        api_key = os.environ.get("_GOOGLE_AI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
-        if not api_key:
-            raise RuntimeError(
-                "Vision agent requires a Gemini API key. "
-                "Set _GOOGLE_AI_API_KEY or GOOGLE_API_KEY environment variable."
-            )
-        _client = genai.Client(api_key=api_key, vertexai=False)
-    return _client
+    """Return the shared Gemini client with vision-specific error text."""
+    try:
+        return get_gemini_api_client()
+    except RuntimeError as exc:
+        raise RuntimeError(
+            "Vision agent requires a Gemini API key. "
+            "Set _GOOGLE_AI_API_KEY or GOOGLE_API_KEY environment variable."
+        ) from exc
 
 
 def _image_part(image_bytes: bytes) -> Any:

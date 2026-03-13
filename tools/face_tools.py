@@ -12,7 +12,6 @@ photo storage is only enabled when explicit consent is provided.
 from __future__ import annotations
 
 import logging
-import os
 import base64
 import hashlib
 from datetime import datetime, timezone
@@ -22,10 +21,9 @@ import cv2
 import numpy as np
 from google.cloud import firestore
 from google.cloud.firestore_v1.vector import Vector
+from config import get_google_cloud_project
 
 logger = logging.getLogger(__name__)
-
-PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "sightline-hackathon")
 
 # Registration contract: enroll using 1-5 samples.
 MIN_FACE_SAMPLES = 1
@@ -38,7 +36,7 @@ def _get_db() -> firestore.Client:
     """Return a lazily-initialized Firestore client."""
     global _db_client
     if _db_client is None:
-        _db_client = firestore.Client(project=PROJECT_ID)
+        _db_client = firestore.Client(project=get_google_cloud_project())
     return _db_client
 
 

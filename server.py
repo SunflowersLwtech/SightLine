@@ -32,6 +32,7 @@ from google.adk.agents.live_request_queue import LiveRequestQueue
 from google.adk.runners import Runner
 from google.genai import types
 from starlette.websockets import WebSocketState
+from firestore_client import get_firestore_client
 
 # ---------------------------------------------------------------------------
 # WebSocket message type constants — eliminates raw string literals
@@ -780,12 +781,7 @@ except ImportError:
 
 FACE_LIBRARY_REFRESH_SEC: float = 60.0
 
-from tools import ALL_FUNCTIONS, ALL_TOOL_DECLARATIONS
-from tools.navigation import NAVIGATION_FUNCTIONS
-from tools.search import SEARCH_FUNCTIONS
-from tools.plus_codes import PLUS_CODES_FUNCTIONS
-from tools.accessibility import ACCESSIBILITY_FUNCTIONS
-from tools.maps_grounding import MAPS_GROUNDING_FUNCTIONS
+from tools import ALL_FUNCTIONS, ALL_TOOL_DECLARATIONS, ALL_TOOL_RUNTIME_METADATA
 from tools.ocr_tool import set_latest_frame as _ocr_set_latest_frame, clear_session as _ocr_clear_session
 from memory.memory_tools import MEMORY_FUNCTIONS
 from tools.tool_behavior import ToolBehavior, behavior_to_text, resolve_tool_behavior
@@ -1008,8 +1004,7 @@ async def api_clear_face_library(user_id: str, request: Request) -> JSONResponse
 async def api_get_profile(user_id: str) -> JSONResponse:
     """Get the UserProfile from Firestore."""
     try:
-        from google.cloud import firestore as _fs
-        db = _fs.Client(project=os.getenv("GOOGLE_CLOUD_PROJECT", "sightline-hackathon"))
+        db = get_firestore_client()
         doc = db.collection("user_profiles").document(user_id).get()
         if not doc.exists:
             return JSONResponse({"error": "Profile not found"}, status_code=404)
@@ -1060,7 +1055,7 @@ async def api_save_profile(user_id: str, request: Request) -> JSONResponse:
 
     try:
         from google.cloud import firestore as _fs
-        db = _fs.Client(project=os.getenv("GOOGLE_CLOUD_PROJECT", "sightline-hackathon"))
+        db = get_firestore_client()
         doc_ref = db.collection("user_profiles").document(user_id)
         filtered["updated_at"] = _fs.SERVER_TIMESTAMP
         # Merge so we don't overwrite fields not included in this request
@@ -1082,8 +1077,7 @@ async def api_save_profile(user_id: str, request: Request) -> JSONResponse:
 async def api_list_users() -> JSONResponse:
     """List all user IDs from Firestore."""
     try:
-        from google.cloud import firestore as _fs
-        db = _fs.Client(project=os.getenv("GOOGLE_CLOUD_PROJECT", "sightline-hackathon"))
+        db = get_firestore_client()
         docs = db.collection("user_profiles").stream()
         user_ids = sorted(doc.id for doc in docs)
         return JSONResponse({"users": user_ids, "count": len(user_ids)})
@@ -1186,7 +1180,7 @@ def _allow_navigation_tool_call(
         → allowed with explicit OR implicit location query intent,
           or general question patterns (what/where/find/any).
     """
-    from tools.navigation import ACTIVE_NAVIGATION_TOOLS, LOCATION_QUERY_TOOLS
+    from tools.navigation import ACTIVE_NAVIGATION_TOOLS, LOCATION_QUERY_TOOLS, NAVIGATION_FUNCTIONS
 
     if func_name not in NAVIGATION_FUNCTIONS:
         return True, "not_navigation_tool"
@@ -1315,47 +1309,22 @@ async def _dispatch_function_call(
             "message": f"'{func_name}' does not exist. Use only the tools listed in your instructions.",
         }
 
-    # Navigation tools: inject current GPS/heading from ephemeral context
-    if func_name in NAVIGATION_FUNCTIONS:
-        ephemeral = session_manager.get_ephemeral_context(session_id)
-        if func_name == "navigate_to" and ephemeral.gps:
+    runtime_metadata = ALL_TOOL_RUNTIME_METADATA.get(
+        func_name,
+        {"gps_injection": None, "force_user_id": False},
+    )
+    gps_injection = runtime_metadata.get("gps_injection")
+    ephemeral = session_manager.get_ephemeral_context(session_id) if gps_injection else None
+    if ephemeral and ephemeral.gps:
+        if gps_injection == "origin_lat_lng_heading":
             func_args.setdefault("origin_lat", ephemeral.gps.lat)
             func_args.setdefault("origin_lng", ephemeral.gps.lng)
             func_args.setdefault("user_heading", ephemeral.heading)
-        elif func_name in ("get_location_info", "nearby_search", "reverse_geocode") and ephemeral.gps:
+        elif gps_injection == "lat_lng":
             func_args.setdefault("lat", ephemeral.gps.lat)
             func_args.setdefault("lng", ephemeral.gps.lng)
 
-    # Plus Codes: inject GPS for convert_to_plus_code
-    if func_name in PLUS_CODES_FUNCTIONS:
-        ephemeral = session_manager.get_ephemeral_context(session_id)
-        if func_name == "convert_to_plus_code" and ephemeral.gps:
-            func_args.setdefault("lat", ephemeral.gps.lat)
-            func_args.setdefault("lng", ephemeral.gps.lng)
-
-    # preview_destination: inject GPS if not explicitly provided
-    if func_name == "preview_destination":
-        ephemeral = session_manager.get_ephemeral_context(session_id)
-        if ephemeral.gps:
-            func_args.setdefault("lat", ephemeral.gps.lat)
-            func_args.setdefault("lng", ephemeral.gps.lng)
-
-    # Accessibility: inject GPS
-    if func_name in ACCESSIBILITY_FUNCTIONS:
-        ephemeral = session_manager.get_ephemeral_context(session_id)
-        if ephemeral.gps:
-            func_args.setdefault("lat", ephemeral.gps.lat)
-            func_args.setdefault("lng", ephemeral.gps.lng)
-
-    # Maps grounding: inject GPS
-    if func_name in MAPS_GROUNDING_FUNCTIONS:
-        ephemeral = session_manager.get_ephemeral_context(session_id)
-        if ephemeral.gps:
-            func_args.setdefault("lat", ephemeral.gps.lat)
-            func_args.setdefault("lng", ephemeral.gps.lng)
-
-    # Memory tools: hard-set user_id from session (security: prevents cross-user access)
-    if func_name in MEMORY_FUNCTIONS:
+    if runtime_metadata.get("force_user_id"):
         func_args["user_id"] = user_id
 
     logger.info(

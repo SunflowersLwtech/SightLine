@@ -1,0 +1,10 @@
+target-version = "py312"
+
+[lint]
+select = ["F", "E9"]
+
+[lint.per-file-ignores]
+"scripts/**/*.py" = ["F401", "F541", "F841"]
+"server.py" = ["F401"]
+"tests/**/*.py" = ["F401", "F841"]
+"websocket_handler.py" = ["F401"]

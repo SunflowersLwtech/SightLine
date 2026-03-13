@@ -1484,7 +1484,7 @@ async def test_gemini_keepalive_timeout_retries_then_reconnects():
 
             async def _failing_stream():
                 raise RuntimeError("keepalive ping timeout")
-                yield  # noqa: unreachable — makes this an async generator
+                yield  # noqa: B018
 
             return _failing_stream()
 
@@ -1526,7 +1526,7 @@ async def test_transient_keepalive_timeout_recovers_without_client_go_away():
                     err = RuntimeError("1006 None. abnormal closure [internal]")
                     err.__cause__ = RuntimeError("keepalive ping timeout")
                     raise err
-                    yield  # noqa: unreachable
+                    yield  # noqa: B018
 
                 yield _make_live_event({"content": {"parts": [{"text": "Recovered response."}]}})
                 while True:
@@ -1650,7 +1650,7 @@ async def test_keepalive_retry_rebuilds_run_config_for_resumption():
                     err = RuntimeError("1006 None. abnormal closure [internal]")
                     err.__cause__ = RuntimeError("keepalive ping timeout")
                     raise err
-                    yield  # noqa: unreachable
+                    yield  # noqa: B018
 
                 yield _make_live_event({"content": {"parts": [{"text": "Recovered response."}]}})
                 while True:

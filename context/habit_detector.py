@@ -11,14 +11,11 @@ Firestore path: user_profiles/{uid}/sessions_meta/{sid}
 """
 
 import logging
-import os
-import time
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from config import get_google_cloud_project
 
 logger = logging.getLogger(__name__)
-
-PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "sightline-hackathon")
 
 _MAX_SESSIONS = 30
 _MIN_OCCURRENCES = 3  # minimum times a pattern must appear to be considered a habit
@@ -46,7 +43,7 @@ class HabitDetector:
     def _try_init(self):
         try:
             from google.cloud import firestore
-            self._firestore = firestore.Client(project=PROJECT_ID)
+            self._firestore = firestore.Client(project=get_google_cloud_project())
         except Exception as e:
             logger.warning("Firestore init failed for HabitDetector user=%s: %s", self.user_id, e)
 

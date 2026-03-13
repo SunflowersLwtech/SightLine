@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import time
 from dataclasses import dataclass, field
+from config import get_google_cloud_project
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +108,7 @@ class SessionMetaTracker:
         global _firestore_client
         if _firestore_client is None:
             from google.cloud import firestore
-            project = os.getenv("GOOGLE_CLOUD_PROJECT", "sightline-hackathon")
-            _firestore_client = firestore.Client(project=project)
+            _firestore_client = firestore.Client(project=get_google_cloud_project())
         return _firestore_client
 
     def _get_doc_ref(self):

@@ -13,6 +13,8 @@ LOD state initialisation, and protocol compliance.
 import json
 import os
 from collections import deque
+from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -49,6 +51,62 @@ class TestHealthEndpoint:
         response = client.get("/health")
         data = response.json()
         assert data["phase"] == 6
+
+
+class TestProfileEndpoints:
+    """Verify REST endpoints use the shared Firestore getter."""
+
+    def test_get_profile_uses_shared_firestore_client(self, client):
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = {
+            "preferred_name": "Ada",
+            "updated_at": datetime(2026, 3, 14, tzinfo=timezone.utc),
+        }
+        mock_db = MagicMock()
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+
+        with patch("server.get_firestore_client", return_value=mock_db) as mock_get_db:
+            response = client.get("/api/profile/user-123")
+
+        assert response.status_code == 200
+        assert response.json()["preferred_name"] == "Ada"
+        assert response.json()["updated_at"] == "2026-03-14T00:00:00+00:00"
+        mock_get_db.assert_called_once_with()
+
+    def test_save_profile_uses_shared_firestore_client_and_invalidates_cache(self, client):
+        mock_db = MagicMock()
+        mock_doc_ref = MagicMock()
+        mock_db.collection.return_value.document.return_value = mock_doc_ref
+
+        with patch("server.get_firestore_client", return_value=mock_db) as mock_get_db, \
+             patch("server.session_manager.invalidate_user_profile") as mock_invalidate:
+            response = client.post(
+                "/api/profile/user-123",
+                json={"preferred_name": "Ada", "ignored_field": "noop"},
+            )
+
+        assert response.status_code == 200
+        mock_get_db.assert_called_once_with()
+        mock_doc_ref.set.assert_called_once()
+        args, kwargs = mock_doc_ref.set.call_args
+        assert args[0]["preferred_name"] == "Ada"
+        assert "ignored_field" not in args[0]
+        assert kwargs["merge"] is True
+        mock_invalidate.assert_called_once_with("user-123")
+
+    def test_list_users_uses_shared_firestore_client(self, client):
+        doc_a = SimpleNamespace(id="alpha")
+        doc_b = SimpleNamespace(id="beta")
+        mock_db = MagicMock()
+        mock_db.collection.return_value.stream.return_value = [doc_b, doc_a]
+
+        with patch("server.get_firestore_client", return_value=mock_db) as mock_get_db:
+            response = client.get("/api/users")
+
+        assert response.status_code == 200
+        assert response.json() == {"users": ["alpha", "beta"], "count": 2}
+        mock_get_db.assert_called_once_with()
 
 
 # ---------------------------------------------------------------------------
@@ -448,6 +506,127 @@ class TestRepeatSuppressionGuards:
             event_name="activity_end",
             interrupted=True,
         ) is False
+
+    @pytest.mark.asyncio
+    async def test_dispatch_injects_navigation_origin_and_heading_from_metadata(self):
+        from server import _dispatch_function_call
+
+        captured = {}
+
+        def fake_tool(**kwargs):
+            captured.update(kwargs)
+            return {"ok": True}
+
+        ephemeral = SimpleNamespace(
+            gps=SimpleNamespace(lat=3.14159, lng=101.6869),
+            heading=270.0,
+        )
+
+        with patch("server.ALL_FUNCTIONS", {"navigate_to": fake_tool}), \
+             patch("server.ALL_TOOL_RUNTIME_METADATA", {
+                 "navigate_to": {
+                     "gps_injection": "origin_lat_lng_heading",
+                     "force_user_id": False,
+                 },
+             }), \
+             patch("server.session_manager.get_ephemeral_context", return_value=ephemeral):
+            result = await _dispatch_function_call("navigate_to", {"destination": "station"}, "s1", "u1")
+
+        assert result == {"ok": True}
+        assert captured["destination"] == "station"
+        assert captured["origin_lat"] == 3.14159
+        assert captured["origin_lng"] == 101.6869
+        assert captured["user_heading"] == 270.0
+
+    @pytest.mark.asyncio
+    async def test_dispatch_injects_lat_lng_from_metadata(self):
+        from server import _dispatch_function_call
+
+        captured = {}
+
+        def fake_tool(**kwargs):
+            captured.update(kwargs)
+            return {"ok": True}
+
+        ephemeral = SimpleNamespace(
+            gps=SimpleNamespace(lat=40.0, lng=-73.0),
+            heading=None,
+        )
+
+        with patch("server.ALL_FUNCTIONS", {"maps_query": fake_tool}), \
+             patch("server.ALL_TOOL_RUNTIME_METADATA", {
+                 "maps_query": {
+                     "gps_injection": "lat_lng",
+                     "force_user_id": False,
+                 },
+             }), \
+             patch("server.session_manager.get_ephemeral_context", return_value=ephemeral):
+            result = await _dispatch_function_call("maps_query", {"question": "nearest pharmacy"}, "s1", "u1")
+
+        assert result == {"ok": True}
+        assert captured["question"] == "nearest pharmacy"
+        assert captured["lat"] == 40.0
+        assert captured["lng"] == -73.0
+
+    @pytest.mark.asyncio
+    async def test_dispatch_keeps_explicit_lat_lng_when_gps_missing(self):
+        from server import _dispatch_function_call
+
+        captured = {}
+
+        def fake_tool(**kwargs):
+            captured.update(kwargs)
+            return {"ok": True}
+
+        ephemeral = SimpleNamespace(gps=None, heading=None)
+
+        with patch("server.ALL_FUNCTIONS", {"preview_destination": fake_tool}), \
+             patch("server.ALL_TOOL_RUNTIME_METADATA", {
+                 "preview_destination": {
+                     "gps_injection": "lat_lng",
+                     "force_user_id": False,
+                 },
+             }), \
+             patch("server.session_manager.get_ephemeral_context", return_value=ephemeral):
+            result = await _dispatch_function_call(
+                "preview_destination",
+                {"lat": 1.23, "lng": 4.56, "destination": "cafe"},
+                "s1",
+                "u1",
+            )
+
+        assert result == {"ok": True}
+        assert captured["lat"] == 1.23
+        assert captured["lng"] == 4.56
+        assert captured["destination"] == "cafe"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_forces_memory_user_id_from_session(self):
+        from server import _dispatch_function_call
+
+        captured = {}
+
+        def fake_tool(**kwargs):
+            captured.update(kwargs)
+            return {"status": "created"}
+
+        with patch("server.ALL_FUNCTIONS", {"remember_entity": fake_tool}), \
+             patch("server.ALL_TOOL_RUNTIME_METADATA", {
+                 "remember_entity": {
+                     "gps_injection": None,
+                     "force_user_id": True,
+                 },
+             }):
+            result = await _dispatch_function_call(
+                "remember_entity",
+                {"user_id": "forged-user", "content": "Walgreens"},
+                "s1",
+                "real-user",
+            )
+
+        assert result == {"status": "created"}
+        assert captured["user_id"] == "real-user"
+        assert captured["content"] == "Walgreens"
 
     def test_activity_start_noop_when_not_interrupted(self):
         from server import _should_reset_interrupted_on_activity_start

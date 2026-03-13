@@ -45,8 +45,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio
+          pip install -r requirements-dev.txt
+
+      - name: Run Ruff
+        run: ruff check .
 
       - name: Run unit tests
         run: pytest tests/ -v --tb=short

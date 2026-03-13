@@ -10,7 +10,7 @@ the model's output behaviour mid-session.
 
 from __future__ import annotations
 
-from lod.models import EphemeralContext, NarrativeSnapshot, SessionContext, UserProfile
+from lod.models import EphemeralContext, SessionContext, UserProfile
 
 # ---------------------------------------------------------------------------
 # Language code → display name mapping
@@ -204,7 +204,7 @@ def build_lod_update_message(
     # 4. Narrative snapshot (resume point after LOD upgrade)
     if session.narrative_snapshot and lod >= 2:
         snap = session.narrative_snapshot
-        parts.append(f"\n## Resume Point")
+        parts.append("\n## Resume Point")
         parts.append(
             f"The user was previously doing: {snap.task_type}. "
             f"Progress: {snap.progress}. "
@@ -300,7 +300,7 @@ def build_full_dynamic_prompt(
     # Narrative snapshot
     if session.narrative_snapshot and lod >= 2:
         snap = session.narrative_snapshot
-        parts.append(f"\n## Resume Point")
+        parts.append("\n## Resume Point")
         parts.append(
             f"Previously doing: {snap.task_type}. "
             f"Progress: {snap.progress}. "

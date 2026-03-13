@@ -13,10 +13,10 @@ import re
 import time
 import uuid
 from typing import Optional
+from config import get_google_cloud_project
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "sightline-hackathon")
 EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
 EMBEDDING_DIM = 2048
 
@@ -65,7 +65,7 @@ class MemoryBankService:
         try:
             from google.cloud import firestore
 
-            self._firestore = firestore.Client(project=PROJECT_ID)
+            self._firestore = firestore.Client(project=get_google_cloud_project())
             logger.info("MemoryBankService initialized for user %s", self.user_id)
         except Exception as e:
             logger.warning(
@@ -424,4 +424,3 @@ def load_relevant_memories(user_id: str, context: str, top_k: int = 3) -> list[s
     bank = _get_bank(user_id)
     results = bank.retrieve_memories(context, top_k=top_k)
     return [_sanitize_memory_content(m["content"]) for m in results]
-

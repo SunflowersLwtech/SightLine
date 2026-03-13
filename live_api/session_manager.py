@@ -17,6 +17,11 @@ import time
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from config import (
+    get_google_cloud_project,
+    get_google_cloud_region,
+    get_session_db_url,
+)
 
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
@@ -52,10 +57,10 @@ def create_session_service():
 
     # Read env at call time because server.py loads .env after imports.
     agent_engine_id = os.getenv("AGENT_ENGINE_ID", "").strip() or None
-    project = os.getenv("GOOGLE_CLOUD_PROJECT", "sightline-hackathon")
-    location = os.getenv("GOOGLE_CLOUD_REGION", "us-central1")
+    project = get_google_cloud_project()
+    location = get_google_cloud_region()
     use_vertex = _env_flag("GOOGLE_GENAI_USE_VERTEXAI", default=False)
-    db_url = os.getenv("SESSION_DB_URL", "sqlite:///sightline_sessions.db")
+    db_url = get_session_db_url()
     service_mode = os.getenv("SESSION_SERVICE_MODE", "auto").strip().lower()
 
     try:
@@ -221,8 +226,7 @@ def _get_firestore():
     if _firestore_client is None:
         try:
             from google.cloud import firestore
-            project = os.getenv("GOOGLE_CLOUD_PROJECT", "sightline-hackathon")
-            _firestore_client = firestore.Client(project=project)
+            _firestore_client = firestore.Client(project=get_google_cloud_project())
         except Exception:
             logger.warning("Firestore client unavailable; using default profiles")
             _firestore_client = False  # Sentinel to avoid retrying

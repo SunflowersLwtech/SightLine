@@ -12,12 +12,12 @@ ongoing narration.
 from __future__ import annotations
 
 import logging
-import os
 import time
 from typing import Any
 
 from google import genai
 from google.genai import errors as genai_errors
+from gemini_client import get_gemini_api_client
 
 logger = logging.getLogger("sightline.tools.search")
 
@@ -25,18 +25,9 @@ logger = logging.getLogger("sightline.tools.search")
 # Client singleton
 # ---------------------------------------------------------------------------
 
-_client: genai.Client | None = None
-
-
 def _get_client() -> genai.Client:
-    """Return a lazily-initialised Genai client."""
-    global _client
-    if _client is None:
-        api_key = os.environ.get("_GOOGLE_AI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        if not api_key:
-            raise RuntimeError("GOOGLE_API_KEY environment variable not set")
-        _client = genai.Client(api_key=api_key, vertexai=False)
-    return _client
+    """Return the shared Gemini Developer API client."""
+    return get_gemini_api_client()
 
 
 # ---------------------------------------------------------------------------

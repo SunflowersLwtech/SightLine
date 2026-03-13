@@ -13,7 +13,7 @@ Tools available to the Orchestrator agent via Gemini Function Calling:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal, TypedDict
 
 from tools.face_tools import (
     MAX_FACE_SAMPLES,
@@ -72,6 +72,14 @@ try:
 except ImportError:
     MEMORY_FUNCTIONS: dict = {}
 from tools.tool_behavior import ToolBehavior, behavior_to_text, resolve_tool_behavior
+
+
+GPSInjectionMode = Literal[None, "lat_lng", "origin_lat_lng_heading"]
+
+
+class ToolRuntimeMetadata(TypedDict):
+    gps_injection: GPSInjectionMode
+    force_user_id: bool
 
 
 def identify_person(
@@ -143,6 +151,34 @@ ALL_FUNCTIONS = {
     **OCR_TOOL_FUNCTIONS,
 }
 
+
+def _runtime_metadata(
+    *,
+    gps_injection: GPSInjectionMode = None,
+    force_user_id: bool = False,
+) -> ToolRuntimeMetadata:
+    return {
+        "gps_injection": gps_injection,
+        "force_user_id": force_user_id,
+    }
+
+
+ALL_TOOL_RUNTIME_METADATA: dict[str, ToolRuntimeMetadata] = {
+    name: _runtime_metadata() for name in ALL_FUNCTIONS
+}
+ALL_TOOL_RUNTIME_METADATA.update({
+    "navigate_to": _runtime_metadata(gps_injection="origin_lat_lng_heading"),
+    "get_location_info": _runtime_metadata(gps_injection="lat_lng"),
+    "nearby_search": _runtime_metadata(gps_injection="lat_lng"),
+    "reverse_geocode": _runtime_metadata(gps_injection="lat_lng"),
+    "convert_to_plus_code": _runtime_metadata(gps_injection="lat_lng"),
+    "preview_destination": _runtime_metadata(gps_injection="lat_lng"),
+    "get_accessibility_info": _runtime_metadata(gps_injection="lat_lng"),
+    "maps_query": _runtime_metadata(gps_injection="lat_lng"),
+})
+for name in MEMORY_FUNCTIONS:
+    ALL_TOOL_RUNTIME_METADATA[name] = _runtime_metadata(force_user_id=True)
+
 __all__ = [
     # Navigation
     "navigate_to",
@@ -175,6 +211,7 @@ __all__ = [
     "identify_person",
     "ToolBehavior",
     "resolve_tool_behavior",
+    "behavior_to_text",
     "FACE_TOOL_DECLARATIONS",
     "FACE_FUNCTIONS",
     # Plus Codes
@@ -190,9 +227,11 @@ __all__ = [
     "maps_query",
     "MAPS_GROUNDING_TOOL_DECLARATIONS",
     "MAPS_GROUNDING_FUNCTIONS",
+    "extract_text_from_camera",
     # Memory
     "MEMORY_FUNCTIONS",
     # Aggregated
     "ALL_TOOL_DECLARATIONS",
     "ALL_FUNCTIONS",
+    "ALL_TOOL_RUNTIME_METADATA",
 ]
