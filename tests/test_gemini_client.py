@@ -18,6 +18,7 @@ def reset_client_caches():
 
 def test_get_gemini_api_client_is_cached(monkeypatch):
     monkeypatch.delenv("_GOOGLE_AI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
 
     with patch("gemini_client.genai.Client", return_value=sentinel.client) as mock_client:
@@ -27,6 +28,18 @@ def test_get_gemini_api_client_is_cached(monkeypatch):
     assert first is sentinel.client
     assert second is sentinel.client
     mock_client.assert_called_once_with(api_key="test-key", vertexai=False)
+
+
+def test_get_gemini_api_client_accepts_gemini_api_key(monkeypatch):
+    monkeypatch.delenv("_GOOGLE_AI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-test-key")
+
+    with patch("gemini_client.genai.Client", return_value=sentinel.client) as mock_client:
+        client = gemini_client.get_gemini_api_client()
+
+    assert client is sentinel.client
+    mock_client.assert_called_once_with(api_key="gemini-test-key", vertexai=False)
 
 
 def test_get_gemini_vertex_client_uses_project_and_region(monkeypatch):
@@ -47,6 +60,7 @@ def test_get_gemini_vertex_client_uses_project_and_region(monkeypatch):
 def test_get_gemini_api_client_raises_when_key_missing(monkeypatch):
     monkeypatch.delenv("_GOOGLE_AI_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
     with pytest.raises(RuntimeError, match="Gemini API key not configured"):
         gemini_client.get_gemini_api_client()

@@ -11,11 +11,16 @@ from config import get_google_cloud_project, get_google_cloud_region
 
 
 def _get_gemini_api_key() -> str:
-    api_key = os.environ.get("_GOOGLE_AI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
+    api_key = (
+        os.environ.get("_GOOGLE_AI_API_KEY")
+        or os.environ.get("GOOGLE_API_KEY")
+        or os.environ.get("GEMINI_API_KEY")
+        or ""
+    )
     if not api_key:
         raise RuntimeError(
             "Gemini API key not configured. "
-            "Set _GOOGLE_AI_API_KEY or GOOGLE_API_KEY environment variable."
+            "Set _GOOGLE_AI_API_KEY, GOOGLE_API_KEY, or GEMINI_API_KEY environment variable."
         )
     return api_key
 

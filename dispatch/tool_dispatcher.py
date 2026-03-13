@@ -105,12 +105,12 @@ async def _dispatch_function_call(
     ephemeral = session_manager.get_ephemeral_context(session_id) if gps_injection else None
     if ephemeral and ephemeral.gps:
         if gps_injection == "origin_lat_lng_heading":
-            func_args.setdefault("origin_lat", ephemeral.gps.lat)
-            func_args.setdefault("origin_lng", ephemeral.gps.lng)
-            func_args.setdefault("user_heading", ephemeral.heading)
+            func_args["origin_lat"] = ephemeral.gps.lat
+            func_args["origin_lng"] = ephemeral.gps.lng
+            func_args["user_heading"] = ephemeral.heading
         elif gps_injection == "lat_lng":
-            func_args.setdefault("lat", ephemeral.gps.lat)
-            func_args.setdefault("lng", ephemeral.gps.lng)
+            func_args["lat"] = ephemeral.gps.lat
+            func_args["lng"] = ephemeral.gps.lng
 
     if runtime_metadata.get("force_user_id"):
         func_args["user_id"] = user_id
@@ -184,4 +184,3 @@ async def _dispatch_function_call(
             "tool": func_name,
             "message": f"The {func_name} tool encountered an internal error. Try again or use a different approach.",
         }
-

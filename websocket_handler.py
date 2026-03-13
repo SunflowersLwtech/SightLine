@@ -23,7 +23,6 @@ from starlette.websockets import WebSocketState
 from api.utils import _coerce_bool, _json_safe
 from app_globals import (
     _NEEDS_SESSION_ID_MAPPING,
-    _TOOL_CATEGORY_MAP,
     AGENT_TEXT_REPEAT_SUPPRESS_SEC,
     FACE_LIBRARY_REFRESH_SEC,
     OCR_PREFEEDBACK_COOLDOWN_SEC,
@@ -41,6 +40,7 @@ from app_globals import (
     _vision_available,
     session_manager,
 )
+from context.spatial_change_detector import SpatialChangeDetector
 from context_injection import ContextInjectionQueue, ModelState, TokenBudgetMonitor
 from dispatch.tool_dispatcher import (
     _dispatch_function_call as _dispatch_function_call_impl,
@@ -87,7 +87,6 @@ from lod import (
     decide_lod,
     on_lod_change,
 )
-from context.spatial_change_detector import SpatialChangeDetector
 from lod.lod_engine import should_speak
 from session_state import SessionState
 from telemetry.signature import (
@@ -97,7 +96,7 @@ from telemetry.signature import (
     _should_inject_telemetry_context,
 )
 from telemetry.telemetry_parser import parse_telemetry, parse_telemetry_to_ephemeral
-from tools import ALL_FUNCTIONS, ALL_TOOL_DECLARATIONS
+from tools import ALL_FUNCTIONS, build_tool_manifest_entries
 from tools.navigation import NAVIGATION_FUNCTIONS
 from tools.ocr_tool import clear_session as _ocr_clear_session
 from tools.ocr_tool import set_latest_frame as _ocr_set_latest_frame
@@ -791,19 +790,10 @@ class WebSocketHandler(DirectIntentMixin):
     # ── Tools manifest ─────────────────────────────────────────────────
 
     def _build_tools_manifest(self) -> dict:
-        tools_list = [
-            {
-                "name": decl["name"],
-                "category": _TOOL_CATEGORY_MAP.get(decl["name"], ("unknown", "WHEN_IDLE"))[0],
-                "behavior": _TOOL_CATEGORY_MAP.get(decl["name"], ("unknown", "WHEN_IDLE"))[1],
-                "description": decl.get("description", ""),
-            }
-            for decl in ALL_TOOL_DECLARATIONS
-        ]
-        for mem_name in ("preload_memory", "remember_entity", "what_do_you_remember", "forget_entity", "forget_recent_memory"):
-            if mem_name in _TOOL_CATEGORY_MAP:
-                cat, beh = _TOOL_CATEGORY_MAP[mem_name]
-                tools_list.append({"name": mem_name, "category": cat, "behavior": beh, "description": ""})
+        tools_list = build_tool_manifest_entries(
+            lod=self.session_ctx.current_lod,
+            is_user_speaking=self.session_ctx.current_activity_state == "user_speaking",
+        )
 
         _entity_graph_available = find_spec("context.entity_graph") is not None
 

@@ -112,28 +112,6 @@ except ImportError:
 
 FACE_LIBRARY_REFRESH_SEC: float = 60.0
 
-_TOOL_CATEGORY_MAP: dict[str, tuple[str, str]] = {
-    "navigate_to": ("navigation", "INTERRUPT"),
-    "get_location_info": ("navigation", "WHEN_IDLE"),
-    "nearby_search": ("navigation", "WHEN_IDLE"),
-    "reverse_geocode": ("navigation", "WHEN_IDLE"),
-    "get_walking_directions": ("navigation", "WHEN_IDLE"),
-    "preview_destination": ("navigation", "WHEN_IDLE"),
-    "validate_address": ("navigation", "WHEN_IDLE"),
-    "google_search": ("search", "WHEN_IDLE"),
-    "identify_person": ("face", "SILENT"),
-    "resolve_plus_code": ("plus_codes", "WHEN_IDLE"),
-    "convert_to_plus_code": ("plus_codes", "WHEN_IDLE"),
-    "get_accessibility_info": ("accessibility", "WHEN_IDLE"),
-    "maps_query": ("maps_grounding", "WHEN_IDLE"),
-    "preload_memory": ("memory", "SILENT"),
-    "remember_entity": ("memory", "WHEN_IDLE"),
-    "what_do_you_remember": ("memory", "WHEN_IDLE"),
-    "forget_entity": ("memory", "SILENT"),
-    "forget_recent_memory": ("memory", "SILENT"),
-    "extract_text_from_camera": ("ocr", "WHEN_IDLE"),
-}
-
 _memory_available = False
 _memory_extractor_available = False
 MemoryBankService = None

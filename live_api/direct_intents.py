@@ -72,6 +72,25 @@ _AREA_CONTEXT_HINTS = (
     "what else can you tell me about this area",
 )
 
+_ACCESSIBILITY_HINTS = (
+    "accessible",
+    "accessibility",
+    "wheelchair",
+    "curb ramp",
+    "curb ramps",
+    "curb cut",
+    "tactile paving",
+    "audio signal",
+    "crossing signal",
+)
+
+_CROSSING_HINTS = (
+    "crossing",
+    "crosswalk",
+    "intersection",
+    "corner",
+)
+
 _NAVIGATION_DESTINATION_PATTERNS = (
     "navigate me to",
     "navigate to",
@@ -109,6 +128,12 @@ def tool_preference_hint(text: str) -> str:
             "This is an explicit text-reading request. Prefer extract_text_from_camera "
             "using the latest camera frame."
         )
+    if _is_accessibility_crossing_query(lowered):
+        hints.append(
+            "This is an accessibility-first crossing request about the user's current area. "
+            "Prefer get_accessibility_info before any navigation shortcut. Do not convert it "
+            "into navigate_to unless the user also gives a destination."
+        )
     if any(token in lowered for token in ("navigate", "directions", "route me", "take me", "guide me")):
         hints.append(
             "This is an explicit active navigation request. Prefer navigate_to or "
@@ -127,6 +152,15 @@ def tool_preference_hint(text: str) -> str:
     if any(token in lowered for token in _MEMORY_RECALL_HINTS):
         hints.append("This is a memory-recall request. Prefer what_do_you_remember.")
     return "\n".join(hints)
+
+
+def _is_accessibility_crossing_query(text: str) -> bool:
+    lowered = (text or "").strip().lower()
+    if not lowered:
+        return False
+    has_accessibility = any(token in lowered for token in _ACCESSIBILITY_HINTS)
+    has_crossing = any(token in lowered for token in _CROSSING_HINTS)
+    return has_accessibility and has_crossing
 
 
 def tool_result_fallback_text(tool_name: str, result: dict[str, object]) -> str | None:
@@ -167,6 +201,13 @@ def tool_result_fallback_text(tool_name: str, result: dict[str, object]) -> str 
     if name == "google_search":
         answer = str(result.get("answer") or "").strip()
         return answer or str(result.get("message") or "").strip() or None
+
+    if name == "get_accessibility_info":
+        summary = str(result.get("summary") or "").strip()
+        if summary:
+            return summary
+        error = str(result.get("error") or "").strip()
+        return error or None
 
     if name == "remember_entity":
         message = str(result.get("message") or "").strip()
@@ -484,6 +525,63 @@ class DirectIntentMixin:
             return False
 
         destination, search_types = self._extract_navigation_destination(input_text)
+        if _is_accessibility_crossing_query(input_text) and not search_types:
+            accessibility_behavior = handler_module.resolve_tool_behavior(
+                tool_name="get_accessibility_info",
+                lod=self.session_ctx.current_lod,
+                is_user_speaking=self.session_ctx.current_activity_state == "user_speaking",
+            )
+            result = await handler_module._dispatch_function_call(
+                "get_accessibility_info",
+                {},
+                self.session_id,
+                self.user_id,
+            )
+            await self._emit_tool_event(
+                "get_accessibility_info",
+                accessibility_behavior,
+                status="invoked",
+                data={"source": "server_shortcut", "query": input_text},
+            )
+            await self._safe_send_json({
+                "type": handler_module.MessageType.TOOL_RESULT,
+                "tool": "get_accessibility_info",
+                "behavior": handler_module.behavior_to_text(accessibility_behavior),
+                "data": handler_module._json_safe(result),
+            })
+            fallback_text = tool_result_fallback_text("get_accessibility_info", result)
+            if fallback_text:
+                self.state.pending_fallback_text = fallback_text
+                self.state.pending_fallback_turn_seq = current_turn
+                await self._emit_pending_fallback_output(current_turn)
+
+            from google.genai.types import FunctionResponse
+
+            shortcut_response = {
+                "success": bool(result.get("success", True)),
+                "handled_by": "server_shortcut",
+                "accessibility_result": result,
+            }
+            fr = FunctionResponse(name="get_accessibility_info", response=shortcut_response)
+            self.ctx_queue.inject_immediate(
+                types.Content(
+                    parts=[
+                        types.Part(
+                            text=(
+                                "[TOOL RESULT READY] The accessibility request has already been "
+                                "handled. Continue from this result without greeting again."
+                            )
+                        ),
+                        types.Part(function_response=fr),
+                    ],
+                    role="user",
+                ),
+                is_function_response=True,
+            )
+            self.state.direct_tool_handled_turn_seq = current_turn
+            logger.info("Handled direct accessibility shortcut for turn %d", current_turn)
+            return True
+
         user_speaking = self.session_ctx.current_activity_state == "user_speaking"
         behavior = handler_module.resolve_tool_behavior(
             tool_name="navigate_to",

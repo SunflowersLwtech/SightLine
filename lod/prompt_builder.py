@@ -36,17 +36,17 @@ def _language_display(code: str) -> str:
 LOD_INSTRUCTIONS: dict[int, str] = {
     1: (
         "LOD 1 -- BRIEF mode.\n"
-        "Rules: Keep responses to 1-2 short sentences (15-40 words max).\n"
-        "Style: Quick, clear, minimal. User is busy (moving fast or in a loud place).\n"
-        "Examples: 'Cafe on your left, outdoor seating.' / 'Crosswalk ahead, sounds busy.'\n"
+        "Rules: Keep responses to 1 short sentence (5-14 words).\n"
+        "Style: Quick, clear, minimal. User is busy, moving fast, or overloaded.\n"
+        "Examples: 'Crosswalk ahead at 12 o'clock.' / 'Wet floor at 1 o'clock.'\n"
         "Focus on what's immediately useful. Skip atmosphere and detail.\n"
         "DO NOT: describe colors, atmosphere, people's appearance, or decorative objects."
     ),
     2: (
         "LOD 2 — STANDARD mode.\n"
-        "Rules: Moderate description (80-150 words). Include spatial layout + key objects.\n"
-        "Style: Medium pace, clear and structured.\n"
-        "Description order: Overall space → key objects → actionable information.\n"
+        "Rules: Keep responses to 1-2 short sentences (15-35 words).\n"
+        "Style: Calm, clear, structured, and easy to hear once.\n"
+        "Description order: overall space → key object → actionable information.\n"
         "Use clock positions for directions (e.g. '2 o'clock').\n"
         "Example: 'You've entered a corridor about 20 metres long. "
         "Three doors on your left, floor-to-ceiling windows on your right. "
@@ -55,11 +55,12 @@ LOD_INSTRUCTIONS: dict[int, str] = {
     ),
     3: (
         "LOD 3 — NARRATIVE mode.\n"
-        "Rules: Detailed description (400-800 words). Complete scene with atmosphere.\n"
-        "Style: Slower pace, expressive, narrative.\n"
-        "Proactively read text, describe menus, introduce environment in detail.\n"
+        "Rules: Keep responses to 2-4 sentences (35-90 words).\n"
+        "Style: Slower pace, expressive, but still audio-friendly.\n"
+        "Describe the scene richly without becoming a monologue.\n"
+        "Read important text, menus, or signs when relevant.\n"
         "The user is relaxed / stationary and welcomes rich information.\n"
-        "DO NOT: rush, use bullet-point style, or skip emotional/atmospheric details."
+        "DO NOT: ramble, switch to bullet-point style, or turn the answer into a transcript dump."
     ),
 }
 
@@ -69,17 +70,14 @@ LOD_INSTRUCTIONS: dict[int, str] = {
 # ---------------------------------------------------------------------------
 
 LOD_COT_PROMPT = (
-    "Before responding, internally reason about the right response depth:\n"
-    "<think>\n"
-    "1. What has changed since the last update? (avoid repeating stable info)\n"
-    "2. Check latest sensor context for relevant changes\n"
-    "3. Decide what information is most valuable right now\n"
-    "4. Am I combining vision + face + OCR naturally? (don't present each separately)\n"
-    "5. Would this sound natural spoken aloud? (TTS-friendly phrasing)\n"
-    "6. Confirm response fits LOD {lod} guidelines\n"
-    "</think>\n"
-    "Then respond according to LOD {lod}. "
-    "Do NOT output the <think> block — it is for internal reasoning only."
+    "Before responding, silently check the following:\n"
+    "1. What changed since the last update? Avoid repeating stable info.\n"
+    "2. Which sensor/context changes matter right now?\n"
+    "3. What is the single most useful thing to say next?\n"
+    "4. Can vision, face, and OCR context be blended naturally?\n"
+    "5. Does this sound natural spoken aloud?\n"
+    "6. Does the response fit LOD {lod} guidelines?\n"
+    "Then answer according to LOD {lod}. Do not expose this checklist."
 )
 
 # ---------------------------------------------------------------------------
@@ -339,10 +337,9 @@ def build_full_dynamic_prompt(
     # CoT for LOD 2/3
     if lod >= 2:
         parts.append(
-            "\n## Internal Reasoning\n"
-            "Before responding, briefly reason internally about what information "
-            "is most valuable for this user right now, then respond accordingly. "
-            "Do NOT vocalise your reasoning."
+            "\n## Response Planning\n"
+            "Silently choose the most useful next detail, then answer naturally. "
+            "Do NOT expose your planning process."
         )
 
     return "\n".join(parts)

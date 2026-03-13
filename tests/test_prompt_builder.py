@@ -39,11 +39,9 @@ def test_lod_update_lod1_no_cot():
 
 def test_lod_update_lod2_has_cot():
     msg = build_lod_update_message(**_default_args(lod=2))
-    assert "internally reason" in msg
-    # CoT should NOT contain raw sensor placeholders
-    assert "{motion_state}" not in msg
-    assert "{cadence" not in msg
-    assert "{noise_db" not in msg
+    assert "silently check the following" in msg
+    assert "<think>" not in msg
+    assert "Do not expose this checklist." in msg
 
 
 def test_lod_update_with_memories():
@@ -72,6 +70,7 @@ def test_full_prompt_contains_principles():
         session=SessionContext(),
     )
     assert "EXPERIENCE FIRST" in msg
+    assert "Response Planning" in msg
 
 
 def test_congenital_blind_no_color():

@@ -2,7 +2,7 @@
 
 import pytest
 
-from context.spatial_change_detector import SpatialChangeDetector, SpatialChange
+from context.spatial_change_detector import SpatialChange, SpatialChangeDetector
 
 
 @pytest.fixture

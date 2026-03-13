@@ -56,7 +56,7 @@ def forget_recent_memory(user_id: str, minutes: int = 30) -> dict:
     }
 
 
-def forget_memory(user_id: str, memory_id: str) -> dict:
+def _forget_memory_by_id(user_id: str, memory_id: str) -> dict:
     """Delete a specific memory by its ID.
 
     Args:
@@ -75,6 +75,11 @@ def forget_memory(user_id: str, memory_id: str) -> dict:
         "deleted": success,
         "status": "ok" if success else "not_found",
     }
+
+
+# Backward-compatible alias for package exports. This is not exposed to the
+# orchestrator tool registry, but keeps older imports from breaking.
+forget_memory = _forget_memory_by_id
 
 
 def remember_entity(user_id: str, name: str, entity_type: str = "person", attributes: str = "") -> dict:
@@ -256,8 +261,100 @@ def forget_entity(user_id: str, name: str) -> dict:
 MEMORY_FUNCTIONS = {
     "preload_memory": preload_memory,
     "forget_recent_memory": forget_recent_memory,
-    "forget_memory": forget_memory,
     "remember_entity": remember_entity,
     "what_do_you_remember": what_do_you_remember,
     "forget_entity": forget_entity,
 }
+
+MEMORY_TOOL_DECLARATIONS = [
+    {
+        "name": "preload_memory",
+        "description": (
+            "Load relevant long-term memories for the current conversation topic. "
+            "Use when the topic or place changes and prior context could help. "
+            "The backend injects user identity automatically."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "context": {
+                    "type": "string",
+                    "description": "Short topic or situation hint used to retrieve relevant memories.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "remember_entity",
+        "description": (
+            "Store a person, place, organization, or event the user explicitly asks you to remember."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the thing to remember.",
+                },
+                "entity_type": {
+                    "type": "string",
+                    "description": "Entity kind such as person, place, organization, or event.",
+                },
+                "attributes": {
+                    "type": "string",
+                    "description": "Short factual details to attach to the entity.",
+                },
+            },
+            "required": ["name"],
+        },
+    },
+    {
+        "name": "what_do_you_remember",
+        "description": (
+            "Recall previously stored memories about the user, a person, a place, or a topic."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Optional focus for memory recall, such as a person's name or topic.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "forget_entity",
+        "description": (
+            "Delete a remembered person, place, or thing when the user explicitly asks you to forget it."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the entity to forget.",
+                },
+            },
+            "required": ["name"],
+        },
+    },
+    {
+        "name": "forget_recent_memory",
+        "description": (
+            "Delete memories created recently when the user says to forget what they just said."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "minutes": {
+                    "type": "integer",
+                    "description": "How many minutes back to delete memories from.",
+                },
+            },
+            "required": [],
+        },
+    },
+]

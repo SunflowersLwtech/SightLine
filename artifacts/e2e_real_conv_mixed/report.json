@@ -1,0 +1,2220 @@
+{
+  "suite_id": "multiturn_e2e_20260314_040744",
+  "created_at": "2026-03-13T20:07:44.931944+00:00",
+  "server_url": "ws://127.0.0.1:8101",
+  "conversations": [
+    {
+      "id": "conv_intersection_crossing",
+      "description": "Crosswalk safety and accessibility routing under realistic telemetry/depth context",
+      "total_turns": 6,
+      "passed": 2,
+      "failed": 4,
+      "duration_sec": 167.8,
+      "bootstrap_message_counts": {
+        "session_ready": 1,
+        "tools_manifest": 1
+      },
+      "turns": [
+        {
+          "turn_id": "M01_intersection_scan",
+          "text": "I'm approaching an intersection. Is anything dangerous right ahead?",
+          "passed": false,
+          "failures": [
+            "no_agent_audio"
+          ],
+          "warnings": [],
+          "user_transcripts": [
+            "I'm approaching an intersection. Is anything dangerous right ahead?"
+          ],
+          "agent_transcripts": [
+            "I'm here, ready when you are."
+          ],
+          "tool_events": [
+            {
+              "tool": "analyze_scene",
+              "status": "queued",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "identify_person",
+              "status": "queued",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "identify_person",
+              "status": "unavailable",
+              "behavior": "SILENT"
+            },
+            {
+              "tool": "analyze_scene",
+              "status": "error",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [
+            {
+              "queued_agents": [
+                "vision",
+                "face"
+              ]
+            },
+            {
+              "queued_agents": []
+            },
+            {
+              "queued_agents": []
+            },
+            {
+              "queued_agents": []
+            },
+            {
+              "queued_agents": []
+            }
+          ],
+          "message_counts": {
+            "transcript": 2,
+            "tool_event": 4,
+            "identity_update": 1,
+            "frame_ack": 5,
+            "debug_activity": 2,
+            "thinking_sound": 2,
+            "capability_degraded": 2
+          },
+          "raw_messages": [
+            {
+              "type": "transcript",
+              "text": "I'm approaching an intersection. Is anything dangerous right ahead?",
+              "role": "user",
+              "source": "client_hint"
+            },
+            {
+              "type": "tool_event",
+              "tool": "analyze_scene",
+              "behavior": "WHEN_IDLE",
+              "status": "queued"
+            },
+            {
+              "type": "tool_event",
+              "tool": "identify_person",
+              "behavior": "SILENT",
+              "status": "queued"
+            },
+            {
+              "type": "identity_update",
+              "person_name": "unknown",
+              "matched": false,
+              "similarity": 0.0,
+              "source": "queued",
+              "behavior": "SILENT"
+            },
+            {
+              "type": "frame_ack",
+              "frame_id": 1,
+              "queued_agents": [
+                "vision",
+                "face"
+              ]
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-13T20:05:30.605162+00:00",
+                "event_count": 13
+              }
+            },
+            {
+              "type": "frame_ack",
+              "frame_id": 2,
+              "queued_agents": []
+            },
+            {
+              "type": "frame_ack",
+              "frame_id": 3,
+              "queued_agents": []
+            },
+            {
+              "type": "tool_event",
+              "tool": "identify_person",
+              "behavior": "SILENT",
+              "status": "unavailable",
+              "data": {
+                "reason": "insightface_unavailable"
+              }
+            },
+            {
+              "type": "thinking_sound",
+              "state": "idle"
+            },
+            {
+              "type": "capability_degraded",
+              "capability": "face",
+              "reason": "InsightFace runtime unavailable",
+              "recoverable": true
+            },
+            {
+              "type": "frame_ack",
+              "frame_id": 4,
+              "queued_agents": []
+            },
+            {
+              "type": "frame_ack",
+              "frame_id": 5,
+              "queued_agents": []
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-13T20:05:30.829527+00:00",
+                "event_count": 14
+              }
+            },
+            {
+              "type": "transcript",
+              "text": "I'm here, ready when you are.",
+              "role": "agent"
+            },
+            {
+              "type": "tool_event",
+              "tool": "analyze_scene",
+              "behavior": "WHEN_IDLE",
+              "status": "error",
+              "data": {
+                "reason": "vision_timeout"
+              }
+            },
+            {
+              "type": "thinking_sound",
+              "state": "idle"
+            },
+            {
+              "type": "capability_degraded",
+              "capability": "vision",
+              "reason": "vision_timeout",
+              "recoverable": true
+            }
+          ],
+          "audio_bytes_received": 0,
+          "first_user_transcript_latency": 4.516504874998645,
+          "first_agent_transcript_latency": 8.060844999999972,
+          "collect_duration_sec": 18.62796724999498,
+          "notes": "Safety scan at an intersection with dense context",
+          "request_reconnect": false,
+          "latest_resume_handle": null
+        },
+        {
+          "turn_id": "M02_accessible_crossing",
+          "text": "Find the safest wheelchair-accessible crossing route here.",
+          "passed": true,
+          "failures": [],
+          "warnings": [
+            "duplicate_tool_call: get_accessibility_info called 2x"
+          ],
+          "user_transcripts": [
+            "Find the safest wheelchair-accessible crossing route here."
+          ],
+          "agent_transcripts": [
+            "tool_timeout"
+          ],
+          "tool_events": [
+            {
+              "tool": "get_accessibility_info",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "get_accessibility_info",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "tool": "get_accessibility_info",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "error": "tool_timeout",
+                "tool": "get_accessibility_info",
+                "message": "The get_accessibility_info tool timed out. Please try again.",
+                "retryable": true
+              }
+            },
+            {
+              "tool": "get_accessibility_info",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "features": [
+                  {
+                    "osm_id": 643414350,
+                    "type": "node",
+                    "lat": 40.756994,
+                    "lng": -73.9865512,
+                    "category": "wheelchair_access",
+                    "value": "yes",
+                    "description": "(Hard Rock Cafe) Wheelchair: yes"
+                  },
+                  {
+                    "osm_id": 2435108448,
+                    "type": "node",
+                    "lat": 40.7593682,
+                    "lng": -73.9849694,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 2435108452,
+                    "type": "node",
+                    "lat": 40.7585496,
+                    "lng": -73.9849674,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 2678466844,
+                    "type": "node",
+                    "lat": 40.7572995,
+                    "lng": -73.9855061,
+                    "category": "wheelchair_access",
+                    "value": "yes",
+                    "description": "(Gap) Wheelchair: yes"
+                  },
+                  {
+                    "osm_id": 3974095823,
+                    "type": "node",
+                    "lat": 40.7566441,
+                    "lng": -73.9865075,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 3974095824,
+                    "type": "node",
+                    "lat": 40.7567549,
+                    "lng": -73.9865657,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 3974095825,
+                    "type": "node",
+                    "lat": 40.7567954,
+                    "lng": -73.9863978,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 3974095826,
+                    "type": "node",
+                    "lat": 40.7572793,
+                    "lng": -73.9860561,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 3974095828,
+                    "type": "node",
+                    "lat": 40.7573856,
+                    "lng": -73.9861159,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 3974095829,
+                    "type": "node",
+                    "lat": 40.7574192,
+                    "lng": -73.9859523,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 3974095832,
+                    "type": "node",
+                    "lat": 40.7580252,
+                    "lng": -73.9856837,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 4316345593,
+                    "type": "node",
+                    "lat": 40.7565134,
+                    "lng": -73.9857687,
+                    "category": "wheelchair_access",
+                    "value": "limited",
+                    "description": "(Brooklyn Diner) Wheelchair: limited"
+                  },
+                  {
+                    "osm_id": 4578017556,
+                    "type": "node",
+                    "lat": 40.7578589,
+                    "lng": -73.9855132,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 4707407257,
+                    "type": "node",
+                    "lat": 40.7580788,
+                    "lng": -73.9855784,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 4707407260,
+                    "type": "node",
+                    "lat": 40.7578673,
+                    "lng": -73.9854354,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 4707407261,
+                    "type": "node",
+                    "lat": 40.7580355,
+                    "lng": -73.9854818,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 4782363341,
+                    "type": "node",
+                    "lat": 40.7594679,
+                    "lng": -73.9848511,
+                    "category": "wheelchair_access",
+                    "value": "no",
+                    "description": "Wheelchair: no"
+                  },
+                  {
+                    "osm_id": 4782363342,
+                    "type": "node",
+                    "lat": 40.7594274,
+                    "lng": -73.9846939,
+                    "category": "wheelchair_access",
+                    "value": "no",
+                    "description": "Wheelchair: no"
+                  },
+                  {
+                    "osm_id": 4782363343,
+                    "type": "node",
+                    "lat": 40.7590036,
+                    "lng": -73.9843751,
+                    "category": "wheelchair_access",
+                    "value": "no",
+                    "description": "Wheelchair: no"
+                  },
+                  {
+                    "osm_id": 6596799508,
+                    "type": "node",
+                    "lat": 40.7579601,
+                    "lng": -73.9853993,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6596799513,
+                    "type": "node",
+                    "lat": 40.758485,
+                    "lng": -73.9850432,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6596799514,
+                    "type": "node",
+                    "lat": 40.7584937,
+                    "lng": -73.9850067,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6596799555,
+                    "type": "node",
+                    "lat": 40.7573844,
+                    "lng": -73.9858587,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597429978,
+                    "type": "node",
+                    "lat": 40.7592367,
+                    "lng": -73.9845078,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464391,
+                    "type": "node",
+                    "lat": 40.7585861,
+                    "lng": -73.9849417,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464410,
+                    "type": "node",
+                    "lat": 40.7593175,
+                    "lng": -73.9846936,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464412,
+                    "type": "node",
+                    "lat": 40.7593089,
+                    "lng": -73.9847318,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464455,
+                    "type": "node",
+                    "lat": 40.7571815,
+                    "lng": -73.9857474,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464471,
+                    "type": "node",
+                    "lat": 40.758592,
+                    "lng": -73.9852176,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464478,
+                    "type": "node",
+                    "lat": 40.7586936,
+                    "lng": -73.9850834,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464486,
+                    "type": "node",
+                    "lat": 40.7578917,
+                    "lng": -73.9855888,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 6597464497,
+                    "type": "node",
+                    "lat": 40.7574443,
+                    "lng": -73.9860199,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597498397,
+                    "type": "node",
+                    "lat": 40.7572395,
+                    "lng": -73.9859662,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6598535157,
+                    "type": "node",
+                    "lat": 40.7591475,
+                    "lng": -73.9846758,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 6598535159,
+                    "type": "node",
+                    "lat": 40.7586679,
+                    "lng": -73.9850272,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 6598535188,
+                    "type": "node",
+                    "lat": 40.7585239,
+                    "lng": -73.9851316,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6598535230,
+                    "type": "node",
+                    "lat": 40.7572239,
+                    "lng": -73.9857273,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 6615272821,
+                    "type": "node",
+                    "lat": 40.7578879,
+                    "lng": -73.9831141,
+                    "category": "wheelchair_access",
+                    "value": "yes",
+                    "description": "(For five coffee roasters) Wheelchair: yes"
+                  },
+                  {
+                    "osm_id": 7633689337,
+                    "type": "node",
+                    "lat": 40.7593946,
+                    "lng": -73.9845476,
+                    "category": "wheelchair_access",
+                    "value": "no",
+                    "description": "(49th Street) Wheelchair: no"
+                  },
+                  {
+                    "osm_id": 9004888709,
+                    "type": "node",
+                    "lat": 40.7580688,
+                    "lng": -73.9856633,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 9235539564,
+                    "type": "node",
+                    "lat": 40.75676,
+                    "lng": -73.9863104,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 9354852633,
+                    "type": "node",
+                    "lat": 40.7591716,
+                    "lng": -73.9847336,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417533,
+                    "type": "node",
+                    "lat": 40.7564912,
+                    "lng": -73.9860482,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417537,
+                    "type": "node",
+                    "lat": 40.7566853,
+                    "lng": -73.9862545,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417538,
+                    "type": "node",
+                    "lat": 40.7566018,
+                    "lng": -73.9863144,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417539,
+                    "type": "node",
+                    "lat": 40.75667,
+                    "lng": -73.9865682,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417540,
+                    "type": "node",
+                    "lat": 40.7566081,
+                    "lng": -73.9864234,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417542,
+                    "type": "node",
+                    "lat": 40.7566385,
+                    "lng": -73.9862881,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 10222417557,
+                    "type": "node",
+                    "lat": 40.7565827,
+                    "lng": -73.9860153,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417558,
+                    "type": "node",
+                    "lat": 40.756532,
+                    "lng": -73.9860335,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  }
+                ],
+                "summary": "Found: 63 tactile paving locations, 34 pedestrian crossings, 1 stairways, 18 wheelchair-accessible locations, 91 surface-tagged paths.",
+                "count": 207,
+                "area": "200m radius around (40.7580, -73.9853)"
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "transcript": 2,
+            "tool_event": 2,
+            "thinking_sound": 2,
+            "tool_result": 2,
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "transcript",
+              "text": "Find the safest wheelchair-accessible crossing route here.",
+              "role": "user",
+              "source": "client_hint"
+            },
+            {
+              "type": "tool_event",
+              "tool": "get_accessibility_info",
+              "behavior": "WHEN_IDLE",
+              "status": "invoked",
+              "data": {
+                "source": "server_shortcut",
+                "query": "Find the safest wheelchair-accessible crossing route here."
+              }
+            },
+            {
+              "type": "thinking_sound",
+              "state": "searching",
+              "tool": "get_accessibility_info"
+            },
+            {
+              "type": "tool_result",
+              "tool": "get_accessibility_info",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "error": "tool_timeout",
+                "tool": "get_accessibility_info",
+                "message": "The get_accessibility_info tool timed out. Please try again.",
+                "retryable": true
+              }
+            },
+            {
+              "type": "tool_event",
+              "tool": "get_accessibility_info",
+              "behavior": "WHEN_IDLE",
+              "status": "invoked",
+              "data": {
+                "args": {
+                  "lat": 34.0194,
+                  "lng": -118.4914
+                }
+              }
+            },
+            {
+              "type": "thinking_sound",
+              "state": "searching",
+              "tool": "get_accessibility_info"
+            },
+            {
+              "type": "tool_result",
+              "tool": "get_accessibility_info",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "features": [
+                  {
+                    "osm_id": 643414350,
+                    "type": "node",
+                    "lat": 40.756994,
+                    "lng": -73.9865512,
+                    "category": "wheelchair_access",
+                    "value": "yes",
+                    "description": "(Hard Rock Cafe) Wheelchair: yes"
+                  },
+                  {
+                    "osm_id": 2435108448,
+                    "type": "node",
+                    "lat": 40.7593682,
+                    "lng": -73.9849694,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 2435108452,
+                    "type": "node",
+                    "lat": 40.7585496,
+                    "lng": -73.9849674,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 2678466844,
+                    "type": "node",
+                    "lat": 40.7572995,
+                    "lng": -73.9855061,
+                    "category": "wheelchair_access",
+                    "value": "yes",
+                    "description": "(Gap) Wheelchair: yes"
+                  },
+                  {
+                    "osm_id": 3974095823,
+                    "type": "node",
+                    "lat": 40.7566441,
+                    "lng": -73.9865075,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 3974095824,
+                    "type": "node",
+                    "lat": 40.7567549,
+                    "lng": -73.9865657,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 3974095825,
+                    "type": "node",
+                    "lat": 40.7567954,
+                    "lng": -73.9863978,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 3974095826,
+                    "type": "node",
+                    "lat": 40.7572793,
+                    "lng": -73.9860561,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 3974095828,
+                    "type": "node",
+                    "lat": 40.7573856,
+                    "lng": -73.9861159,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 3974095829,
+                    "type": "node",
+                    "lat": 40.7574192,
+                    "lng": -73.9859523,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 3974095832,
+                    "type": "node",
+                    "lat": 40.7580252,
+                    "lng": -73.9856837,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 4316345593,
+                    "type": "node",
+                    "lat": 40.7565134,
+                    "lng": -73.9857687,
+                    "category": "wheelchair_access",
+                    "value": "limited",
+                    "description": "(Brooklyn Diner) Wheelchair: limited"
+                  },
+                  {
+                    "osm_id": 4578017556,
+                    "type": "node",
+                    "lat": 40.7578589,
+                    "lng": -73.9855132,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 4707407257,
+                    "type": "node",
+                    "lat": 40.7580788,
+                    "lng": -73.9855784,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 4707407260,
+                    "type": "node",
+                    "lat": 40.7578673,
+                    "lng": -73.9854354,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 4707407261,
+                    "type": "node",
+                    "lat": 40.7580355,
+                    "lng": -73.9854818,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 4782363341,
+                    "type": "node",
+                    "lat": 40.7594679,
+                    "lng": -73.9848511,
+                    "category": "wheelchair_access",
+                    "value": "no",
+                    "description": "Wheelchair: no"
+                  },
+                  {
+                    "osm_id": 4782363342,
+                    "type": "node",
+                    "lat": 40.7594274,
+                    "lng": -73.9846939,
+                    "category": "wheelchair_access",
+                    "value": "no",
+                    "description": "Wheelchair: no"
+                  },
+                  {
+                    "osm_id": 4782363343,
+                    "type": "node",
+                    "lat": 40.7590036,
+                    "lng": -73.9843751,
+                    "category": "wheelchair_access",
+                    "value": "no",
+                    "description": "Wheelchair: no"
+                  },
+                  {
+                    "osm_id": 6596799508,
+                    "type": "node",
+                    "lat": 40.7579601,
+                    "lng": -73.9853993,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6596799513,
+                    "type": "node",
+                    "lat": 40.758485,
+                    "lng": -73.9850432,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6596799514,
+                    "type": "node",
+                    "lat": 40.7584937,
+                    "lng": -73.9850067,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6596799555,
+                    "type": "node",
+                    "lat": 40.7573844,
+                    "lng": -73.9858587,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597429978,
+                    "type": "node",
+                    "lat": 40.7592367,
+                    "lng": -73.9845078,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464391,
+                    "type": "node",
+                    "lat": 40.7585861,
+                    "lng": -73.9849417,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464410,
+                    "type": "node",
+                    "lat": 40.7593175,
+                    "lng": -73.9846936,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464412,
+                    "type": "node",
+                    "lat": 40.7593089,
+                    "lng": -73.9847318,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464455,
+                    "type": "node",
+                    "lat": 40.7571815,
+                    "lng": -73.9857474,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464471,
+                    "type": "node",
+                    "lat": 40.758592,
+                    "lng": -73.9852176,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464478,
+                    "type": "node",
+                    "lat": 40.7586936,
+                    "lng": -73.9850834,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597464486,
+                    "type": "node",
+                    "lat": 40.7578917,
+                    "lng": -73.9855888,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 6597464497,
+                    "type": "node",
+                    "lat": 40.7574443,
+                    "lng": -73.9860199,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6597498397,
+                    "type": "node",
+                    "lat": 40.7572395,
+                    "lng": -73.9859662,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6598535157,
+                    "type": "node",
+                    "lat": 40.7591475,
+                    "lng": -73.9846758,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 6598535159,
+                    "type": "node",
+                    "lat": 40.7586679,
+                    "lng": -73.9850272,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 6598535188,
+                    "type": "node",
+                    "lat": 40.7585239,
+                    "lng": -73.9851316,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 6598535230,
+                    "type": "node",
+                    "lat": 40.7572239,
+                    "lng": -73.9857273,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 6615272821,
+                    "type": "node",
+                    "lat": 40.7578879,
+                    "lng": -73.9831141,
+                    "category": "wheelchair_access",
+                    "value": "yes",
+                    "description": "(For five coffee roasters) Wheelchair: yes"
+                  },
+                  {
+                    "osm_id": 7633689337,
+                    "type": "node",
+                    "lat": 40.7593946,
+                    "lng": -73.9845476,
+                    "category": "wheelchair_access",
+                    "value": "no",
+                    "description": "(49th Street) Wheelchair: no"
+                  },
+                  {
+                    "osm_id": 9004888709,
+                    "type": "node",
+                    "lat": 40.7580688,
+                    "lng": -73.9856633,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 9235539564,
+                    "type": "node",
+                    "lat": 40.75676,
+                    "lng": -73.9863104,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 9354852633,
+                    "type": "node",
+                    "lat": 40.7591716,
+                    "lng": -73.9847336,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417533,
+                    "type": "node",
+                    "lat": 40.7564912,
+                    "lng": -73.9860482,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417537,
+                    "type": "node",
+                    "lat": 40.7566853,
+                    "lng": -73.9862545,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417538,
+                    "type": "node",
+                    "lat": 40.7566018,
+                    "lng": -73.9863144,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417539,
+                    "type": "node",
+                    "lat": 40.75667,
+                    "lng": -73.9865682,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417540,
+                    "type": "node",
+                    "lat": 40.7566081,
+                    "lng": -73.9864234,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417542,
+                    "type": "node",
+                    "lat": 40.7566385,
+                    "lng": -73.9862881,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  },
+                  {
+                    "osm_id": 10222417557,
+                    "type": "node",
+                    "lat": 40.7565827,
+                    "lng": -73.9860153,
+                    "category": "tactile_paving",
+                    "value": "yes",
+                    "description": "Tactile paving present"
+                  },
+                  {
+                    "osm_id": 10222417558,
+                    "type": "node",
+                    "lat": 40.756532,
+                    "lng": -73.9860335,
+                    "category": "crossing",
+                    "description": "Pedestrian crossing (traffic_signals)"
+                  }
+                ],
+                "summary": "Found: 63 tactile paving locations, 34 pedestrian crossings, 1 stairways, 18 wheelchair-accessible locations, 91 surface-tagged paths.",
+                "count": 207,
+                "area": "200m radius around (40.7580, -73.9853)"
+              }
+            },
+            {
+              "type": "transcript",
+              "text": "tool_timeout",
+              "role": "agent",
+              "source": "tool_fallback"
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-13T20:05:55.844599+00:00",
+                "event_count": 15
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-13T20:05:55.849183+00:00",
+                "event_count": 16
+              }
+            }
+          ],
+          "audio_bytes_received": 1,
+          "first_user_transcript_latency": 4.0277590839978075,
+          "first_agent_transcript_latency": 10.400255250002374,
+          "collect_duration_sec": 20.58033070899546,
+          "notes": "Accessibility-first crossing guidance",
+          "request_reconnect": false,
+          "latest_resume_handle": null
+        },
+        {
+          "turn_id": "M03_where_exactly",
+          "text": "Where exactly am I at this corner?",
+          "passed": false,
+          "failures": [
+            "expected_one_of_['get_location_info', 'reverse_geocode']_none_called"
+          ],
+          "warnings": [],
+          "user_transcripts": [
+            "Where exactly am I at this corner?"
+          ],
+          "agent_transcripts": [
+            "You are approaching an intersection with traffic signals and tactile paving directly ahead.",
+            "There are several crossings nearby, so it looks like a standard corner.",
+            "You are approaching an intersection with traffic signals and tactile paving directly ahead. There are several crossings nearby, so it looks like a standard corner.",
+            "I'm sorry, there was a timeout when checking for accessibility features right now.",
+            "I can try that again if you'd like.",
+            "I'm sorry, there was a timeout when checking for accessibility features right now. I can try that again if you'd like."
+          ],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "transcript": 7,
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "transcript",
+              "text": "Where exactly am I at this corner?",
+              "role": "user",
+              "source": "client_hint"
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-13T20:06:07.032686+00:00",
+                "event_count": 17
+              }
+            },
+            {
+              "type": "transcript",
+              "text": "You are approaching an intersection with traffic signals and tactile paving directly ahead.",
+              "role": "agent"
+            },
+            {
+              "type": "transcript",
+              "text": "There are several crossings nearby, so it looks like a standard corner.",
+              "role": "agent"
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-13T20:06:09.181368+00:00",
+                "event_count": 18
+              }
+            },
+            {
+              "type": "transcript",
+              "text": "You are approaching an intersection with traffic signals and tactile paving directly ahead. There are several crossings nearby, so it looks like a standard corner.",
+              "role": "agent"
+            },
+            {
+              "type": "transcript",
+              "text": "I'm sorry, there was a timeout when checking for accessibility features right now.",
+              "role": "agent"
+            },
+            {
+              "type": "transcript",
+              "text": "I can try that again if you'd like.",
+              "role": "agent"
+            },
+            {
+              "type": "transcript",
+              "text": "I'm sorry, there was a timeout when checking for accessibility features right now. I can try that again if you'd like.",
+              "role": "agent"
+            }
+          ],
+          "audio_bytes_received": 63,
+          "first_user_transcript_latency": 2.653071207998437,
+          "first_agent_transcript_latency": 2.6550294999979087,
+          "collect_duration_sec": 13.080969040995114,
+          "notes": "Location grounding for crossing context",
+          "request_reconnect": false,
+          "latest_resume_handle": null
+        },
+        {
+          "turn_id": "M04_validate_address",
+          "text": "I need to cross toward one two three west forty second street.",
+          "passed": false,
+          "failures": [
+            "expected_tool_validate_address_not_called"
+          ],
+          "warnings": [],
+          "user_transcripts": [
+            "I need to cross toward one two three west forty second street."
+          ],
+          "agent_transcripts": [
+            "I apologize, the accessibility data service is down temporarily.",
+            "Is there anything else I can help you with?",
+            "I apologize, the accessibility data service is down temporarily. Is there anything else I can help you with?",
+            "I apologize, the accessibility data service is down temporarily. Is there anything else I can help you with?"
+          ],
+          "tool_events": [],
+          "tool_results": [],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "transcript": 5,
+            "debug_activity": 2,
+            "tool_event": 1,
+            "thinking_sound": 1,
+            "tool_result": 1,
+            "navigation_result": 1
+          },
+          "raw_messages": [
+            {
+              "type": "transcript",
+              "text": "I apologize, the accessibility data service is down temporarily.",
+              "role": "agent"
+            },
+            {
+              "type": "transcript",
+              "text": "Is there anything else I can help you with?",
+              "role": "agent"
+            },
+            {
+              "type": "transcript",
+              "text": "I need to cross toward one two three west forty second street.",
+              "role": "user",
+              "source": "client_hint"
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-13T20:06:20.116648+00:00",
+                "event_count": 19
+              }
+            },
+            {
+              "type": "transcript",
+              "text": "I apologize, the accessibility data service is down temporarily. Is there anything else I can help you with?",
+              "role": "agent"
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-13T20:06:24.844556+00:00",
+                "event_count": 20
+              }
+            },
+            {
+              "type": "transcript",
+              "text": "I apologize, the accessibility data service is down temporarily. Is there anything else I can help you with?",
+              "role": "agent",
+              "source": "audio_backfill"
+            },
+            {
+              "type": "tool_event",
+              "tool": "reverse_geocode",
+              "behavior": "WHEN_IDLE",
+              "status": "invoked",
+              "data": {
+                "args": {
+                  "lat": 34.0194,
+                  "lng": -118.4914
+                }
+              }
+            },
+            {
+              "type": "thinking_sound",
+              "state": "searching",
+              "tool": "reverse_geocode"
+            },
+            {
+              "type": "tool_result",
+              "tool": "reverse_geocode",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "address": "1540 Broadway, New York, NY 10036, USA"
+              }
+            },
+            {
+              "type": "navigation_result",
+              "summary": "",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "address": "1540 Broadway, New York, NY 10036, USA"
+              }
+            }
+          ],
+          "audio_bytes_received": 26,
+          "first_user_transcript_latency": 4.731936458003474,
+          "first_agent_transcript_latency": 4.729662458004896,
+          "collect_duration_sec": 14.975810208001349,
+          "notes": "Address validation speech-normalization path",
+          "request_reconnect": false,
+          "latest_resume_handle": null
+        },
+        {
+          "turn_id": "M05_navigate_safe",
+          "text": "Navigate me to the nearest pharmacy entrance with curb ramps.",
+          "passed": false,
+          "failures": [
+            "expected_tool_behavior_mismatch:navigate_to:INTERRUPT"
+          ],
+          "warnings": [],
+          "user_transcripts": [
+            "Navigate me to the nearest pharmacy entrance with curb ramps."
+          ],
+          "agent_transcripts": [
+            "158 W 45th St, New York, NY 10036, USA is at 2 o'clock, 85 meters. I'll guide you there."
+          ],
+          "tool_events": [
+            {
+              "tool": "nearby_search",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            },
+            {
+              "tool": "navigate_to",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "tool": "navigate_to",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "destination": "158 W 45th St, New York, NY 10036, USA",
+                "total_distance": "85 m",
+                "total_duration": "1 min",
+                "destination_direction": "at 2 o'clock, 85 meters",
+                "steps": [
+                  {
+                    "step": 1,
+                    "instruction": "Head southwest on 7th Ave toward W 45th St",
+                    "distance": "27 m",
+                    "direction": "depart",
+                    "clock_direction": "at 3 o'clock, 27 meters"
+                  },
+                  {
+                    "step": 2,
+                    "instruction": "Turn left onto W 45th St\nDestination will be on the right",
+                    "distance": "58 m",
+                    "direction": "turn to 9 o'clock",
+                    "clock_direction": "straight ahead, 58 meters"
+                  }
+                ],
+                "slope_warnings": [],
+                "accessibility_note": "Walking route. Watch for crosswalks and intersections. Listen for traffic signals at crossings."
+              }
+            },
+            {
+              "_type": "navigation_result",
+              "type": "navigation_result",
+              "summary": "at 2 o'clock, 85 meters",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "destination": "158 W 45th St, New York, NY 10036, USA",
+                "total_distance": "85 m",
+                "total_duration": "1 min",
+                "destination_direction": "at 2 o'clock, 85 meters",
+                "steps": [
+                  {
+                    "step": 1,
+                    "instruction": "Head southwest on 7th Ave toward W 45th St",
+                    "distance": "27 m",
+                    "direction": "depart",
+                    "clock_direction": "at 3 o'clock, 27 meters"
+                  },
+                  {
+                    "step": 2,
+                    "instruction": "Turn left onto W 45th St\nDestination will be on the right",
+                    "distance": "58 m",
+                    "direction": "turn to 9 o'clock",
+                    "clock_direction": "straight ahead, 58 meters"
+                  }
+                ],
+                "slope_warnings": [],
+                "accessibility_note": "Walking route. Watch for crosswalks and intersections. Listen for traffic signals at crossings."
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "transcript": 2,
+            "tool_event": 2,
+            "thinking_sound": 2,
+            "tool_result": 1,
+            "navigation_result": 1,
+            "debug_activity": 2
+          },
+          "raw_messages": [
+            {
+              "type": "transcript",
+              "text": "Navigate me to the nearest pharmacy entrance with curb ramps.",
+              "role": "user",
+              "source": "client_hint"
+            },
+            {
+              "type": "tool_event",
+              "tool": "nearby_search",
+              "behavior": "WHEN_IDLE",
+              "status": "invoked",
+              "data": {
+                "source": "server_shortcut",
+                "types": [
+                  "pharmacy"
+                ]
+              }
+            },
+            {
+              "type": "thinking_sound",
+              "state": "searching",
+              "tool": "nearby_search"
+            },
+            {
+              "type": "tool_event",
+              "tool": "navigate_to",
+              "behavior": "WHEN_IDLE",
+              "status": "invoked",
+              "data": {
+                "source": "server_shortcut",
+                "destination": "158 W 45th St, New York, NY 10036, USA"
+              }
+            },
+            {
+              "type": "thinking_sound",
+              "state": "searching",
+              "tool": "navigate_to"
+            },
+            {
+              "type": "tool_result",
+              "tool": "navigate_to",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "destination": "158 W 45th St, New York, NY 10036, USA",
+                "total_distance": "85 m",
+                "total_duration": "1 min",
+                "destination_direction": "at 2 o'clock, 85 meters",
+                "steps": [
+                  {
+                    "step": 1,
+                    "instruction": "Head southwest on 7th Ave toward W 45th St",
+                    "distance": "27 m",
+                    "direction": "depart",
+                    "clock_direction": "at 3 o'clock, 27 meters"
+                  },
+                  {
+                    "step": 2,
+                    "instruction": "Turn left onto W 45th St\nDestination will be on the right",
+                    "distance": "58 m",
+                    "direction": "turn to 9 o'clock",
+                    "clock_direction": "straight ahead, 58 meters"
+                  }
+                ],
+                "slope_warnings": [],
+                "accessibility_note": "Walking route. Watch for crosswalks and intersections. Listen for traffic signals at crossings."
+              }
+            },
+            {
+              "type": "navigation_result",
+              "summary": "at 2 o'clock, 85 meters",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "destination": "158 W 45th St, New York, NY 10036, USA",
+                "total_distance": "85 m",
+                "total_duration": "1 min",
+                "destination_direction": "at 2 o'clock, 85 meters",
+                "steps": [
+                  {
+                    "step": 1,
+                    "instruction": "Head southwest on 7th Ave toward W 45th St",
+                    "distance": "27 m",
+                    "direction": "depart",
+                    "clock_direction": "at 3 o'clock, 27 meters"
+                  },
+                  {
+                    "step": 2,
+                    "instruction": "Turn left onto W 45th St\nDestination will be on the right",
+                    "distance": "58 m",
+                    "direction": "turn to 9 o'clock",
+                    "clock_direction": "straight ahead, 58 meters"
+                  }
+                ],
+                "slope_warnings": [],
+                "accessibility_note": "Walking route. Watch for crosswalks and intersections. Listen for traffic signals at crossings."
+              }
+            },
+            {
+              "type": "transcript",
+              "text": "158 W 45th St, New York, NY 10036, USA is at 2 o'clock, 85 meters. I'll guide you there.",
+              "role": "agent",
+              "source": "tool_fallback"
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-13T20:07:08.330176+00:00",
+                "event_count": 21
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-13T20:07:08.529495+00:00",
+                "event_count": 22
+              }
+            }
+          ],
+          "audio_bytes_received": 1,
+          "first_user_transcript_latency": 16.28554529199755,
+          "first_agent_transcript_latency": 32.72252683399711,
+          "collect_duration_sec": 43.00653220900131,
+          "notes": "INTERRUPT behavior verification for navigation tool",
+          "request_reconnect": false,
+          "latest_resume_handle": null
+        },
+        {
+          "turn_id": "M06_thanks",
+          "text": "Great, keep me safe and let's continue.",
+          "passed": true,
+          "failures": [],
+          "warnings": [],
+          "user_transcripts": [
+            "Great, keep me safe and let's continue."
+          ],
+          "agent_transcripts": [
+            "I'm having trouble responding right now. Please try again."
+          ],
+          "tool_events": [
+            {
+              "tool": "validate_address",
+              "status": "invoked",
+              "behavior": "WHEN_IDLE"
+            }
+          ],
+          "tool_results": [
+            {
+              "tool": "validate_address",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "corrected_address": "123 West 42nd Street, New York, NY 10036, USA",
+                "was_corrected": true,
+                "correction_note": "Did you mean '123 West 42nd Street, New York, NY 10036, USA'?",
+                "latitude": 40.7561366,
+                "longitude": -73.9874449,
+                "is_complete": true
+              }
+            },
+            {
+              "_type": "navigation_result",
+              "type": "navigation_result",
+              "summary": "",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "corrected_address": "123 West 42nd Street, New York, NY 10036, USA",
+                "was_corrected": true,
+                "correction_note": "Did you mean '123 West 42nd Street, New York, NY 10036, USA'?",
+                "latitude": 40.7561366,
+                "longitude": -73.9874449,
+                "is_complete": true
+              }
+            }
+          ],
+          "lod_updates": [],
+          "frame_acks": [],
+          "message_counts": {
+            "transcript": 2,
+            "debug_activity": 2,
+            "tool_event": 1,
+            "thinking_sound": 1,
+            "tool_result": 1,
+            "navigation_result": 1
+          },
+          "raw_messages": [
+            {
+              "type": "transcript",
+              "text": "Great, keep me safe and let's continue.",
+              "role": "user",
+              "source": "client_hint"
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_start",
+                "state": "user_speaking",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-13T20:07:19.121593+00:00",
+                "event_count": 23
+              }
+            },
+            {
+              "type": "debug_activity",
+              "data": {
+                "event": "activity_end",
+                "state": "idle",
+                "source": "ios_client",
+                "queue_status": "forwarded",
+                "queue_note": "",
+                "timestamp": "2026-03-13T20:07:22.743693+00:00",
+                "event_count": 24
+              }
+            },
+            {
+              "type": "tool_event",
+              "tool": "validate_address",
+              "behavior": "WHEN_IDLE",
+              "status": "invoked",
+              "data": {
+                "args": {
+                  "address": "123 West 42nd Street"
+                }
+              }
+            },
+            {
+              "type": "thinking_sound",
+              "state": "searching",
+              "tool": "validate_address"
+            },
+            {
+              "type": "tool_result",
+              "tool": "validate_address",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "corrected_address": "123 West 42nd Street, New York, NY 10036, USA",
+                "was_corrected": true,
+                "correction_note": "Did you mean '123 West 42nd Street, New York, NY 10036, USA'?",
+                "latitude": 40.7561366,
+                "longitude": -73.9874449,
+                "is_complete": true
+              }
+            },
+            {
+              "type": "navigation_result",
+              "summary": "",
+              "behavior": "WHEN_IDLE",
+              "data": {
+                "success": true,
+                "corrected_address": "123 West 42nd Street, New York, NY 10036, USA",
+                "was_corrected": true,
+                "correction_note": "Did you mean '123 West 42nd Street, New York, NY 10036, USA'?",
+                "latitude": 40.7561366,
+                "longitude": -73.9874449,
+                "is_complete": true
+              }
+            },
+            {
+              "type": "transcript",
+              "text": "I'm having trouble responding right now. Please try again.",
+              "role": "agent",
+              "source": "silent_turn_fallback"
+            }
+          ],
+          "audio_bytes_received": 1,
+          "first_user_transcript_latency": 3.62147491700307,
+          "first_agent_transcript_latency": 18.050476750002417,
+          "collect_duration_sec": 25.297538458005874,
+          "notes": "Conversation close",
+          "request_reconnect": false,
+          "latest_resume_handle": null
+        }
+      ],
+      "issues": [
+        {
+          "id": "MT-001",
+          "turn": "M01_intersection_scan",
+          "title": "no_agent_audio",
+          "severity": "high",
+          "evidence": {
+            "user_transcripts": [
+              "I'm approaching an intersection. Is anything dangerous right ahead?"
+            ],
+            "agent_transcripts": [
+              "I'm here, ready when you are."
+            ],
+            "tool_events": [
+              {
+                "tool": "analyze_scene",
+                "status": "queued",
+                "behavior": "WHEN_IDLE"
+              },
+              {
+                "tool": "identify_person",
+                "status": "queued",
+                "behavior": "SILENT"
+              },
+              {
+                "tool": "identify_person",
+                "status": "unavailable",
+                "behavior": "SILENT"
+              },
+              {
+                "tool": "analyze_scene",
+                "status": "error",
+                "behavior": "WHEN_IDLE"
+              }
+            ],
+            "message_counts": {
+              "transcript": 2,
+              "tool_event": 4,
+              "identity_update": 1,
+              "frame_ack": 5,
+              "debug_activity": 2,
+              "thinking_sound": 2,
+              "capability_degraded": 2
+            }
+          }
+        },
+        {
+          "id": "MT-002",
+          "turn": "M02_accessible_crossing",
+          "title": "duplicate_tool_call: get_accessibility_info called 2x",
+          "severity": "observation",
+          "evidence": {
+            "tool_events": [
+              {
+                "tool": "get_accessibility_info",
+                "status": "invoked",
+                "behavior": "WHEN_IDLE"
+              },
+              {
+                "tool": "get_accessibility_info",
+                "status": "invoked",
+                "behavior": "WHEN_IDLE"
+              }
+            ],
+            "agent_transcripts": [
+              "tool_timeout"
+            ]
+          }
+        },
+        {
+          "id": "MT-003",
+          "turn": "M03_where_exactly",
+          "title": "expected_one_of_['get_location_info', 'reverse_geocode']_none_called",
+          "severity": "medium",
+          "evidence": {
+            "user_transcripts": [
+              "Where exactly am I at this corner?"
+            ],
+            "agent_transcripts": [
+              "You are approaching an intersection with traffic signals and tactile paving directly ahead.",
+              "There are several crossings nearby, so it looks like a standard corner.",
+              "You are approaching an intersection with traffic signals and tactile paving directly ahead. There are several crossings nearby, so it looks like a standard corner.",
+              "I'm sorry, there was a timeout when checking for accessibility features right now.",
+              "I can try that again if you'd like."
+            ],
+            "tool_events": [],
+            "message_counts": {
+              "transcript": 7,
+              "debug_activity": 2
+            }
+          }
+        },
+        {
+          "id": "MT-004",
+          "turn": "M04_validate_address",
+          "title": "expected_tool_validate_address_not_called",
+          "severity": "medium",
+          "evidence": {
+            "user_transcripts": [
+              "I need to cross toward one two three west forty second street."
+            ],
+            "agent_transcripts": [
+              "I apologize, the accessibility data service is down temporarily.",
+              "Is there anything else I can help you with?",
+              "I apologize, the accessibility data service is down temporarily. Is there anything else I can help you with?",
+              "I apologize, the accessibility data service is down temporarily. Is there anything else I can help you with?"
+            ],
+            "tool_events": [],
+            "message_counts": {
+              "transcript": 5,
+              "debug_activity": 2,
+              "tool_event": 1,
+              "thinking_sound": 1,
+              "tool_result": 1,
+              "navigation_result": 1
+            }
+          }
+        },
+        {
+          "id": "MT-005",
+          "turn": "M05_navigate_safe",
+          "title": "expected_tool_behavior_mismatch:navigate_to:INTERRUPT",
+          "severity": "medium",
+          "evidence": {
+            "user_transcripts": [
+              "Navigate me to the nearest pharmacy entrance with curb ramps."
+            ],
+            "agent_transcripts": [
+              "158 W 45th St, New York, NY 10036, USA is at 2 o'clock, 85 meters. I'll guide you there."
+            ],
+            "tool_events": [
+              {
+                "tool": "nearby_search",
+                "status": "invoked",
+                "behavior": "WHEN_IDLE"
+              },
+              {
+                "tool": "navigate_to",
+                "status": "invoked",
+                "behavior": "WHEN_IDLE"
+              }
+            ],
+            "message_counts": {
+              "transcript": 2,
+              "tool_event": 2,
+              "thinking_sound": 2,
+              "tool_result": 1,
+              "navigation_result": 1,
+              "debug_activity": 2
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_turns": 6,
+    "passed": 2,
+    "failed": 4,
+    "pass_rate": "33.3%",
+    "total_issues": 5,
+    "tool_chain_coverage": {
+      "required": [
+        "analyze_scene",
+        "convert_to_plus_code",
+        "extract_text_from_camera",
+        "forget_entity",
+        "forget_recent_memory",
+        "get_accessibility_info",
+        "get_location_info",
+        "get_walking_directions",
+        "google_search",
+        "identify_person",
+        "maps_query",
+        "navigate_to",
+        "nearby_search",
+        "preload_memory",
+        "preview_destination",
+        "remember_entity",
+        "resolve_plus_code",
+        "reverse_geocode",
+        "validate_address",
+        "what_do_you_remember"
+      ],
+      "observed": [
+        "analyze_scene",
+        "get_accessibility_info",
+        "identify_person",
+        "navigate_to",
+        "nearby_search",
+        "validate_address"
+      ],
+      "missing": [
+        "convert_to_plus_code",
+        "extract_text_from_camera",
+        "forget_entity",
+        "forget_recent_memory",
+        "get_location_info",
+        "get_walking_directions",
+        "google_search",
+        "maps_query",
+        "preload_memory",
+        "preview_destination",
+        "remember_entity",
+        "resolve_plus_code",
+        "reverse_geocode",
+        "what_do_you_remember"
+      ]
+    }
+  },
+  "all_issues": [
+    {
+      "id": "MT-001",
+      "turn": "M01_intersection_scan",
+      "title": "no_agent_audio",
+      "severity": "high",
+      "evidence": {
+        "user_transcripts": [
+          "I'm approaching an intersection. Is anything dangerous right ahead?"
+        ],
+        "agent_transcripts": [
+          "I'm here, ready when you are."
+        ],
+        "tool_events": [
+          {
+            "tool": "analyze_scene",
+            "status": "queued",
+            "behavior": "WHEN_IDLE"
+          },
+          {
+            "tool": "identify_person",
+            "status": "queued",
+            "behavior": "SILENT"
+          },
+          {
+            "tool": "identify_person",
+            "status": "unavailable",
+            "behavior": "SILENT"
+          },
+          {
+            "tool": "analyze_scene",
+            "status": "error",
+            "behavior": "WHEN_IDLE"
+          }
+        ],
+        "message_counts": {
+          "transcript": 2,
+          "tool_event": 4,
+          "identity_update": 1,
+          "frame_ack": 5,
+          "debug_activity": 2,
+          "thinking_sound": 2,
+          "capability_degraded": 2
+        }
+      }
+    },
+    {
+      "id": "MT-002",
+      "turn": "M02_accessible_crossing",
+      "title": "duplicate_tool_call: get_accessibility_info called 2x",
+      "severity": "observation",
+      "evidence": {
+        "tool_events": [
+          {
+            "tool": "get_accessibility_info",
+            "status": "invoked",
+            "behavior": "WHEN_IDLE"
+          },
+          {
+            "tool": "get_accessibility_info",
+            "status": "invoked",
+            "behavior": "WHEN_IDLE"
+          }
+        ],
+        "agent_transcripts": [
+          "tool_timeout"
+        ]
+      }
+    },
+    {
+      "id": "MT-003",
+      "turn": "M03_where_exactly",
+      "title": "expected_one_of_['get_location_info', 'reverse_geocode']_none_called",
+      "severity": "medium",
+      "evidence": {
+        "user_transcripts": [
+          "Where exactly am I at this corner?"
+        ],
+        "agent_transcripts": [
+          "You are approaching an intersection with traffic signals and tactile paving directly ahead.",
+          "There are several crossings nearby, so it looks like a standard corner.",
+          "You are approaching an intersection with traffic signals and tactile paving directly ahead. There are several crossings nearby, so it looks like a standard corner.",
+          "I'm sorry, there was a timeout when checking for accessibility features right now.",
+          "I can try that again if you'd like."
+        ],
+        "tool_events": [],
+        "message_counts": {
+          "transcript": 7,
+          "debug_activity": 2
+        }
+      }
+    },
+    {
+      "id": "MT-004",
+      "turn": "M04_validate_address",
+      "title": "expected_tool_validate_address_not_called",
+      "severity": "medium",
+      "evidence": {
+        "user_transcripts": [
+          "I need to cross toward one two three west forty second street."
+        ],
+        "agent_transcripts": [
+          "I apologize, the accessibility data service is down temporarily.",
+          "Is there anything else I can help you with?",
+          "I apologize, the accessibility data service is down temporarily. Is there anything else I can help you with?",
+          "I apologize, the accessibility data service is down temporarily. Is there anything else I can help you with?"
+        ],
+        "tool_events": [],
+        "message_counts": {
+          "transcript": 5,
+          "debug_activity": 2,
+          "tool_event": 1,
+          "thinking_sound": 1,
+          "tool_result": 1,
+          "navigation_result": 1
+        }
+      }
+    },
+    {
+      "id": "MT-005",
+      "turn": "M05_navigate_safe",
+      "title": "expected_tool_behavior_mismatch:navigate_to:INTERRUPT",
+      "severity": "medium",
+      "evidence": {
+        "user_transcripts": [
+          "Navigate me to the nearest pharmacy entrance with curb ramps."
+        ],
+        "agent_transcripts": [
+          "158 W 45th St, New York, NY 10036, USA is at 2 o'clock, 85 meters. I'll guide you there."
+        ],
+        "tool_events": [
+          {
+            "tool": "nearby_search",
+            "status": "invoked",
+            "behavior": "WHEN_IDLE"
+          },
+          {
+            "tool": "navigate_to",
+            "status": "invoked",
+            "behavior": "WHEN_IDLE"
+          }
+        ],
+        "message_counts": {
+          "transcript": 2,
+          "tool_event": 2,
+          "thinking_sound": 2,
+          "tool_result": 1,
+          "navigation_result": 1,
+          "debug_activity": 2
+        }
+      }
+    }
+  ]
+}

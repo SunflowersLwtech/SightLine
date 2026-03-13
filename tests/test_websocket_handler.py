@@ -788,6 +788,44 @@ async def test_direct_navigation_shortcut_emits_navigation_result(handler, sessi
     assert session_state.turn_output_seen is True
 
 
+@pytest.mark.asyncio
+async def test_direct_accessibility_crossing_shortcut_uses_accessibility_tool(handler, session_state, fake_ws):
+    session_state.user_turn_seq = 1
+    session_state.pending_fallback_turn_seq = 1
+    session_state.turn_output_seen = False
+    handler.state.transcript_history.append({
+        "role": "user",
+        "text": "Find the safest wheelchair-accessible crossing route here.",
+    })
+
+    with patch("websocket_handler._dispatch_function_call", new_callable=AsyncMock) as mock_dispatch, \
+         patch("websocket_handler.synthesize_fallback_pcm", new_callable=AsyncMock) as mock_tts, \
+         patch("websocket_handler.session_manager.get_ephemeral_context") as mock_ephemeral:
+        mock_dispatch.return_value = {
+            "success": True,
+            "summary": "Found tactile paving and an audio crossing signal nearby.",
+            "count": 2,
+            "features": [],
+        }
+        mock_tts.return_value = b"\x00\x00" * 8
+        mock_ephemeral.return_value = type(
+            "Ephemeral",
+            (),
+            {"gps": type("GPS", (), {"lat": 40.7580, "lng": -73.9853})()},
+        )()
+        handled = await handler._maybe_handle_direct_navigation_intent(
+            "Find the safest wheelchair-accessible crossing route here."
+        )
+
+    assert handled is True
+    assert mock_dispatch.await_count == 1
+    assert mock_dispatch.await_args.args[0] == "get_accessibility_info"
+    tool_results = fake_ws.get_sent_json_by_type("tool_result")
+    assert tool_results
+    assert tool_results[-1]["tool"] == "get_accessibility_info"
+    assert session_state.turn_output_seen is True
+
+
 def test_tool_result_fallback_text_for_navigation():
     text = _tool_result_fallback_text(
         "navigate_to",

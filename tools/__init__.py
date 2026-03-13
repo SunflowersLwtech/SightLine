@@ -1,14 +1,10 @@
-"""SightLine function calling tools.
+"""SightLine tool registry and manifest helpers.
 
-Tools available to the Orchestrator agent via Gemini Function Calling:
-- navigate_to / get_location_info / nearby_search / reverse_geocode: Google Maps
-- preview_destination: Street View + Vision Agent
-- validate_address: Address Validation API
-- google_search: Grounding search
-- identify_person: Face ID matching (SILENT behavior)
-- resolve_plus_code / convert_to_plus_code: Google Plus Codes (offline)
-- get_accessibility_info: OSM accessibility data
-- maps_query: Gemini Maps Grounding
+This module is the single source of truth for:
+- runtime function dispatch
+- callable tool ordering for the orchestrator
+- tool declarations shown to clients
+- per-tool category metadata used in the tools manifest
 """
 
 from __future__ import annotations
@@ -69,9 +65,10 @@ from tools.search import (
 )
 
 try:
-    from memory.memory_tools import MEMORY_FUNCTIONS
+    from memory.memory_tools import MEMORY_FUNCTIONS, MEMORY_TOOL_DECLARATIONS
 except ImportError:
     MEMORY_FUNCTIONS: dict = {}
+    MEMORY_TOOL_DECLARATIONS: list[dict[str, Any]] = []
 from tools.tool_behavior import ToolBehavior, behavior_to_text, resolve_tool_behavior
 
 GPSInjectionMode = Literal[None, "lat_lng", "origin_lat_lng_heading"]
@@ -130,15 +127,17 @@ FACE_FUNCTIONS = {
 }
 
 # Aggregate all tool declarations and function maps
-ALL_TOOL_DECLARATIONS = (
+CALLABLE_TOOL_DECLARATIONS = (
     NAVIGATION_TOOL_DECLARATIONS
     + SEARCH_TOOL_DECLARATIONS
-    + FACE_TOOL_DECLARATIONS
+    + MEMORY_TOOL_DECLARATIONS
     + PLUS_CODES_TOOL_DECLARATIONS
     + ACCESSIBILITY_TOOL_DECLARATIONS
     + MAPS_GROUNDING_TOOL_DECLARATIONS
     + OCR_TOOL_DECLARATIONS
 )
+PASSIVE_TOOL_DECLARATIONS = FACE_TOOL_DECLARATIONS
+ALL_TOOL_DECLARATIONS = CALLABLE_TOOL_DECLARATIONS + PASSIVE_TOOL_DECLARATIONS
 
 ALL_FUNCTIONS = {
     **NAVIGATION_FUNCTIONS,
@@ -149,6 +148,32 @@ ALL_FUNCTIONS = {
     **ACCESSIBILITY_FUNCTIONS,
     **MAPS_GROUNDING_FUNCTIONS,
     **OCR_TOOL_FUNCTIONS,
+}
+
+CALLABLE_TOOL_ORDER = [str(decl["name"]) for decl in CALLABLE_TOOL_DECLARATIONS]
+CALLABLE_TOOL_NAMES = set(CALLABLE_TOOL_ORDER)
+PASSIVE_TOOL_NAMES = {str(decl["name"]) for decl in PASSIVE_TOOL_DECLARATIONS}
+
+ALL_TOOL_CATEGORIES: dict[str, str] = {
+    "navigate_to": "navigation",
+    "get_location_info": "navigation",
+    "nearby_search": "navigation",
+    "reverse_geocode": "navigation",
+    "get_walking_directions": "navigation",
+    "preview_destination": "navigation",
+    "validate_address": "navigation",
+    "google_search": "search",
+    "identify_person": "face",
+    "resolve_plus_code": "plus_codes",
+    "convert_to_plus_code": "plus_codes",
+    "get_accessibility_info": "accessibility",
+    "maps_query": "maps_grounding",
+    "preload_memory": "memory",
+    "remember_entity": "memory",
+    "what_do_you_remember": "memory",
+    "forget_entity": "memory",
+    "forget_recent_memory": "memory",
+    "extract_text_from_camera": "ocr",
 }
 
 
@@ -178,6 +203,34 @@ ALL_TOOL_RUNTIME_METADATA.update({
 })
 for name in MEMORY_FUNCTIONS:
     ALL_TOOL_RUNTIME_METADATA[name] = _runtime_metadata(force_user_id=True)
+
+
+def build_tool_manifest_entries(
+    *,
+    lod: int,
+    is_user_speaking: bool = False,
+) -> list[dict[str, Any]]:
+    """Build tool manifest entries for the current session state."""
+    entries: list[dict[str, Any]] = []
+    for decl in ALL_TOOL_DECLARATIONS:
+        name = str(decl["name"])
+        entries.append(
+            {
+                "name": name,
+                "category": ALL_TOOL_CATEGORIES.get(name, "unknown"),
+                "behavior": behavior_to_text(
+                    resolve_tool_behavior(
+                        tool_name=name,
+                        lod=lod,
+                        is_user_speaking=is_user_speaking,
+                    )
+                ),
+                "callable": name in CALLABLE_TOOL_NAMES,
+                "source": "automatic" if name in PASSIVE_TOOL_NAMES else "function_call",
+                "description": decl.get("description", ""),
+            }
+        )
+    return entries
 
 __all__ = [
     # Navigation
@@ -230,8 +283,16 @@ __all__ = [
     "extract_text_from_camera",
     # Memory
     "MEMORY_FUNCTIONS",
+    "MEMORY_TOOL_DECLARATIONS",
     # Aggregated
+    "CALLABLE_TOOL_DECLARATIONS",
+    "PASSIVE_TOOL_DECLARATIONS",
+    "CALLABLE_TOOL_ORDER",
+    "CALLABLE_TOOL_NAMES",
+    "PASSIVE_TOOL_NAMES",
+    "ALL_TOOL_CATEGORIES",
     "ALL_TOOL_DECLARATIONS",
     "ALL_FUNCTIONS",
     "ALL_TOOL_RUNTIME_METADATA",
+    "build_tool_manifest_entries",
 ]

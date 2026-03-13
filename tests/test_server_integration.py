@@ -590,6 +590,42 @@ class TestRepeatSuppressionGuards:
         assert captured["lng"] == -73.0
 
     @pytest.mark.asyncio
+    async def test_dispatch_overrides_model_supplied_lat_lng_when_gps_available(self):
+        from dispatch.tool_dispatcher import _dispatch_function_call
+
+        captured = {}
+
+        def fake_tool(**kwargs):
+            captured.update(kwargs)
+            return {"ok": True}
+
+        ephemeral = SimpleNamespace(
+            gps=SimpleNamespace(lat=40.7580, lng=-73.9853),
+            heading=None,
+        )
+        mock_session_manager = MagicMock()
+        mock_session_manager.get_ephemeral_context.return_value = ephemeral
+
+        with patch("dispatch.tool_dispatcher.ALL_FUNCTIONS", {"get_location_info": fake_tool}), \
+             patch("dispatch.tool_dispatcher.ALL_TOOL_RUNTIME_METADATA", {
+                 "get_location_info": {
+                     "gps_injection": "lat_lng",
+                     "force_user_id": False,
+                 },
+             }):
+            result = await _dispatch_function_call(
+                "get_location_info",
+                {"lat": 34.0522, "lng": -118.2437},
+                "s1",
+                "u1",
+                session_manager=mock_session_manager,
+            )
+
+        assert result == {"ok": True}
+        assert captured["lat"] == 40.7580
+        assert captured["lng"] == -73.9853
+
+    @pytest.mark.asyncio
     async def test_dispatch_keeps_explicit_lat_lng_when_gps_missing(self):
         from dispatch.tool_dispatcher import _dispatch_function_call
 
