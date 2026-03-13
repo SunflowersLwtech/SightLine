@@ -34,6 +34,7 @@ final class PipelineCoordinator: ObservableObject {
     let mediaPermissionGate = MediaPermissionGate()
     let debugModel = DebugOverlayModel()
     let devConsoleModel = DeveloperConsoleModel()
+    let thinkingSoundManager = ThinkingSoundManager()
 
     @Published var transcript: String = ""
     @Published var isActive = false
@@ -444,8 +445,15 @@ final class PipelineCoordinator: ObservableObject {
         }
 
         webSocketManager.onAudioReceived = { [weak self] data in
+            self?.thinkingSoundManager.stopImmediately()
             self?.audioCapture.lastModelAudioReceivedAt = CFAbsoluteTimeGetCurrent()
             self?.audioPlayback.playAudioData(data)
+        }
+
+        webSocketManager.onPrioritizedAudioReceived = { [weak self] data, priority in
+            self?.thinkingSoundManager.stopImmediately()
+            self?.audioCapture.lastModelAudioReceivedAt = CFAbsoluteTimeGetCurrent()
+            self?.audioPlayback.playAudioData(data, priority: priority)
         }
 
         audioCapture.isModelAudioPlaying = { [weak self] in
@@ -661,6 +669,7 @@ final class PipelineCoordinator: ObservableObject {
                 // Start shared engine first — enables hardware AEC between capture & playback.
                 SharedAudioEngine.shared.setup()
                 audioPlayback.setup()
+                thinkingSoundManager.setup()
                 if !isMuted {
                     audioCapture.startCapture()
                 }
@@ -783,6 +792,7 @@ final class PipelineCoordinator: ObservableObject {
         audioCapture.stopCapture()
         cameraManager.stopCapture()
         isCameraActive = false
+        thinkingSoundManager.teardown()
         audioPlayback.teardown()
         SharedAudioEngine.shared.teardown()
         webSocketManager.disconnect()

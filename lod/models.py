@@ -50,6 +50,7 @@ class EphemeralContext:
     depth_center: Optional[float] = None  # center distance in meters (None = no depth data)
     depth_min: Optional[float] = None  # closest object distance in meters
     depth_min_region: Optional[str] = None  # region of closest object
+    depth_quadrants: Optional[dict] = None  # per-region distances: {"topLeft": 2.1, "topRight": 3.5, ...}
     # Watch extended context
     watch_pitch: float = 0.0
     watch_roll: float = 0.0

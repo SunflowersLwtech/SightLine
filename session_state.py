@@ -35,6 +35,9 @@ class SessionState:
     last_vision_prefeedback_at: float = 0.0
     first_vision_after_camera: bool = True
     frame_seq: int = 0
+    last_vision_spatial_objects: list = field(default_factory=list)
+    last_vision_people_count: int = 0
+    last_vision_safety_warnings: list = field(default_factory=list)
 
     # -- Face recognition ----------------------------------------------------
     face_lock: asyncio.Lock = field(default_factory=asyncio.Lock)

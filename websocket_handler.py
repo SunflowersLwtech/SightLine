@@ -87,6 +87,7 @@ from lod import (
     decide_lod,
     on_lod_change,
 )
+from context.spatial_change_detector import SpatialChangeDetector
 from lod.lod_engine import should_speak
 from session_state import SessionState
 from telemetry.signature import (
@@ -191,6 +192,7 @@ class WebSocketHandler(DirectIntentMixin):
         self._pending_resume_context: str | None = None
         self._downstream_ready = asyncio.Event()
         self._downstream_init_error: Exception | None = None
+        self._spatial_detector = SpatialChangeDetector()
 
     def _current_run_config(self):
         language_code = getattr(self.user_profile, "language", "") or ""
@@ -601,6 +603,11 @@ class WebSocketHandler(DirectIntentMixin):
             self.stop_downstream.set()
             return False
 
+    async def _safe_send_prioritized_bytes(self, pcm: bytes, priority: int) -> bool:
+        """Send PCM audio with priority tag. Format: [0x03, priority_byte, ...pcm_data]."""
+        header = bytes([0x03, priority])
+        return await self._safe_send_bytes(header + pcm)
+
     async def _safe_send_bytes(self, payload: bytes) -> bool:
         if not self._is_websocket_open():
             self.stop_downstream.set()
@@ -683,6 +690,13 @@ class WebSocketHandler(DirectIntentMixin):
         if data:
             payload["data"] = _json_safe(data)
         await self._safe_send_json(payload)
+
+        # Thinking sound lifecycle: start on invoked, stop on completed/error
+        if status == "invoked":
+            sound_state = "thinking" if tool == "analyze_scene" else "searching"
+            await self._safe_send_json({"type": "thinking_sound", "state": sound_state, "tool": tool})
+        elif status in ("completed", "error", "unavailable"):
+            await self._safe_send_json({"type": "thinking_sound", "state": "idle"})
 
     async def _emit_capability_degraded(self, capability: str, reason: str, recoverable: bool = True) -> None:
         await self._safe_send_json({
@@ -944,12 +958,17 @@ class WebSocketHandler(DirectIntentMixin):
 
         try:
             from agents.vision_agent import analyze_scene
+            ephemeral_ctx = session_manager.get_ephemeral_context(self.session_id)
             ctx_dict = {
                 "space_type": self.session_ctx.space_type,
                 "trip_purpose": self.session_ctx.trip_purpose,
                 "active_task": self.session_ctx.active_task,
-                "motion_state": session_manager.get_ephemeral_context(self.session_id).motion_state,
+                "motion_state": ephemeral_ctx.motion_state,
                 "has_guide_dog": self.user_profile.has_guide_dog,
+                "depth_center": getattr(ephemeral_ctx, "depth_center", None),
+                "depth_min": getattr(ephemeral_ctx, "depth_min", None),
+                "depth_min_region": getattr(ephemeral_ctx, "depth_min_region", None),
+                "depth_quadrants": getattr(ephemeral_ctx, "depth_quadrants", None),
             }
             result = await analyze_scene(image_base64, self.session_ctx.current_lod, ctx_dict)
             if self._is_stale_turn(origin_turn_seq):
@@ -985,12 +1004,36 @@ class WebSocketHandler(DirectIntentMixin):
             await self._safe_send_json({"type": MessageType.VISION_DEBUG, "data": {"bounding_boxes": _json_safe(result.get("bounding_boxes", [])), "confidence": float(result.get("confidence", 0.0)), "lod": self.session_ctx.current_lod}})
             await self._emit_tool_event("analyze_scene", ToolBehavior.WHEN_IDLE, status="completed", data={"confidence": float(result.get("confidence", 0.0)), "repeat_suppressed": repeated})
 
+            # Spatial change detection — may override speak decision
+            _prev_vision = {
+                "safety_warnings": self.state.last_vision_safety_warnings,
+                "people_count": self.state.last_vision_people_count,
+                "spatial_objects": self.state.last_vision_spatial_objects,
+            }
+            spatial_changes = self._spatial_detector.detect(
+                _prev_vision, result,
+                motion_state=ephemeral_ctx.motion_state,
+            )
+            # Update stored state for next comparison
+            self.state.last_vision_spatial_objects = result.get("spatial_objects", [])
+            self.state.last_vision_people_count = result.get("people_count", 0) or 0
+            self.state.last_vision_safety_warnings = result.get("safety_warnings", [])
+
             if result.get("confidence", 0) > 0 and not repeated:
                 if self.ctx_queue.vision_spoken_cooldown_active:
                     logger.info("Suppressed vision: vision_spoken_cooldown active")
                 else:
                     ephemeral = session_manager.get_ephemeral_context(self.session_id)
-                    speak = should_speak(info_type="spatial_description", current_lod=self.session_ctx.current_lod, step_cadence=getattr(ephemeral, "step_cadence", 0.0) or 0.0, ambient_noise_db=getattr(ephemeral, "ambient_noise_db", 50.0) or 50.0)
+                    # Determine info_type based on spatial changes
+                    info_type = "spatial_description"
+                    if any(c.severity == "safety" for c in spatial_changes):
+                        info_type = "proximity_alert"
+                    elif any(c.severity == "significant" for c in spatial_changes):
+                        info_type = "scene_change"
+                    speak = should_speak(info_type=info_type, current_lod=self.session_ctx.current_lod, step_cadence=getattr(ephemeral, "step_cadence", 0.0) or 0.0, ambient_noise_db=getattr(ephemeral, "ambient_noise_db", 50.0) or 50.0)
+                    # Safety-severity changes always force speech
+                    if any(c.severity == "safety" for c in spatial_changes):
+                        speak = True
                     if self.state.first_vision_after_camera:
                         speak = False
                         self.state.first_vision_after_camera = False

@@ -47,6 +47,33 @@ def _format_vision_result(result: dict, lod: int) -> str:
         else:
             parts.append(f"{count} people nearby")
 
+    # Spatial objects grouped by salience
+    spatial_objects = result.get("spatial_objects", [])
+    if spatial_objects:
+        by_salience: dict[str, list[str]] = {}
+        for obj in spatial_objects:
+            if not isinstance(obj, dict):
+                continue
+            label = obj.get("label", "object")
+            clock = obj.get("clock_position")
+            dist = obj.get("distance_estimate", "")
+            salience = obj.get("salience", "background")
+            desc = label
+            if clock:
+                desc += f" at {clock} o'clock"
+            if dist:
+                desc += f", {dist}"
+            by_salience.setdefault(salience, []).append(desc)
+
+        if "safety" in by_salience:
+            parts.append("Nearby hazards: " + "; ".join(by_salience["safety"]))
+        if "navigation" in by_salience:
+            parts.append("Key landmarks: " + "; ".join(by_salience["navigation"]))
+        if lod >= 2 and "interaction" in by_salience:
+            parts.append("Near you: " + "; ".join(by_salience["interaction"]))
+        if lod >= 3 and "background" in by_salience:
+            parts.append("Also visible: " + "; ".join(by_salience["background"]))
+
     return "\n".join(parts)
 
 

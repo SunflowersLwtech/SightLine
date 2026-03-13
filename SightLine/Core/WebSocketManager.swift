@@ -39,6 +39,7 @@ class WebSocketManager: ObservableObject {
 
     // Callbacks
     var onAudioReceived: ((Data) -> Void)?
+    var onPrioritizedAudioReceived: ((Data, AudioPriority) -> Void)?
     var onTextReceived: ((String) -> Void)?
     var onTextSent: ((String) -> Void)?
     var onConnectionStateChanged: ((Bool) -> Void)?
@@ -242,8 +243,15 @@ class WebSocketManager: ObservableObject {
                 as? NWProtocolWebSocket.Metadata {
                 switch metadata.opcode {
                 case .binary:
-                    if let data = content {
-                        self.onAudioReceived?(data)
+                    if let data = content, !data.isEmpty {
+                        if data[0] == BinaryMagic.prioritizedAudio && data.count >= 3 {
+                            let priorityByte = Int(data[1])
+                            let audioData = data.subdata(in: 2..<data.count)
+                            let priority = AudioPriority(rawValue: priorityByte) ?? .normal
+                            self.onPrioritizedAudioReceived?(audioData, priority)
+                        } else {
+                            self.onAudioReceived?(data)
+                        }
                     }
                 case .text:
                     if let data = content, let text = String(data: data, encoding: .utf8) {

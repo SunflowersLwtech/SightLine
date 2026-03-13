@@ -13,8 +13,9 @@ import Foundation
 /// Magic bytes for binary WebSocket protocol.
 /// Eliminates ~33% Base64 overhead on audio/image payloads.
 enum BinaryMagic {
-    static let audio: UInt8 = 0x01   // PCM 16kHz mono
-    static let image: UInt8 = 0x02   // JPEG 768x768
+    static let audio: UInt8 = 0x01           // PCM 16kHz mono
+    static let image: UInt8 = 0x02           // JPEG 768x768
+    static let prioritizedAudio: UInt8 = 0x03 // [priority_byte, ...PCM 24kHz]
 }
 
 enum UpstreamMessage {
@@ -119,7 +120,7 @@ enum DownstreamMessage {
     case faceLibraryCleared(deletedCount: Int)
     case error(message: String)
     case toolEvent(tool: String, behavior: ToolBehaviorMode, payload: [String: Any])
-    case visionResult(summary: String, behavior: ToolBehaviorMode)
+    case visionResult(summary: String, behavior: ToolBehaviorMode, spatialObjects: [[String: Any]])
     case ocrResult(summary: String, behavior: ToolBehaviorMode)
     case visionDebug(data: [String: Any])
     case ocrDebug(data: [String: Any])
@@ -134,6 +135,7 @@ enum DownstreamMessage {
     case debugActivity(data: [String: Any])
     case interrupted
     case profileUpdatedAck
+    case thinkingSound(state: String)
     case toolsManifest(tools: [[String: Any]], contextModules: [[String: Any]], subAgents: [String: String])
     case unknown(raw: String)
 
@@ -208,7 +210,10 @@ enum DownstreamMessage {
                 ?? "unknown_tool"
             return .toolEvent(tool: tool, behavior: behavior, payload: dataPayload)
         case "vision_result":
-            return .visionResult(summary: extractSummary(), behavior: behavior)
+            let spatialObjects = (dataPayload["spatial_objects"] as? [[String: Any]])
+                ?? (json["spatial_objects"] as? [[String: Any]])
+                ?? []
+            return .visionResult(summary: extractSummary(), behavior: behavior, spatialObjects: spatialObjects)
         case "ocr_result":
             return .ocrResult(summary: extractSummary(), behavior: behavior)
         case "vision_debug":
@@ -247,6 +252,9 @@ enum DownstreamMessage {
             return .interrupted
         case "profile_updated_ack":
             return .profileUpdatedAck
+        case "thinking_sound":
+            let state = json["state"] as? String ?? "idle"
+            return .thinkingSound(state: state)
         case "tools_manifest":
             let tools = json["tools"] as? [[String: Any]] ?? []
             let modules = json["context_modules"] as? [[String: Any]] ?? []

@@ -80,7 +80,9 @@ BASE_SPEECH_THRESHOLD = 3.5
 
 INFO_VALUES: dict[str, float] = {
     "navigation": 8.0,
+    "proximity_alert": 7.5,
     "face_recognition": 7.0,
+    "scene_change": 6.0,
     "spatial_description": 5.0,
     "object_enumeration": 3.0,
     "atmosphere": 1.0,

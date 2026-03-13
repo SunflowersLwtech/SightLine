@@ -25,6 +25,7 @@ final class SharedAudioEngine {
 
     private(set) var engine: AVAudioEngine?
     private(set) var playerNode: AVAudioPlayerNode?
+    private(set) var ambientPlayerNode: AVAudioPlayerNode?
     private(set) var isVoiceProcessingEnabled = false
     private(set) var isRunning = false
 
@@ -61,6 +62,19 @@ final class SharedAudioEngine {
         }
         newEngine.connect(newPlayer, to: newEngine.mainMixerNode, format: playbackFormat)
 
+        // Ambient player for thinking/processing sounds (separate node, low volume)
+        let ambientPlayer = AVAudioPlayerNode()
+        newEngine.attach(ambientPlayer)
+        if let ambientFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: SightLineConfig.audioOutputSampleRate,
+            channels: 1,
+            interleaved: true
+        ) {
+            newEngine.connect(ambientPlayer, to: newEngine.mainMixerNode, format: ambientFormat)
+            ambientPlayer.volume = 0.12  // 12% of speech volume — below barge-in RMS threshold
+        }
+
         // Enable hardware voice processing (AEC) on the input node.
         // This is the core fix: with capture and playback on the same engine,
         // the system can cancel speaker audio from the mic signal.
@@ -79,9 +93,11 @@ final class SharedAudioEngine {
         do {
             try newEngine.start()
             newPlayer.play()
+            ambientPlayer.play()
 
             engine = newEngine
             playerNode = newPlayer
+            ambientPlayerNode = ambientPlayer
             isRunning = true
 
             registerNotifications()
@@ -94,10 +110,12 @@ final class SharedAudioEngine {
     func teardown() {
         removeNotifications()
 
+        ambientPlayerNode?.stop()
         playerNode?.stop()
         engine?.stop()
         engine = nil
         playerNode = nil
+        ambientPlayerNode = nil
         isRunning = false
         isVoiceProcessingEnabled = false
 

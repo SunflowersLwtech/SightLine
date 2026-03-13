@@ -64,6 +64,9 @@ Examples: "Step down at 12 o'clock, 1 meter" / "Low branch at 11 o'clock, head h
 When depth data is provided, use it to refine distance estimates.
 If no hazards are visible, return an empty safety_warnings list.
 Do NOT describe anything else — no people, colors, atmosphere, or text.
+
+For each hazard, populate spatial_objects with label, clock_position, \
+distance_estimate, region, and salience='safety'.
 """
 
 _SYSTEM_PROMPT_LOD2 = """\
@@ -80,6 +83,10 @@ Include approximate dimensions when possible ("corridor about 3 meters wide").
 Write the scene description as a natural spoken paragraph, not a bulleted list.
 Use clock positions for spatial references.
 Priority: safety > navigation > context. Skip decorative details.
+
+Populate spatial_objects for all navigation-relevant objects (doors, stairs, signs, \
+counters, people, seating, paths). Use clock positions 1-12 and qualitative distance. \
+Categorize salience as safety/navigation/interaction.
 """
 
 _SYSTEM_PROMPT_LOD3 = """\
@@ -100,6 +107,10 @@ Use sensory language: "warm light filtering through large windows" rather than \
 "well-lit room". Describe textures, temperatures, and spatial feelings.
 Use clock positions for spatial references.
 Write as a flowing spoken narrative — the user relies on you as their eyes.
+
+Include all visible objects in spatial_objects, including furniture, decorative items, \
+and architectural features. Mark salience appropriately (safety/navigation/interaction/\
+background). This gives the user a complete mental model of the space.
 """
 
 _SYSTEM_PROMPTS: dict[int, str] = {
@@ -155,6 +166,35 @@ _RESPONSE_SCHEMA = types.Schema(
             type=types.Type.NUMBER,
             description="Confidence score from 0.0 to 1.0.",
         ),
+        "spatial_objects": types.Schema(
+            type=types.Type.ARRAY,
+            items=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "label": types.Schema(
+                        type=types.Type.STRING,
+                        description="Object type: person, chair, door, vehicle, stairs, counter, table, etc.",
+                    ),
+                    "clock_position": types.Schema(
+                        type=types.Type.INTEGER,
+                        description="Clock position 1-12 relative to user facing direction.",
+                    ),
+                    "distance_estimate": types.Schema(
+                        type=types.Type.STRING,
+                        description="Qualitative: within_reach, 1m, 2m, 3m, 5m, far.",
+                    ),
+                    "region": types.Schema(
+                        type=types.Type.STRING,
+                        description="Image region: center, topLeft, topRight, bottomLeft, bottomRight.",
+                    ),
+                    "salience": types.Schema(
+                        type=types.Type.STRING,
+                        description="safety, navigation, interaction, or background.",
+                    ),
+                },
+            ),
+            description="Structured spatial map of objects with clock positions and distances.",
+        ),
     },
     required=[
         "safety_warnings",
@@ -176,6 +216,7 @@ _EMPTY_RESULT: dict[str, Any] = {
     "detected_text": None,
     "people_count": 0,
     "confidence": 0.0,
+    "spatial_objects": [],
 }
 
 
@@ -213,6 +254,13 @@ def _build_context_user_message(lod: int, session_context: dict) -> str:
             depth_info += f", closest object at {depth_min:.1f}m ({depth_min_region})"
         depth_info += "."
         parts.append(depth_info)
+
+    # Per-region depth quadrants for calibrating spatial_objects distance_estimate
+    depth_quadrants = session_context.get("depth_quadrants")
+    if depth_quadrants and isinstance(depth_quadrants, dict):
+        q_parts = [f"{k} {v:.1f}m" for k, v in depth_quadrants.items() if v is not None and v > 0]
+        if q_parts:
+            parts.append(f"Depth per region: {', '.join(q_parts)}. Use these to calibrate distance_estimate for objects in each region.")
 
     return " ".join(parts)
 

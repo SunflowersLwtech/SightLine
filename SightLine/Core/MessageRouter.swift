@@ -116,12 +116,14 @@ final class MessageRouter {
                     behavior: behavior
                 )
             }
-        case .visionResult(let summary, let behavior):
+        case .visionResult(let summary, let behavior, let spatialObjects):
             DispatchQueue.main.async { coordinator.debugModel.markCapabilityReady("vision") }
             // Haptic feedback for safety-critical vision alerts
             if behavior == .INTERRUPT {
                 HapticManager.shared.obstacleProximity(distance: 0.3)
             }
+            // Dispatch haptics based on spatial objects
+            self.dispatchSpatialHaptics(spatialObjects)
             handleToolMessage(
                 text: summary.isEmpty ? "Vision analysis updated." : summary,
                 behavior: behavior
@@ -223,6 +225,14 @@ final class MessageRouter {
             }
             UserDefaults.standard.set(handle, forKey: SightLineConfig.sessionResumptionHandleDefaultsKey)
             logger.info("Session resumption handle updated: \(handle.prefix(20))...")
+        case .thinkingSound(let state):
+            DispatchQueue.main.async {
+                switch state {
+                case "thinking": coordinator.thinkingSoundManager.setState(.thinking)
+                case "searching": coordinator.thinkingSoundManager.setState(.searching)
+                default: coordinator.thinkingSoundManager.setState(.idle)
+                }
+            }
         case .toolsManifest(let tools, let modules, let agents):
             DispatchQueue.main.async {
                 coordinator.devConsoleModel.captureToolsManifest(tools: tools, modules: modules, subAgents: agents)
@@ -288,6 +298,38 @@ final class MessageRouter {
             return
         }
         handleToolMessage(text: personText, behavior: behavior)
+    }
+
+    /// Dispatch haptic feedback based on spatial objects from vision analysis.
+    func dispatchSpatialHaptics(_ spatialObjects: [[String: Any]]) {
+        for obj in spatialObjects {
+            guard let label = obj["label"] as? String,
+                  let salience = obj["salience"] as? String else { continue }
+            let distance = obj["distance_estimate"] as? String ?? ""
+            let isClose = distance == "within_reach" || distance == "1m"
+
+            // Only fire haptics for nearby safety/interaction objects
+            guard salience == "safety" || isClose else { continue }
+
+            switch label {
+            case "person":
+                if isClose { HapticManager.shared.objectTexture(.person) }
+            case "vehicle":
+                HapticManager.shared.objectTexture(.vehicle)
+            case "stairs", "steps":
+                HapticManager.shared.objectTexture(.stairs)
+            case "door":
+                HapticManager.shared.objectTexture(.door)
+            default:
+                if salience == "safety" {
+                    let dist: Float = isClose ? 0.5 : 1.5
+                    HapticManager.shared.obstacleProximity(distance: dist)
+                }
+            }
+
+            // Only dispatch one haptic per vision frame to avoid fatigue
+            break
+        }
     }
 
     func drainWhenIdleToolQueueIfPossible() {

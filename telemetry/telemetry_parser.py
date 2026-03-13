@@ -301,6 +301,9 @@ def parse_telemetry_to_ephemeral(data: dict) -> EphemeralContext:
             if min_d is not None:
                 ctx.depth_min = float(min_d)
             ctx.depth_min_region = depth.get("min_distance_region")
+            quadrants = depth.get("quadrants")
+            if quadrants and isinstance(quadrants, dict):
+                ctx.depth_quadrants = {k: float(v) for k, v in quadrants.items() if v is not None}
         except (ValueError, TypeError):
             pass
 

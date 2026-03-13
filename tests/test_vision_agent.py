@@ -366,5 +366,6 @@ class TestModuleConstants:
             "detected_text",
             "people_count",
             "confidence",
+            "spatial_objects",
         }
         assert set(_EMPTY_RESULT.keys()) == expected_keys
