@@ -11,9 +11,9 @@ photo storage is only enabled when explicit consent is provided.
 
 from __future__ import annotations
 
-import logging
 import base64
 import hashlib
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -21,6 +21,7 @@ import cv2
 import numpy as np
 from google.cloud import firestore
 from google.cloud.firestore_v1.vector import Vector
+
 from config import get_google_cloud_project
 
 logger = logging.getLogger(__name__)

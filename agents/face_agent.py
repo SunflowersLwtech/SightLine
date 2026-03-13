@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import base64
 import logging
+import os
 import time
 from typing import Any, Optional
 
 import cv2
 import numpy as np
-import os
+
 from tools.tool_behavior import ToolBehavior, behavior_to_text
 
 logger = logging.getLogger(__name__)

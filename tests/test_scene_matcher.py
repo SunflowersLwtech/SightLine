@@ -6,13 +6,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from context.scene_matcher import (
+    _COSINE_THRESHOLD,
     SceneMatch,
     SceneMatcher,
     ScenePattern,
-    _COSINE_THRESHOLD,
     _cosine_similarity,
 )
-
 
 # ---------------------------------------------------------------------------
 # Cosine similarity

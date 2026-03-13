@@ -9,7 +9,7 @@ for the LOD decision engine.
 Phase 5: SessionMetaTracker for runtime session lifecycle telemetry.
 """
 
-from telemetry.telemetry_parser import parse_telemetry, parse_telemetry_to_ephemeral
 from telemetry.session_meta_tracker import SessionMetaTracker
+from telemetry.telemetry_parser import parse_telemetry, parse_telemetry_to_ephemeral
 
 __all__ = ["parse_telemetry", "parse_telemetry_to_ephemeral", "SessionMetaTracker"]

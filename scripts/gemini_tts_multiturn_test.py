@@ -31,7 +31,6 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-
 _MAGIC_AUDIO = 0x01
 _DEFAULT_TTS_MODEL = "gemini-2.5-flash-preview-tts"
 _DEFAULT_TARGET_SAMPLE_RATE = 16000

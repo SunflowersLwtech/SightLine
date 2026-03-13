@@ -110,8 +110,9 @@ class LocationContextService:
 
         # Step 1: Reverse geocode + nearby POIs via existing navigation tool
         try:
-            from tools.navigation import get_location_info
             import asyncio
+
+            from tools.navigation import get_location_info
             info = await asyncio.to_thread(get_location_info, lat, lng)
             if info.get("success"):
                 ctx.address = info.get("address", "")

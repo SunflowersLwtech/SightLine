@@ -14,30 +14,39 @@ Phase 3 additions:
 """
 
 from google.adk.agents import Agent
+
 from tools import (
+    convert_to_plus_code,
+    extract_text_from_camera,
+    get_accessibility_info,
     get_location_info,
     get_walking_directions,
     google_search,
+    maps_query,
     navigate_to,
     nearby_search,
     preview_destination,
-    reverse_geocode,
     resolve_plus_code,
-    convert_to_plus_code,
+    reverse_geocode,
     validate_address,
-    get_accessibility_info,
-    maps_query,
-    extract_text_from_camera,
 )
 
 # Memory tools (custom Firestore Memory Bank + Entity Graph)
 try:
     from memory.memory_tools import (
-        preload_memory as _preload_memory_tool,
-        remember_entity as _remember_entity_tool,
-        what_do_you_remember as _what_do_you_remember_tool,
         forget_entity as _forget_entity_tool,
+    )
+    from memory.memory_tools import (
         forget_recent_memory as _forget_recent_memory_tool,
+    )
+    from memory.memory_tools import (
+        preload_memory as _preload_memory_tool,
+    )
+    from memory.memory_tools import (
+        remember_entity as _remember_entity_tool,
+    )
+    from memory.memory_tools import (
+        what_do_you_remember as _what_do_you_remember_tool,
     )
 except ImportError:
     def _preload_memory_tool(user_id: str, context: str = "") -> dict:

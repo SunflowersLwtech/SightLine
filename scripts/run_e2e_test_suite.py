@@ -21,7 +21,8 @@ import json
 import logging
 import os
 import time
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -411,8 +412,8 @@ class E2ETestSuite:
 
     async def _verify_server_health(self) -> None:
         """Check that the server is reachable via HTTP health endpoint."""
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         # Derive HTTP URL from WebSocket URL
         http_url = self.ws_base_url.replace("ws://", "http://").replace("wss://", "https://")

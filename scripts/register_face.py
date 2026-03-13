@@ -31,7 +31,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tools.face_tools import register_face, list_faces, clear_face_library, delete_all_faces
+from tools.face_tools import (
+    clear_face_library,
+    delete_all_faces,
+    list_faces,
+    register_face,
+)
 
 
 def read_image_as_base64(path: str) -> str:

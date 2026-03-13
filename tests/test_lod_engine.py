@@ -3,7 +3,6 @@
 from lod.lod_engine import LODDecisionLog, decide_lod, should_speak
 from lod.models import EphemeralContext, SessionContext, UserProfile
 
-
 # =====================================================================
 # decide_lod() — Rule 1: Motion state baseline (experience-driven)
 # =====================================================================

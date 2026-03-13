@@ -13,8 +13,8 @@ LOD Levels:
 
 from __future__ import annotations
 
-import base64
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -24,6 +24,7 @@ from typing import Any
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
+
 from gemini_client import get_gemini_api_client
 
 logger = logging.getLogger("sightline.vision_agent")

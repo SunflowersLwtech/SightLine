@@ -6,7 +6,7 @@ All InsightFace and Firestore interactions are mocked.
 import base64
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import numpy as np
 import pytest

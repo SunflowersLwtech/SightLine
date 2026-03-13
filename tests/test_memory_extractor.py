@@ -8,8 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from memory.memory_extractor import MemoryExtractor, _VALID_CATEGORIES
-
+from memory.memory_extractor import _VALID_CATEGORIES, MemoryExtractor
 
 # ---------------------------------------------------------------------------
 # Helpers

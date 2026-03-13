@@ -14,12 +14,12 @@ Phase 3 additions:
 
 import asyncio
 import base64
-from collections import deque
 import json
 import logging
 import os
 import re
 import time
+from collections import deque
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -32,6 +32,7 @@ from google.adk.agents.live_request_queue import LiveRequestQueue
 from google.adk.runners import Runner
 from google.genai import types
 from starlette.websockets import WebSocketState
+
 from firestore_client import get_firestore_client
 
 # ---------------------------------------------------------------------------
@@ -85,9 +86,9 @@ from lod import (
 )
 from lod.lod_engine import should_speak
 from lod.telemetry_aggregator import TelemetryAggregator
-from telemetry.telemetry_parser import parse_telemetry, parse_telemetry_to_ephemeral
-from telemetry.session_meta_tracker import SessionMetaTracker
 from session_state import SessionState
+from telemetry.session_meta_tracker import SessionMetaTracker
+from telemetry.telemetry_parser import parse_telemetry, parse_telemetry_to_ephemeral
 
 # ---------------------------------------------------------------------------
 # Environment & logging
@@ -105,10 +106,35 @@ if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").upper() == "TRUE":
     if _api_key:
         os.environ["_GOOGLE_AI_API_KEY"] = _api_key
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+# Structured JSON logging for Cloud Run; human-readable locally.
+# Cloud Run sets K_SERVICE automatically — use it to detect production.
+if os.environ.get("K_SERVICE"):
+
+    class _JsonFormatter(logging.Formatter):
+        """One JSON object per line — parsed natively by Cloud Logging."""
+
+        def format(self, record: logging.LogRecord) -> str:
+            entry: dict = {
+                "severity": record.levelname,
+                "message": record.getMessage(),
+                "time": datetime.fromtimestamp(
+                    record.created, tz=timezone.utc
+                ).isoformat(),
+                "logger": record.name,
+            }
+            if record.exc_info and record.exc_info[0]:
+                entry["exception"] = self.formatException(record.exc_info)
+            return json.dumps(entry)
+
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(_JsonFormatter())
+    logging.root.addHandler(_handler)
+    logging.root.setLevel(logging.INFO)
+else:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
 logger = logging.getLogger("sightline.server")
 
 # ---------------------------------------------------------------------------
@@ -289,7 +315,8 @@ class TokenBudgetMonitor:
 # the model mid-speech (clientContent unconditionally interrupts generation).
 # ---------------------------------------------------------------------------
 
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 
 
 @dataclass
@@ -781,9 +808,10 @@ except ImportError:
 
 FACE_LIBRARY_REFRESH_SEC: float = 60.0
 
-from tools import ALL_FUNCTIONS, ALL_TOOL_DECLARATIONS, ALL_TOOL_RUNTIME_METADATA
-from tools.ocr_tool import set_latest_frame as _ocr_set_latest_frame, clear_session as _ocr_clear_session
 from memory.memory_tools import MEMORY_FUNCTIONS
+from tools import ALL_FUNCTIONS, ALL_TOOL_DECLARATIONS, ALL_TOOL_RUNTIME_METADATA
+from tools.ocr_tool import clear_session as _ocr_clear_session
+from tools.ocr_tool import set_latest_frame as _ocr_set_latest_frame
 from tools.tool_behavior import ToolBehavior, behavior_to_text, resolve_tool_behavior
 
 # ---------------------------------------------------------------------------
@@ -819,8 +847,12 @@ _TOOL_CATEGORY_MAP: dict[str, tuple[str, str]] = {
 _memory_available = False
 _memory_extractor_available = False
 try:
-    from memory.memory_bank import load_relevant_memories, MemoryBankService, evict_stale_banks
-    from memory.memory_budget import MemoryBudgetTracker, MEMORY_WRITE_BUDGET
+    from memory.memory_bank import (
+        MemoryBankService,
+        evict_stale_banks,
+        load_relevant_memories,
+    )
+    from memory.memory_budget import MEMORY_WRITE_BUDGET, MemoryBudgetTracker
     _memory_available = True
 except ImportError:
     logger.warning("Memory module not available")
@@ -1180,7 +1212,11 @@ def _allow_navigation_tool_call(
         → allowed with explicit OR implicit location query intent,
           or general question patterns (what/where/find/any).
     """
-    from tools.navigation import ACTIVE_NAVIGATION_TOOLS, LOCATION_QUERY_TOOLS, NAVIGATION_FUNCTIONS
+    from tools.navigation import (
+        ACTIVE_NAVIGATION_TOOLS,
+        LOCATION_QUERY_TOOLS,
+        NAVIGATION_FUNCTIONS,
+    )
 
     if func_name not in NAVIGATION_FUNCTIONS:
         return True, "not_navigation_tool"
@@ -1463,7 +1499,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     token_monitor = TokenBudgetMonitor()
 
     # Tool call deduplication (E2E-002 / E2E-003)
-    from tools.dedup import ToolCallDeduplicator, MutualExclusionFilter, AudioGate
+    from tools.dedup import AudioGate, MutualExclusionFilter, ToolCallDeduplicator
     tool_dedup = ToolCallDeduplicator()
     tool_mutex = MutualExclusionFilter()
     audio_gate = AudioGate()
@@ -1478,10 +1514,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
     _lod_evaluator = None
     _assembled_profile = None
     try:
+        from context.habit_detector import HabitDetector
         from context.location_context import LocationContextService
         from context.lod_evaluator import LODEvaluator
         from context.profile_assembler import ProfileAssembler
-        from context.habit_detector import HabitDetector
 
         _location_ctx_service = LocationContextService(user_id)
         _lod_evaluator = LODEvaluator()

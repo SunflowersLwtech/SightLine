@@ -22,7 +22,6 @@ from session_state import SessionState
 from tools.tool_behavior import ToolBehavior
 from websocket_handler import WebSocketHandler, _tool_result_fallback_text
 
-
 # =============================================================================
 # Test Doubles (Enhanced FakeLiveRequestQueue, FakeRunner, FakeWebSocket)
 # =============================================================================

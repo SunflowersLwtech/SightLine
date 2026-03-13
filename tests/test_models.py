@@ -1,6 +1,12 @@
 """Tests for SightLine LOD data models."""
 
-from lod.models import EphemeralContext, GPSData, NarrativeSnapshot, SessionContext, UserProfile
+from lod.models import (
+    EphemeralContext,
+    GPSData,
+    NarrativeSnapshot,
+    SessionContext,
+    UserProfile,
+)
 
 
 def test_ephemeral_context_defaults():

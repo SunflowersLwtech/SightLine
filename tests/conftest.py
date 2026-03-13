@@ -7,7 +7,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest
-from lod.models import EphemeralContext, GPSData, SessionContext, UserProfile
+
+import lod.lod_engine  # noqa: F401
 
 # Pre-import real modules that test_context_injection_queue.py would otherwise
 # stub out.  By importing them here (conftest loads first), the real modules
@@ -16,7 +17,7 @@ from lod.models import EphemeralContext, GPSData, SessionContext, UserProfile
 # real attributes correctly.
 import telemetry.session_meta_tracker  # noqa: F401
 import telemetry.telemetry_parser  # noqa: F401
-import lod.lod_engine  # noqa: F401
+from lod.models import EphemeralContext, GPSData, SessionContext, UserProfile
 
 # Pre-import packages that are safe to load and commonly stubbed
 try:

@@ -4,18 +4,17 @@ All Firestore calls are mocked so tests run offline.
 """
 
 import time
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
 from context.entity_graph import (
-    Entity,
-    EntityGraphService,
     MAX_ENTITIES,
     MAX_RELATIONS,
+    Entity,
+    EntityGraphService,
     Relation,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

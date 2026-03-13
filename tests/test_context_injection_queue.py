@@ -5,17 +5,16 @@ state switching, max_age timeout, vision spoken cooldown, and SILENT wrapping.
 """
 
 import asyncio
-import time
-from unittest.mock import MagicMock, patch
-
-import pytest
 
 # We need to import the class from server.py.  The module has heavy
 # dependencies (ADK, Firestore, etc.) so we patch them at import time.
-
 # Minimal stubs so `import server` doesn't blow up.
 import sys
+import time
 import types as _pytypes
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 _created_stub_modules: set[str] = set()
 
@@ -207,10 +206,10 @@ if _sightline_dir not in sys.path:
     sys.path.insert(0, _sightline_dir)
 
 from server import (
-    ContextInjectionQueue,
-    ModelState,
     QUEUE_MAX_AGE_SEC,
     VISION_SPOKEN_COOLDOWN_SEC,
+    ContextInjectionQueue,
+    ModelState,
     _QueuedItem,
 )
 

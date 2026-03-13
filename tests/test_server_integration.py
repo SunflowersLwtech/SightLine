@@ -28,6 +28,7 @@ import pytest
 def client():
     """Create a TestClient for the SightLine FastAPI app."""
     from fastapi.testclient import TestClient
+
     from server import app
     return TestClient(app)
 
@@ -231,7 +232,7 @@ class TestSessionManager:
 
     def test_run_config_lod3_longer_silence(self):
         """LOD 3 should have longer silence duration than LOD 1."""
-        from live_api.session_manager import SessionManager, LOD_VAD_PRESETS
+        from live_api.session_manager import LOD_VAD_PRESETS, SessionManager
         assert LOD_VAD_PRESETS[3]["silence_duration_ms"] > LOD_VAD_PRESETS[1]["silence_duration_ms"]
 
     def test_context_window_compression_guardrail(self):
@@ -303,9 +304,9 @@ class TestTelemetryLODIntegration:
 
     def test_telemetry_to_ephemeral_to_lod(self):
         """Full pipeline: raw telemetry JSON → EphemeralContext → LOD decision."""
-        from telemetry.telemetry_parser import parse_telemetry_to_ephemeral
         from lod import decide_lod
         from lod.models import SessionContext, UserProfile
+        from telemetry.telemetry_parser import parse_telemetry_to_ephemeral
 
         raw = {
             "motion_state": "walking",
@@ -326,9 +327,9 @@ class TestTelemetryLODIntegration:
 
     def test_stationary_gives_lod2_with_default_concise(self):
         """Stationary user with default concise pref should get LOD 2 (Rule 5 reduces 3→2)."""
-        from telemetry.telemetry_parser import parse_telemetry_to_ephemeral
         from lod import decide_lod
         from lod.models import SessionContext, UserProfile
+        from telemetry.telemetry_parser import parse_telemetry_to_ephemeral
 
         raw = {
             "motion_state": "stationary",

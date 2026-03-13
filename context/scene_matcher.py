@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
+
 from config import get_google_cloud_project
 
 logger = logging.getLogger(__name__)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import sentinel, patch
+from unittest.mock import patch, sentinel
 
 import pytest
 

@@ -2,8 +2,8 @@
 
 from lod.models import EphemeralContext, NarrativeSnapshot, SessionContext, UserProfile
 from lod.prompt_builder import (
-    _language_display,
     _build_persona_block,
+    _language_display,
     build_full_dynamic_prompt,
     build_lod_update_message,
 )

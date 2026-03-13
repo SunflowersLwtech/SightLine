@@ -13,6 +13,7 @@ Firestore path: user_profiles/{uid}/sessions_meta/{sid}
 import logging
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+
 from config import get_google_cloud_project
 
 logger = logging.getLogger(__name__)

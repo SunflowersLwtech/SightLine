@@ -16,6 +16,7 @@ from typing import Any
 
 from google import genai
 from google.genai import types
+
 from gemini_client import get_gemini_vertex_client
 
 logger = logging.getLogger("sightline.tools.maps_grounding")

@@ -4,9 +4,8 @@ import time
 
 import pytest
 
-from context.profile_assembler import ProfileAssembler, _MAX_CHARS
+from context.profile_assembler import _MAX_CHARS, ProfileAssembler
 from lod.models import UserProfile
-
 
 # ---------------------------------------------------------------------------
 # Helpers

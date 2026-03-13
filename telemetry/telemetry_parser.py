@@ -10,7 +10,6 @@ Phase 2 additions:
 
 import json
 import logging
-
 from typing import Optional
 
 from lod.models import EphemeralContext, GPSData

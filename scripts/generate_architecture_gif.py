@@ -1,7 +1,8 @@
-import cairosvg
-import imageio.v2 as imageio
 import os
 import re
+
+import cairosvg
+import imageio.v2 as imageio
 
 # Configuration
 INPUT_SVG = 'assets/system-architecture.svg'
@@ -19,16 +20,16 @@ def create_gif():
     svg_content = re.sub(r'marker-end="url\(#[^\)]+\)"', '', svg_content)
 
     images = []
-    
+
     # We will animate the 'stroke-dashoffset' to create a flowing effect on dashed lines
     # The patterns are roughly length 6-8. A 24-unit shift covers multiples of 3, 4, 6, 8 nicely.
     # Let's use 24 frames shifting by -1 each time, or 12 frames shifting by -2.
-    
+
     print("Generating frames...")
     for i in range(FRAMES):
         # Calculate offset. We shift backwards to make it look like it's flowing forward usually.
-        offset = i * -2 
-        
+        offset = i * -2
+
         # Inject stroke-dashoffset into elements that have stroke-dasharray
         # We use a regex substitution callback to append the offset
         def add_offset(match):
@@ -41,11 +42,11 @@ def create_gif():
 
         # Target lines with dasharray
         frame_svg = re.sub(r'stroke-dasharray="[^"]*"', add_offset, svg_content)
-        
+
         try:
             # Convert to PNG in memory
             png_data = cairosvg.svg2png(bytestring=frame_svg.encode('utf-8'))
-            
+
             # Append to image list
             images.append(imageio.imread(png_data))
             print(f"  - Frame {i+1}/{FRAMES} rendered")

@@ -17,16 +17,22 @@ import time
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+from google.adk.agents.run_config import RunConfig, StreamingMode
+from google.genai import types
+
 from config import (
     get_google_cloud_project,
     get_google_cloud_region,
     get_session_db_url,
 )
-
-from google.adk.agents.run_config import RunConfig, StreamingMode
-from google.genai import types
-
-from lod.models import EphemeralContext, GPSData, NarrativeSnapshot, SessionContext, UserProfile
+from lod.models import (
+    EphemeralContext,
+    GPSData,
+    NarrativeSnapshot,
+    SessionContext,
+    UserProfile,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -20,68 +20,13 @@ from google.adk.runners import Runner
 from google.genai import types
 from starlette.websockets import WebSocketState
 
-from session_state import SessionState
-from server import (
-    MessageType,
-    ModelState,
-    ContextInjectionQueue,
-    TokenBudgetMonitor,
-    _INTERNAL_TAG_RE,
-    _coerce_bool,
-    _is_repeated_text,
-    _should_reset_interrupted_on_activity_start,
-    _build_telemetry_signature,
-    _changed_signature_fields,
-    _should_inject_telemetry_context,
-    _detect_voice_intent,
-    _has_navigation_intent,
-    _has_location_query_intent,
-    _recent_user_utterances,
-    _allow_navigation_tool_call,
-    _json_safe,
-    _extract_function_calls,
-    _dispatch_function_call,
-    _format_vision_result,
-    _format_face_results,
-    _format_ocr_result,
-    build_full_dynamic_prompt,
-    TELEMETRY_FORCE_REFRESH_SEC,
-    AGENT_TEXT_REPEAT_SUPPRESS_SEC,
-    VISION_REPEAT_SUPPRESS_SEC,
-    OCR_REPEAT_SUPPRESS_SEC,
-    VISION_PREFEEDBACK_COOLDOWN_SEC,
-    OCR_PREFEEDBACK_COOLDOWN_SEC,
-    PASSIVE_SPEECH_GUARD_SEC,
-    FACE_LIBRARY_REFRESH_SEC,
-    WS_INACTIVITY_TIMEOUT_SEC,
-    SESSION_TIMEOUT_SEC,
-    session_manager,
-    _vision_available,
-    _ocr_available,
-    _face_available,
-    _memory_available,
-    _memory_extractor_available,
-    _TOOL_CATEGORY_MAP,
-    _ocr_set_latest_frame,
-    _ocr_clear_session,
-)
-from lod import (
-    build_lod_update_message,
-    decide_lod,
-    on_lod_change,
-)
-from lod.lod_engine import should_speak
-from telemetry.telemetry_parser import parse_telemetry, parse_telemetry_to_ephemeral
-from tools import ALL_FUNCTIONS, ALL_TOOL_DECLARATIONS
-from tools.navigation import NAVIGATION_FUNCTIONS
-from tools.tool_behavior import ToolBehavior, behavior_to_text, resolve_tool_behavior
-from live_api.tts_fallback import (
-    synthesize_local_pcm as synthesize_local_fallback_pcm,
-    synthesize_pcm as synthesize_fallback_pcm,
-)
 from live_api.direct_intents import (
     DirectIntentMixin,
+)
+from live_api.direct_intents import (
     tool_preference_hint as _tool_preference_hint,
+)
+from live_api.direct_intents import (
     tool_result_fallback_text as _tool_result_fallback_text,
 )
 from live_api.downstream_recovery import (
@@ -89,6 +34,67 @@ from live_api.downstream_recovery import (
     flatten_exception_text,
     is_retryable_transport_error,
 )
+from live_api.tts_fallback import (
+    synthesize_local_pcm as synthesize_local_fallback_pcm,
+)
+from live_api.tts_fallback import (
+    synthesize_pcm as synthesize_fallback_pcm,
+)
+from lod import (
+    build_lod_update_message,
+    decide_lod,
+    on_lod_change,
+)
+from lod.lod_engine import should_speak
+from server import (
+    _INTERNAL_TAG_RE,
+    _TOOL_CATEGORY_MAP,
+    AGENT_TEXT_REPEAT_SUPPRESS_SEC,
+    FACE_LIBRARY_REFRESH_SEC,
+    OCR_PREFEEDBACK_COOLDOWN_SEC,
+    OCR_REPEAT_SUPPRESS_SEC,
+    PASSIVE_SPEECH_GUARD_SEC,
+    SESSION_TIMEOUT_SEC,
+    TELEMETRY_FORCE_REFRESH_SEC,
+    VISION_PREFEEDBACK_COOLDOWN_SEC,
+    VISION_REPEAT_SUPPRESS_SEC,
+    WS_INACTIVITY_TIMEOUT_SEC,
+    ContextInjectionQueue,
+    MessageType,
+    ModelState,
+    TokenBudgetMonitor,
+    _allow_navigation_tool_call,
+    _build_telemetry_signature,
+    _changed_signature_fields,
+    _coerce_bool,
+    _detect_voice_intent,
+    _dispatch_function_call,
+    _extract_function_calls,
+    _face_available,
+    _format_face_results,
+    _format_ocr_result,
+    _format_vision_result,
+    _has_location_query_intent,
+    _has_navigation_intent,
+    _is_repeated_text,
+    _json_safe,
+    _memory_available,
+    _memory_extractor_available,
+    _ocr_available,
+    _ocr_clear_session,
+    _ocr_set_latest_frame,
+    _recent_user_utterances,
+    _should_inject_telemetry_context,
+    _should_reset_interrupted_on_activity_start,
+    _vision_available,
+    build_full_dynamic_prompt,
+    session_manager,
+)
+from session_state import SessionState
+from telemetry.telemetry_parser import parse_telemetry, parse_telemetry_to_ephemeral
+from tools import ALL_FUNCTIONS, ALL_TOOL_DECLARATIONS
+from tools.navigation import NAVIGATION_FUNCTIONS
+from tools.tool_behavior import ToolBehavior, behavior_to_text, resolve_tool_behavior
 
 logger = logging.getLogger("sightline.server")
 
@@ -500,9 +506,9 @@ class WebSocketHandler(DirectIntentMixin):
         self._cancel_response_watchdog()
         if _memory_extractor_available and _memory_available and self.state.transcript_history:
             try:
-                from memory.memory_extractor import MemoryExtractor
                 from memory.memory_bank import MemoryBankService
                 from memory.memory_budget import MemoryBudgetTracker
+                from memory.memory_extractor import MemoryExtractor
 
                 extractor = MemoryExtractor()
                 bank = MemoryBankService(self.user_id)

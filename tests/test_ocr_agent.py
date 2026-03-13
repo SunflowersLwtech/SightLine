@@ -8,15 +8,14 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-from agents.ocr_agent import (
-    OCR_MODEL,
-    _EMPTY_RESULT,
-    _SAFETY_SYSTEM_PROMPT,
-    extract_text,
-)
 from google.genai import types
 
+from agents.ocr_agent import (
+    _EMPTY_RESULT,
+    _SAFETY_SYSTEM_PROMPT,
+    OCR_MODEL,
+    extract_text,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures

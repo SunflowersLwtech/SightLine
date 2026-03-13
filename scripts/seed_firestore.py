@@ -21,8 +21,9 @@ import sys
 # Ensure the project root is on sys.path so `lod.models` can be imported.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import numpy as np
 from datetime import datetime, timezone
+
+import numpy as np
 from google.cloud import firestore
 from google.cloud.firestore_v1.vector import Vector
 

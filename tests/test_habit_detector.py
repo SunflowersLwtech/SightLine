@@ -5,8 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from context.habit_detector import HabitDetector, ProactiveHint, _MIN_OCCURRENCES
-
+from context.habit_detector import _MIN_OCCURRENCES, HabitDetector, ProactiveHint
 
 # ---------------------------------------------------------------------------
 # Helpers

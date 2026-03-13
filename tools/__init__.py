@@ -15,6 +15,11 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
 
+from tools.accessibility import (
+    ACCESSIBILITY_FUNCTIONS,
+    ACCESSIBILITY_TOOL_DECLARATIONS,
+    get_accessibility_info,
+)
 from tools.face_tools import (
     MAX_FACE_SAMPLES,
     MIN_FACE_SAMPLES,
@@ -24,6 +29,11 @@ from tools.face_tools import (
     list_faces,
     load_face_library,
     register_face,
+)
+from tools.maps_grounding import (
+    MAPS_GROUNDING_FUNCTIONS,
+    MAPS_GROUNDING_TOOL_DECLARATIONS,
+    maps_query,
 )
 from tools.navigation import (
     ACTIVE_NAVIGATION_TOOLS,
@@ -41,10 +51,10 @@ from tools.navigation import (
     reverse_geocode,
     validate_address,
 )
-from tools.search import (
-    SEARCH_FUNCTIONS,
-    SEARCH_TOOL_DECLARATIONS,
-    google_search,
+from tools.ocr_tool import (
+    OCR_TOOL_DECLARATIONS,
+    OCR_TOOL_FUNCTIONS,
+    extract_text_from_camera,
 )
 from tools.plus_codes import (
     PLUS_CODES_FUNCTIONS,
@@ -52,27 +62,17 @@ from tools.plus_codes import (
     convert_to_plus_code,
     resolve_plus_code,
 )
-from tools.accessibility import (
-    ACCESSIBILITY_FUNCTIONS,
-    ACCESSIBILITY_TOOL_DECLARATIONS,
-    get_accessibility_info,
+from tools.search import (
+    SEARCH_FUNCTIONS,
+    SEARCH_TOOL_DECLARATIONS,
+    google_search,
 )
-from tools.maps_grounding import (
-    MAPS_GROUNDING_FUNCTIONS,
-    MAPS_GROUNDING_TOOL_DECLARATIONS,
-    maps_query,
-)
-from tools.ocr_tool import (
-    OCR_TOOL_FUNCTIONS,
-    OCR_TOOL_DECLARATIONS,
-    extract_text_from_camera,
-)
+
 try:
     from memory.memory_tools import MEMORY_FUNCTIONS
 except ImportError:
     MEMORY_FUNCTIONS: dict = {}
 from tools.tool_behavior import ToolBehavior, behavior_to_text, resolve_tool_behavior
-
 
 GPSInjectionMode = Literal[None, "lat_lng", "origin_lat_lng_heading"]
 

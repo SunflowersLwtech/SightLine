@@ -143,7 +143,8 @@ jobs:
           echo "Health check: HTTP $STATUS"
 
           if [ "$STATUS" != "200" ]; then
-            echo "::warning::Health check returned HTTP $STATUS (service may still be starting)"
+            echo "::error::Health check returned HTTP $STATUS — deployment may be broken"
+            exit 1
           else
             echo "Deployment verified successfully!"
           fi

@@ -29,6 +29,14 @@ print('InsightFace buffalo_l models downloaded successfully')"
 # Copy backend source (excluding iOS, docs, dev, tests via .dockerignore)
 COPY . .
 
+# Run as non-root user for security
+# Move InsightFace models so ~/ resolves correctly for the new user
+RUN groupadd -r appuser && useradd -r -g appuser -d /home/appuser -m appuser \
+    && mv /root/.insightface /home/appuser/.insightface \
+    && chown -R appuser:appuser /app /home/appuser
+
+USER appuser
+
 EXPOSE 8080
 
 CMD ["python", "-m", "uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -15,6 +15,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Optional
+
 from config import get_google_cloud_project
 
 logger = logging.getLogger(__name__)

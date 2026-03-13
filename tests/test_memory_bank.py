@@ -10,13 +10,12 @@ import pytest
 
 from memory.memory_bank import (
     MemoryBankService,
-    _sanitize_memory_content,
-    load_relevant_memories,
-    evict_stale_banks,
     _bank_instances,
     _bank_last_accessed,
+    _sanitize_memory_content,
+    evict_stale_banks,
+    load_relevant_memories,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

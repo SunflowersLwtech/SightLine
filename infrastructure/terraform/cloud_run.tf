@@ -94,6 +94,18 @@ resource "google_cloud_run_v2_service" "backend" {
         period_seconds        = 10
         failure_threshold     = 5
       }
+
+      # --- Liveness Probe ---
+      # Restarts unhealthy containers (e.g., stuck event loops)
+      liveness_probe {
+        http_get {
+          path = "/health"
+        }
+        initial_delay_seconds = 30
+        timeout_seconds       = 5
+        period_seconds        = 30
+        failure_threshold     = 3
+      }
     }
   }
 

@@ -10,13 +10,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from context.lod_evaluator import (
-    LODAdjustment,
-    LODEvaluator,
     _DEBOUNCE_S,
     _TIMEOUT_S,
+    LODAdjustment,
+    LODEvaluator,
 )
 from lod.models import UserProfile
-
 
 # ---------------------------------------------------------------------------
 # Helpers

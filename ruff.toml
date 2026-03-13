@@ -1,10 +1,13 @@
 target-version = "py312"
 
 [lint]
-select = ["F", "E9"]
+select = ["F", "E9", "I", "W", "B"]
+
+[lint.isort]
+known-first-party = ["agents", "context", "live_api", "lod", "memory", "telemetry", "tools"]
 
 [lint.per-file-ignores]
-"scripts/**/*.py" = ["F401", "F541", "F841"]
+"scripts/**/*.py" = ["F401", "F541", "F841", "B007", "B023"]
 "server.py" = ["F401"]
-"tests/**/*.py" = ["F401", "F841"]
+"tests/**/*.py" = ["F401", "F841", "B007"]
 "websocket_handler.py" = ["F401"]

@@ -8,17 +8,16 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from google.genai import types
 
 from agents.vision_agent import (
-    VISION_MODEL,
     _EMPTY_RESULT,
     _MEDIA_RESOLUTION_BY_LOD,
     _SYSTEM_PROMPTS,
+    VISION_MODEL,
     _build_context_user_message,
     analyze_scene,
 )
-from google.genai import types
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
