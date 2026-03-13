@@ -57,7 +57,6 @@ from server import (
     WS_INACTIVITY_TIMEOUT_SEC,
     SESSION_TIMEOUT_SEC,
     STARTUP_HABIT_DETECT_TIMEOUT_SEC,
-    _NEEDS_SESSION_ID_MAPPING,
     session_manager,
     _vision_available,
     _ocr_available,
@@ -85,6 +84,10 @@ from live_api.tts_fallback import (
 
 logger = logging.getLogger("sightline.server")
 
+# Patchable sentinel: None → read live from server module at runtime.
+# Unit tests can override with patch.multiple("websocket_handler", _NEEDS_SESSION_ID_MAPPING=False).
+_NEEDS_SESSION_ID_MAPPING = None
+
 _STALE_QUEUE_CATEGORIES = {
     "echo_cancel",
     "face",
@@ -92,7 +95,6 @@ _STALE_QUEUE_CATEGORIES = {
     "lod_resume",
     "ocr",
     "telemetry",
-    "turn_boundary",
     "vad",
     "vision",
 }
@@ -405,6 +407,7 @@ class WebSocketHandler:
         self.state.latest_agent_transcript_for_turn = ""
         self.state.pending_fallback_text = None
         self.state.pending_fallback_turn_seq = self.state.user_turn_seq
+        self.state.recent_agent_texts.clear()
         self._schedule_response_watchdog(self.state.user_turn_seq)
         discard_stale = getattr(self.ctx_queue, "discard_stale", None)
         if callable(discard_stale):
@@ -1054,6 +1057,7 @@ class WebSocketHandler:
                 await downstream_task
             except (asyncio.CancelledError, Exception):
                 pass
+            await self._cleanup()
             return
 
         asyncio.create_task(self.session_meta.write_session_start())
@@ -1925,6 +1929,8 @@ class WebSocketHandler:
 
                     if magic == self.state.MAGIC_AUDIO:
                         self._register_user_activity()
+                        if self.audio_gate.should_mute:
+                            continue
                         blob = types.Blob(data=payload, mime_type="audio/pcm;rate=16000")
                         self.live_request_queue.send_realtime(blob)
                         continue
@@ -1958,6 +1964,8 @@ class WebSocketHandler:
                 msg_type = message.get("type")
                 if msg_type == "audio":
                     self._register_user_activity()
+                    if self.audio_gate.should_mute:
+                        continue
                     audio_bytes = base64.b64decode(message["data"])
                     blob = types.Blob(data=audio_bytes, mime_type="audio/pcm;rate=16000")
                     self.live_request_queue.send_realtime(blob)
@@ -2009,8 +2017,13 @@ class WebSocketHandler:
                     if preference_hint:
                         hint_text += "\n" + preference_hint
                     if self._pending_resume_context:
-                        hint_text = self._pending_resume_context + "\n\n" + hint_text
+                        resume_content = types.Content(
+                            parts=[types.Part(text=self._pending_resume_context)],
+                            role="user",
+                        )
+                        self.ctx_queue.inject_immediate(resume_content)
                         self._pending_resume_context = None
+                        logger.info("Injected resume context on text_hint for session %s", self.session_id)
                     hint_content = types.Content(
                         parts=[types.Part(
                             text=hint_text
@@ -2297,7 +2310,9 @@ class WebSocketHandler:
         """Read events from the Live API and forward to the iOS client."""
         try:
             adk_session_id = self.session_id
-            if _NEEDS_SESSION_ID_MAPPING:
+            import server as _srv_ref
+            _needs_mapping = _NEEDS_SESSION_ID_MAPPING if _NEEDS_SESSION_ID_MAPPING is not None else _srv_ref._NEEDS_SESSION_ID_MAPPING
+            if _needs_mapping:
                 cached_adk_id = session_manager.get_adk_session_id(self.session_id)
                 if cached_adk_id:
                     adk_session_id = cached_adk_id
@@ -2683,6 +2698,28 @@ class WebSocketHandler:
             self.audio_gate.enter()
             try:
                 result = await _dispatch_function_call(fc.name, call_args, self.session_id, self.user_id)
+            except Exception as dispatch_exc:
+                logger.exception(
+                    "Tool dispatch failed for %s: %s (session=%s)",
+                    fc.name, dispatch_exc, self.session_id,
+                )
+                result = {"status": "error", "error": str(dispatch_exc)}
+                from google.genai.types import FunctionResponse as _FR
+                err_fr = _FR(name=fc.name, response=result)
+                self.ctx_queue.inject_immediate(
+                    types.Content(
+                        parts=[types.Part(function_response=err_fr)],
+                        role="user",
+                    ),
+                    is_function_response=True,
+                )
+                await self._safe_send_json({
+                    "type": MessageType.TOOL_RESULT,
+                    "tool": fc.name,
+                    "behavior": behavior_to_text(behavior),
+                    "data": _json_safe(result),
+                })
+                continue
             finally:
                 self.audio_gate.exit()
             await self._safe_send_json({"type": MessageType.TOOL_RESULT, "tool": fc.name, "behavior": behavior_to_text(behavior), "data": _json_safe(result)})

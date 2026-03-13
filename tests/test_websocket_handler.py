@@ -325,6 +325,7 @@ def handler(
 
     mock_audio_gate = MagicMock()
     mock_audio_gate.is_allowed = Mock(return_value=True)
+    mock_audio_gate.should_mute = False
 
     mock_run_config = MagicMock()
     mock_run_config.get = Mock(return_value={})
@@ -411,6 +412,7 @@ async def test_gemini_stream_error_mid_conversation(fake_ws, fake_queue, session
 
     mock_audio_gate = MagicMock()
     mock_audio_gate.is_allowed = Mock(return_value=True)
+    mock_audio_gate.should_mute = False
 
     mock_run_config = MagicMock()
     mock_run_config.get = Mock(return_value={})
@@ -851,10 +853,12 @@ async def test_resume_context_is_prepended_to_next_text_hint(handler, fake_ws, m
     with handler_runtime_patches():
         await handler.run()
 
-    mock_ctx_queue.inject_immediate.assert_called()
-    content = mock_ctx_queue.inject_immediate.call_args.args[0]
-    assert "[SESSION RESUME]" in content.parts[0].text
-    assert "what's around me" in content.parts[0].text
+    assert mock_ctx_queue.inject_immediate.call_count >= 2
+    calls = mock_ctx_queue.inject_immediate.call_args_list
+    resume_content = calls[-2].args[0]
+    hint_content = calls[-1].args[0]
+    assert "[SESSION RESUME]" in resume_content.parts[0].text
+    assert "what's around me" in hint_content.parts[0].text
 
 
 @pytest.mark.websocket
@@ -981,6 +985,7 @@ async def test_tool_call_dispatched_and_result_sent(fake_ws, fake_queue, session
 
     mock_audio_gate = MagicMock()
     mock_audio_gate.is_allowed = Mock(return_value=True)
+    mock_audio_gate.should_mute = False
 
     mock_run_config = MagicMock()
     mock_run_config.get = Mock(return_value={})
@@ -1043,8 +1048,24 @@ async def test_tool_call_dispatched_and_result_sent(fake_ws, fake_queue, session
 
         # Verify tool was called
         assert mock_dispatch.called
-        injected_content = mock_ctx_queue.inject_immediate.call_args.args[0]
-        assert "TOOL RESULT READY" in injected_content.parts[0].text
+        # Search all inject_immediate calls for the tool result (ordering
+        # between run() greeting and _downstream tool result is non-deterministic)
+        tool_result_found = False
+        for call in mock_ctx_queue.inject_immediate.call_args_list:
+            content = call.args[0]
+            if (
+                hasattr(content, "parts")
+                and content.parts
+                and hasattr(content.parts[0], "text")
+                and content.parts[0].text
+                and "TOOL RESULT READY" in content.parts[0].text
+            ):
+                tool_result_found = True
+                break
+        assert tool_result_found, (
+            "Expected inject_immediate call with 'TOOL RESULT READY', "
+            f"got calls: {mock_ctx_queue.inject_immediate.call_args_list}"
+        )
 
 
 @pytest.mark.skip(reason="placeholder — not yet implemented")
@@ -1296,6 +1317,7 @@ def _make_handler_with_runner(runner, **overrides):
 
     mock_audio_gate = MagicMock()
     mock_audio_gate.is_allowed = Mock(return_value=True)
+    mock_audio_gate.should_mute = False
     mock_run_config = MagicMock()
     mock_run_config.get = Mock(return_value={})
 
@@ -1846,15 +1868,23 @@ async def test_tool_dispatch_exception_sends_error_result():
             fake_ws.queue_disconnect()
 
         asyncio.create_task(delayed_disconnect())
-        # The handler propagates the exception from _dispatch_function_call
-        # through _handle_function_calls, which is caught by _downstream's
-        # outer exception handler. This sends an error to the client.
+        # The handler catches the exception from _dispatch_function_call
+        # inside _handle_function_calls and injects an error FunctionResponse
+        # so the model doesn't hang. The session continues gracefully.
         await handler.run()
 
     # Verify the tool was called
     assert mock_dispatch.called
-    # Session should clean up
+    # Session should clean up normally after delayed disconnect
     assert fake_queue.closed
+    # Error function response should have been injected
+    ctx_queue = handler.ctx_queue
+    error_injected = any(
+        call.kwargs.get("is_function_response", False)
+        or (len(call.args) > 1 and call.args[1] is True)
+        for call in ctx_queue.inject_immediate.call_args_list
+    )
+    assert error_injected, "Expected error FunctionResponse to be injected"
 
 
 @pytest.mark.websocket
