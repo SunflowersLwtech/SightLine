@@ -37,6 +37,9 @@ def resolve_tool_behavior(
     if name == "identify_person":
         return ToolBehavior.SILENT
 
+    if name == "get_emergency_help":
+        return ToolBehavior.INTERRUPT
+
     if name == "navigate_to" and lod <= 1:
         return ToolBehavior.INTERRUPT
 

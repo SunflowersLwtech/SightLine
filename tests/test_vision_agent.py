@@ -369,3 +369,27 @@ class TestModuleConstants:
             "spatial_objects",
         }
         assert set(_EMPTY_RESULT.keys()) == expected_keys
+
+    def test_lod1_prompt_mentions_currency(self):
+        prompt = _SYSTEM_PROMPTS[1]
+        assert "currency" in prompt.lower() or "money" in prompt.lower()
+
+    def test_lod2_prompt_mentions_emotions(self):
+        prompt = _SYSTEM_PROMPTS[2]
+        assert "emotion" in prompt.lower() or "expression" in prompt.lower()
+
+    def test_lod2_prompt_mentions_currency(self):
+        prompt = _SYSTEM_PROMPTS[2]
+        assert "currency" in prompt.lower()
+
+    def test_lod3_prompt_mentions_light(self):
+        prompt = _SYSTEM_PROMPTS[3]
+        assert "light" in prompt.lower()
+
+    def test_lod3_prompt_mentions_qr_codes(self):
+        prompt = _SYSTEM_PROMPTS[3]
+        assert "qr" in prompt.lower() or "barcode" in prompt.lower()
+
+    def test_lod1_prompt_mentions_motion_direction(self):
+        prompt = _SYSTEM_PROMPTS[1]
+        assert "motion_direction" in prompt

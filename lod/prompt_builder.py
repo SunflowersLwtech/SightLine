@@ -40,6 +40,7 @@ LOD_INSTRUCTIONS: dict[int, str] = {
         "Style: Quick, clear, minimal. User is busy, moving fast, or overloaded.\n"
         "Examples: 'Crosswalk ahead at 12 o'clock.' / 'Wet floor at 1 o'clock.'\n"
         "Focus on what's immediately useful. Skip atmosphere and detail.\n"
+        "Safety alerts (obstacles, vehicles, hazards) always override silence.\n"
         "DO NOT: describe colors, atmosphere, people's appearance, or decorative objects."
     ),
     2: (
@@ -48,6 +49,7 @@ LOD_INSTRUCTIONS: dict[int, str] = {
         "Style: Calm, clear, structured, and easy to hear once.\n"
         "Description order: overall space → key object → actionable information.\n"
         "Use clock positions for directions (e.g. '2 o'clock').\n"
+        "Include: currency denominations, people's expressions, lighting changes.\n"
         "Example: 'You've entered a corridor about 20 metres long. "
         "Three doors on your left, floor-to-ceiling windows on your right. "
         "Elevator entrance at 12 o'clock, about 10 metres ahead.'\n"
@@ -59,6 +61,8 @@ LOD_INSTRUCTIONS: dict[int, str] = {
         "Style: Slower pace, expressive, but still audio-friendly.\n"
         "Describe the scene richly without becoming a monologue.\n"
         "Read important text, menus, or signs when relevant.\n"
+        "Include: lighting quality, emotional atmosphere, currency details, expressions.\n"
+        "On first camera activation, provide a warm comprehensive scene overview.\n"
         "The user is relaxed / stationary and welcomes rich information.\n"
         "DO NOT: ramble, switch to bullet-point style, or turn the answer into a transcript dump."
     ),

@@ -52,11 +52,16 @@ You are a safety analysis system for a blind user navigating in real time.
 
 ONLY report immediate physical hazards visible in this image:
 - Stairs, steps, drop-offs, curbs
-- Approaching vehicles or cyclists
+- Approaching vehicles or cyclists — flag with urgency, note direction of \
+approach (e.g., "vehicle approaching from 3 o'clock")
 - Obstacles in the walking path (poles, furniture, construction)
 - Wet/slippery surfaces, uneven ground
 - Low-hanging objects at head height (tree branches, awnings, scaffolding)
 - Overhead obstructions that a cane would not detect
+- Currency or payment-related items in the walking path (dropped money, wallet)
+
+For moving objects (vehicles, cyclists, people), indicate motion direction \
+using the motion_direction field: "approaching", "receding", or "crossing".
 
 Format: "[hazard] at [clock position], [distance estimate]"
 Examples: "Step down at 12 o'clock, 1 meter" / "Low branch at 11 o'clock, head height"
@@ -79,6 +84,12 @@ Include approximate dimensions when possible ("corridor about 3 meters wide").
 3. Signage and wayfinding: readable signs, door numbers, directions.
 4. People: approximate count and proximity (not appearance descriptions).
 5. Key landmarks: counters, elevators, escalators, seating areas.
+6. Currency: identify any visible banknotes or coins. Report denomination \
+and count. If multiple bills/coins, estimate the total.
+7. Emotions: note obvious facial expressions (smiling, frowning, waving, \
+concerned) for people within 3 meters. Use the emotions field.
+
+For moving objects, set motion_direction: "approaching", "receding", or "crossing".
 
 Write the scene description as a natural spoken paragraph, not a bulleted list.
 Use clock positions for spatial references.
@@ -96,12 +107,22 @@ understanding of their surroundings.
 Provide a comprehensive description as a natural, flowing narrative:
 1. SAFETY: Any hazards (always first priority).
 2. Spatial layout: full description of the space, dimensions, and organization.
-3. People: count, approximate positions, expressions, activities.
+3. People: count, approximate positions, detailed expressions and activities. \
+Use the emotions field for each person: note expression (smiling, laughing, \
+focused, concerned, puzzled) and what they appear to be doing.
 4. Text: all readable text (signs, menus, labels, screens).
 5. Objects: notable items, their positions and material qualities.
-6. Atmosphere: lighting quality (warm, fluorescent, natural), ambient energy \
-(quiet, bustling, peaceful), textures and surfaces, sounds you might infer \
-(traffic hum, conversation murmur, birdsong).
+6. Atmosphere and light: report the light_level field — describe lighting \
+quality in detail (warm incandescent, cool fluorescent, bright daylight, \
+dim indoor, dark, specific light sources like desk lamps or overhead fixtures). \
+Note ambient energy (quiet, bustling, peaceful), textures and surfaces, \
+sounds you might infer (traffic hum, conversation murmur, birdsong).
+7. Currency: identify any visible banknotes or coins with denomination, \
+country of origin if identifiable, and count. Use the currency_detected field.
+8. QR codes / barcodes: note presence and describe any readable content \
+or context clues about what the code links to.
+
+For moving objects, set motion_direction: "approaching", "receding", or "crossing".
 
 Use sensory language: "warm light filtering through large windows" rather than \
 "well-lit room". Describe textures, temperatures, and spatial feelings.
@@ -191,9 +212,43 @@ _RESPONSE_SCHEMA = types.Schema(
                         type=types.Type.STRING,
                         description="safety, navigation, interaction, or background.",
                     ),
+                    "motion_direction": types.Schema(
+                        type=types.Type.STRING,
+                        nullable=True,
+                        description="For moving objects: approaching, receding, or crossing.",
+                    ),
                 },
             ),
             description="Structured spatial map of objects with clock positions and distances.",
+        ),
+        "light_level": types.Schema(
+            type=types.Type.STRING,
+            nullable=True,
+            description="Lighting quality: bright_daylight, overcast, dim_indoor, dark, fluorescent, warm_ambient, etc.",
+        ),
+        "emotions": types.Schema(
+            type=types.Type.ARRAY,
+            nullable=True,
+            items=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "person_position": types.Schema(
+                        type=types.Type.STRING,
+                        description="Clock position and distance of the person, e.g. '2 o'clock, 2m'.",
+                    ),
+                    "expression": types.Schema(
+                        type=types.Type.STRING,
+                        description="Observed facial expression: smiling, frowning, laughing, concerned, neutral, etc.",
+                    ),
+                },
+            ),
+            description="Detected facial expressions for nearby people.",
+        ),
+        "currency_detected": types.Schema(
+            type=types.Type.ARRAY,
+            nullable=True,
+            items=types.Schema(type=types.Type.STRING),
+            description="Identified currency: denomination and count, e.g. 'US $20 bill', '2 euro coins'.",
         ),
     },
     required=[

@@ -16,6 +16,11 @@ from tools.accessibility import (
     ACCESSIBILITY_TOOL_DECLARATIONS,
     get_accessibility_info,
 )
+from tools.emergency import (
+    EMERGENCY_FUNCTIONS,
+    EMERGENCY_TOOL_DECLARATIONS,
+    get_emergency_help,
+)
 from tools.face_tools import (
     MAX_FACE_SAMPLES,
     MIN_FACE_SAMPLES,
@@ -135,6 +140,7 @@ CALLABLE_TOOL_DECLARATIONS = (
     + ACCESSIBILITY_TOOL_DECLARATIONS
     + MAPS_GROUNDING_TOOL_DECLARATIONS
     + OCR_TOOL_DECLARATIONS
+    + EMERGENCY_TOOL_DECLARATIONS
 )
 PASSIVE_TOOL_DECLARATIONS = FACE_TOOL_DECLARATIONS
 ALL_TOOL_DECLARATIONS = CALLABLE_TOOL_DECLARATIONS + PASSIVE_TOOL_DECLARATIONS
@@ -148,6 +154,7 @@ ALL_FUNCTIONS = {
     **ACCESSIBILITY_FUNCTIONS,
     **MAPS_GROUNDING_FUNCTIONS,
     **OCR_TOOL_FUNCTIONS,
+    **EMERGENCY_FUNCTIONS,
 }
 
 CALLABLE_TOOL_ORDER = [str(decl["name"]) for decl in CALLABLE_TOOL_DECLARATIONS]
@@ -174,6 +181,7 @@ ALL_TOOL_CATEGORIES: dict[str, str] = {
     "forget_entity": "memory",
     "forget_recent_memory": "memory",
     "extract_text_from_camera": "ocr",
+    "get_emergency_help": "emergency",
 }
 
 
@@ -200,6 +208,7 @@ ALL_TOOL_RUNTIME_METADATA.update({
     "preview_destination": _runtime_metadata(gps_injection="lat_lng"),
     "get_accessibility_info": _runtime_metadata(gps_injection="lat_lng"),
     "maps_query": _runtime_metadata(gps_injection="lat_lng"),
+    "get_emergency_help": _runtime_metadata(gps_injection="lat_lng"),
 })
 for name in MEMORY_FUNCTIONS:
     ALL_TOOL_RUNTIME_METADATA[name] = _runtime_metadata(force_user_id=True)
@@ -281,6 +290,10 @@ __all__ = [
     "MAPS_GROUNDING_TOOL_DECLARATIONS",
     "MAPS_GROUNDING_FUNCTIONS",
     "extract_text_from_camera",
+    # Emergency
+    "get_emergency_help",
+    "EMERGENCY_TOOL_DECLARATIONS",
+    "EMERGENCY_FUNCTIONS",
     # Memory
     "MEMORY_FUNCTIONS",
     "MEMORY_TOOL_DECLARATIONS",

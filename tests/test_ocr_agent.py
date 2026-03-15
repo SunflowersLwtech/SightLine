@@ -379,3 +379,19 @@ class TestModuleConstants:
         assert _EMPTY_RESULT["text_type"] == "unknown"
         assert _EMPTY_RESULT["items"] == []
         assert _EMPTY_RESULT["confidence"] == 0.0
+
+    def test_system_prompt_mentions_medicine(self):
+        from agents.ocr_agent import _SYSTEM_PROMPT
+        assert "medicine" in _SYSTEM_PROMPT.lower() or "medication" in _SYSTEM_PROMPT.lower()
+
+    def test_system_prompt_mentions_receipt(self):
+        from agents.ocr_agent import _SYSTEM_PROMPT
+        assert "receipt" in _SYSTEM_PROMPT.lower()
+
+    def test_system_prompt_mentions_food_packaging(self):
+        from agents.ocr_agent import _SYSTEM_PROMPT
+        assert "allergen" in _SYSTEM_PROMPT.lower()
+
+    def test_system_prompt_mentions_business_card(self):
+        from agents.ocr_agent import _SYSTEM_PROMPT
+        assert "business card" in _SYSTEM_PROMPT.lower()

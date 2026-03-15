@@ -21,6 +21,7 @@ from tools import (
     convert_to_plus_code,
     extract_text_from_camera,
     get_accessibility_info,
+    get_emergency_help,
     get_location_info,
     get_walking_directions,
     google_search,
@@ -183,13 +184,28 @@ safety-critical text is detected automatically)
 
 **"Is this area accessible?"** → ``get_accessibility_info`` (tactile paving, ramps, signals)
 
+**"Help!" / "Emergency" / "I need help" / "Call 911"** → ``get_emergency_help`` — \
+INTERRUPT priority, always override. Provide emergency number, nearest services, \
+and location code immediately. Do not hesitate or ask clarifying questions first.
+
 **General knowledge / fact check** → ``google_search``
 
 **Navigation results** include slope warnings (>8% = ADA threshold) and accessibility info.
 
 ### Automatic Injections (No Tool Call Needed)
 - ``[VISION ANALYSIS]``: Scene understanding — integrate naturally into speech.
+  - When currency is detected, read the denomination clearly and naturally: \
+"That looks like a twenty-dollar bill" (not "Currency detected: USD 20").
+  - When emotions are detected, weave them in warmly: "The person across from \
+you seems to be smiling" (not "Expression: smiling detected").
+  - When light conditions change, mention it during transitions: "You've stepped \
+into a brightly lit space" or "It's quite dim in here".
+  - When motion_direction is "approaching" for vehicles, alert with urgency.
 - ``[OCR RESULT]``: Safety-critical text detected — read aloud when relevant.
+  - For medication labels: read drug name, dosage, and warnings clearly.
+  - For receipts: summarize store, item count, and total.
+  - For food packaging: always read allergens first (safety-critical), then calories.
+  - For business cards: read name, title, and contact info.
 - ``[FACE ID]``: Recognized faces — weave names naturally: "David is sitting across \
 from you" (never "Face recognized: David").
 Do NOT mention analysis systems by name.
@@ -234,6 +250,7 @@ _AGENT_TOOL_BINDINGS = {
     "get_accessibility_info": get_accessibility_info,
     "maps_query": maps_query,
     "extract_text_from_camera": extract_text_from_camera,
+    "get_emergency_help": get_emergency_help,
     "preload_memory": preload_memory,
     "remember_entity": remember_entity,
     "what_do_you_remember": what_do_you_remember,

@@ -38,7 +38,8 @@ visible text in the image accurately.
 Rules:
 1. Extract every piece of readable text — signs, menus, labels, documents, \
    screens, handwriting.
-2. Classify the text type: "menu", "sign", "document", "label", or "unknown".
+2. Classify the text type: "menu", "sign", "document", "label", \
+   "medicine_label", "receipt", "food_packaging", "business_card", or "unknown".
 3. For menus: parse into individual items with prices when visible. Format \
    each item as "Item Name - $Price" or just "Item Name" if no price. \
    Group items by category when clear (e.g. appetizers, mains, drinks, desserts).
@@ -47,8 +48,32 @@ Rules:
 6. Report confidence based on text clarity (0.0 = unreadable, 1.0 = crystal clear).
 7. If no text is visible, return empty results with confidence 0.0.
 
+## Specialized Document Types
+
+For medicine labels / prescription bottles:
+- Extract: drug name, dosage/strength, frequency/directions, warnings/side effects, \
+  expiry date, manufacturer. Populate the medicine_info field.
+- Safety-critical: always flag drug interaction warnings and "do not exceed" limits.
+
+For receipts:
+- Extract: store/merchant name, individual items with prices, subtotal, tax, total, \
+  payment method, change given, date/time. Populate the receipt_info field.
+- Read items in order from top to bottom.
+
+For food packaging / nutrition labels:
+- Extract: product name, allergens (CRITICAL for safety — always extract), \
+  calories per serving, serving size, key nutrients, ingredients list. \
+  Populate the nutrition_info field.
+- Allergens are safety-critical — always extract and flag prominently.
+
+For business cards:
+- Extract: person's name, job title, company, phone number(s), email, \
+  website, physical address. Populate the contact_info field.
+- Preserve exact formatting of phone numbers and emails.
+
 Text priority (extract all, but rank by importance):
-1. Safety-critical: warnings, caution signs, traffic signals, hazard labels.
+1. Safety-critical: warnings, caution signs, traffic signals, hazard labels, \
+   allergens, drug warnings.
 2. Actionable: prices, opening hours, directions, instructions, dosage info.
 3. Informational: names, titles, descriptions, news headlines.
 4. Decorative: brand slogans, decorative quotes, background text.
@@ -90,7 +115,8 @@ _RESPONSE_SCHEMA = types.Schema(
         ),
         "text_type": types.Schema(
             type=types.Type.STRING,
-            enum=["menu", "sign", "document", "label", "unknown"],
+            enum=["menu", "sign", "document", "label", "medicine_label",
+                  "receipt", "food_packaging", "business_card", "unknown"],
             description="Classification of the dominant text type.",
         ),
         "items": types.Schema(
@@ -101,6 +127,55 @@ _RESPONSE_SCHEMA = types.Schema(
         "confidence": types.Schema(
             type=types.Type.NUMBER,
             description="Confidence score from 0.0 to 1.0.",
+        ),
+        "medicine_info": types.Schema(
+            type=types.Type.OBJECT,
+            nullable=True,
+            properties={
+                "drug_name": types.Schema(type=types.Type.STRING, description="Name of the medication."),
+                "dosage": types.Schema(type=types.Type.STRING, description="Dosage/strength, e.g. '200mg'."),
+                "frequency": types.Schema(type=types.Type.STRING, description="How often to take, e.g. 'every 6 hours'."),
+                "warnings": types.Schema(type=types.Type.ARRAY, items=types.Schema(type=types.Type.STRING), description="Warnings and side effects."),
+                "expiry_date": types.Schema(type=types.Type.STRING, nullable=True, description="Expiration date if visible."),
+            },
+            description="Structured medicine label information.",
+        ),
+        "receipt_info": types.Schema(
+            type=types.Type.OBJECT,
+            nullable=True,
+            properties={
+                "store_name": types.Schema(type=types.Type.STRING, description="Merchant/store name."),
+                "items": types.Schema(type=types.Type.ARRAY, items=types.Schema(type=types.Type.STRING), description="Line items with prices."),
+                "total": types.Schema(type=types.Type.STRING, description="Total amount."),
+                "payment_method": types.Schema(type=types.Type.STRING, nullable=True, description="Payment method if shown."),
+                "change": types.Schema(type=types.Type.STRING, nullable=True, description="Change given if shown."),
+            },
+            description="Structured receipt information.",
+        ),
+        "nutrition_info": types.Schema(
+            type=types.Type.OBJECT,
+            nullable=True,
+            properties={
+                "product_name": types.Schema(type=types.Type.STRING, description="Product name."),
+                "allergens": types.Schema(type=types.Type.ARRAY, items=types.Schema(type=types.Type.STRING), description="Allergen warnings."),
+                "calories": types.Schema(type=types.Type.STRING, description="Calories per serving."),
+                "serving_size": types.Schema(type=types.Type.STRING, description="Serving size."),
+                "ingredients": types.Schema(type=types.Type.STRING, nullable=True, description="Ingredients list."),
+            },
+            description="Structured nutrition/food packaging information.",
+        ),
+        "contact_info": types.Schema(
+            type=types.Type.OBJECT,
+            nullable=True,
+            properties={
+                "name": types.Schema(type=types.Type.STRING, description="Person's name."),
+                "title": types.Schema(type=types.Type.STRING, nullable=True, description="Job title."),
+                "company": types.Schema(type=types.Type.STRING, nullable=True, description="Company name."),
+                "phone": types.Schema(type=types.Type.STRING, nullable=True, description="Phone number(s)."),
+                "email": types.Schema(type=types.Type.STRING, nullable=True, description="Email address."),
+                "address": types.Schema(type=types.Type.STRING, nullable=True, description="Physical address."),
+            },
+            description="Structured business card / contact information.",
         ),
     },
     required=["text", "text_type", "items", "confidence"],
